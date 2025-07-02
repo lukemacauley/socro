@@ -73,59 +73,10 @@ export async function loader(args: Route.LoaderArgs) {
     );
   }
 
-  const notificationUrl =
-    process.env.WEBHOOK_URL + "/api/webhooks/microsoft/email";
-
-  // Create subscription with proper token
-  // const subscriptionStart = performance.now();
-  // try {
-  //   const subscription = await fetch(
-  //     "https://graph.microsoft.com/v1.0/subscriptions",
-  //     {
-  //       method: "POST",
-  //       headers: {
-  //         Authorization: `Bearer ${userAccessToken}`,
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({
-  //         changeType: "created",
-  //         notificationUrl,
-  //         resource: "me/messages",
-  //         expirationDateTime: new Date(
-  //           Date.now() + 4230 * 60 * 1000
-  //         ).toISOString(),
-  //       }),
-  //     }
-  //   );
-
-  //   if (!subscription.ok) {
-  //     const error = await subscription.json();
-  //     console.log("Subscription error:", error);
-  //     console.log(`[PERF] Create subscription (failed): ${(performance.now() - subscriptionStart).toFixed(2)}ms`);
-
-  //     if (subscription.status === 401) {
-  //       // Token expired, trigger re-authorization
-  //       return {
-  //         needsAuthorization: true,
-  //         authUrl: `/auth/microsoft?userId=${userId}`,
-  //       };
-  //     }
-  //     return { emails, error };
-  //   } else {
-  // const data = await subscription.json();
-  // console.log(`[PERF] Create subscription: ${(performance.now() - subscriptionStart).toFixed(2)}ms`);
   console.log(
     `[PERF] Total loader time: ${(performance.now() - startTime).toFixed(2)}ms`
   );
-  console.log({ emails });
-  return { emails, subscription: null };
-  // }
-  // } catch (error) {
-  //   console.log("Error:", error);
-  //   console.log(`[PERF] Create subscription (error): ${(performance.now() - subscriptionStart).toFixed(2)}ms`);
-  //   console.log(`[PERF] Total loader time: ${(performance.now() - startTime).toFixed(2)}ms`);
-  //   return { emails, error: "Failed to create subscription" };
-  // }
+  return { emails };
 }
 
 export default function Profile({ loaderData }: Route.ComponentProps) {
@@ -138,12 +89,6 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
       {loaderData?.error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           Error: {loaderData.error}
-        </div>
-      )}
-
-      {loaderData?.subscription && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          Webhook subscription active: {loaderData.subscription.id}
         </div>
       )}
 

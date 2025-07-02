@@ -1,4 +1,4 @@
-import { Outlet } from "react-router";
+import { Outlet, useLocation, Link } from "react-router";
 import { AppSidebar } from "~/components/app-sidebar";
 import {
   Breadcrumb,
@@ -16,6 +16,42 @@ import {
 } from "~/components/ui/sidebar";
 
 export default function Layout() {
+  const location = useLocation();
+  const pathSegments = location.pathname.split("/").filter(Boolean);
+
+  // Build breadcrumb items based on current path
+  const breadcrumbItems: any = [];
+
+  // // Always show Home as first item
+  // breadcrumbItems.push({
+  //   label: "Home",
+  //   href: "/",
+  //   isLast: pathSegments.length === 0,
+  // });
+
+  // Build up the path for each segment
+  let currentPath = "";
+  pathSegments.forEach((segment, index) => {
+    currentPath += `/${segment}`;
+    const isLast = index === pathSegments.length - 1;
+
+    // Format the label
+    let label = segment;
+    if (segment === "emails") {
+      label = "Emails";
+    } else if (segment === "new") {
+      label = "New";
+    } else {
+      label = "Conversation";
+    }
+
+    breadcrumbItems.push({
+      label,
+      href: currentPath,
+      isLast,
+    });
+  });
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -29,15 +65,22 @@ export default function Layout() {
             />
             <Breadcrumb>
               <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">
-                    Building Your Application
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-                </BreadcrumbItem>
+                {breadcrumbItems.map((item, index) => (
+                  <>
+                    <BreadcrumbItem key={item.href}>
+                      {item.isLast ? (
+                        <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild>
+                          <Link to={item.href}>{item.label}</Link>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                    {index < breadcrumbItems.length - 1 && (
+                      <BreadcrumbSeparator key={`sep-${index}`} />
+                    )}
+                  </>
+                ))}
               </BreadcrumbList>
             </Breadcrumb>
           </div>

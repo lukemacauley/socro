@@ -130,3 +130,51 @@ export const addUserNote = mutation({
     });
   },
 });
+
+export const createTestConversation = mutation({
+  args: {
+    subject: v.string(),
+    content: v.string(),
+    senderEmail: v.string(),
+    senderName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity === null) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_external_id", (q) => q.eq("externalId", identity.subject))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const userId = user._id;
+    // Create conversation
+    const conversationId = await ctx.db.insert("conversations", {
+      userId,
+      emailId: `test-${Date.now()}`,
+      subject: args.subject,
+      fromEmail: args.senderEmail,
+      fromName: args.senderName,
+      status: "new",
+      lastActivity: Date.now(),
+    });
+
+    // Add email message
+    await ctx.db.insert("messages", {
+      conversationId,
+      content: args.content,
+      type: "email",
+      sender: args.senderEmail,
+      timestamp: Date.now(),
+      emailId: `test-msg-${Date.now()}`,
+    });
+
+    return conversationId;
+  },
+});

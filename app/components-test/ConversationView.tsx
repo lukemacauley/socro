@@ -2,37 +2,19 @@ import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export function ConversationView({
   conversationId,
 }: {
   conversationId: Id<"conversations">;
 }) {
-  const conversationData = useQuery(api.conversations.get, { conversationId });
+  const data = useQuery(api.conversations.get, { conversationId });
   const updateStatus = useMutation(api.conversations.updateStatus);
   const addUserNote = useMutation(api.conversations.addUserNote);
   const generateAiResponse = useAction(api.ai.generateResponse);
 
   const [newNote, setNewNote] = useState("");
-  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
-
-  if (conversationData === undefined) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!conversationData) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
-        <p>Conversation not found</p>
-      </div>
-    );
-  }
-
-  const { conversation, messages } = conversationData;
 
   const handleStatusChange = async (
     status: "new" | "in_progress" | "resolved"
@@ -59,25 +41,22 @@ export function ConversationView({
   };
 
   const handleGenerateResponse = async () => {
-    const originalEmail = messages.find((m) => m.type === "email");
+    const originalEmail = data?.messages.find((m) => m.type === "email");
     if (!originalEmail) {
-      // toast.error("No original email found");
+      toast.error("No original email found");
       return;
     }
 
-    setIsGeneratingResponse(true);
     try {
       await generateAiResponse({
         conversationId,
         emailContent: originalEmail.content,
-        emailSubject: conversation.subject,
-        senderName: conversation.fromName,
+        emailSubject: data?.conversation.subject ?? "",
+        senderName: data?.conversation.fromName,
       });
-      // toast.success("AI response generated");
+      toast.success("AI response generated");
     } catch (error) {
-      // toast.error("Failed to generate AI response");
-    } finally {
-      setIsGeneratingResponse(false);
+      toast.error("Failed to generate AI response");
     }
   };
 
@@ -88,18 +67,23 @@ export function ConversationView({
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <h1 className="text-xl font-semibold mb-1">
-              {conversation.subject}
+              {data?.conversation.subject}
             </h1>
             <p className="text-sm text-gray-600">
-              From: {conversation.fromName || conversation.fromEmail}
+              From:{" "}
+              {data?.conversation.fromName || data?.conversation.fromEmail}
             </p>
           </div>
 
           {/* Status controls */}
           <div className="flex gap-2">
             <select
-              value={conversation.status}
-              onChange={(e) => handleStatusChange(e.target.value as any)}
+              value={data?.conversation.status}
+              onChange={(e) =>
+                handleStatusChange(
+                  e.target.value as "new" | "in_progress" | "resolved"
+                )
+              }
               className="px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="new">New</option>
@@ -109,10 +93,9 @@ export function ConversationView({
 
             <button
               onClick={handleGenerateResponse}
-              disabled={isGeneratingResponse}
               className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isGeneratingResponse ? "Generating..." : "Generate AI Response"}
+              Generate AI Response
             </button>
           </div>
         </div>
@@ -120,7 +103,7 @@ export function ConversationView({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
+        {data?.messages.map((message) => (
           <div
             key={message._id}
             className={`p-4 rounded-lg ${

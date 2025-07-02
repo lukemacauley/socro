@@ -1,7 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { WebhookEvent } from "@clerk/backend";
+import { type WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
 
 const http = httpRouter();

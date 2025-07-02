@@ -9,16 +9,10 @@ import {
 import { rootAuthLoader } from "@clerk/react-router/ssr.server";
 import type { Route } from "./+types/root";
 import "./app.css";
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  UserButton,
-  SignInButton,
-  useAuth,
-} from "@clerk/react-router";
+import { ClerkProvider, useAuth } from "@clerk/react-router";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
+import { Toaster } from "./components/ui/sonner";
 
 export async function loader(args: Route.LoaderArgs) {
   return rootAuthLoader(args);
@@ -49,6 +43,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <ScrollRestoration />
+        <Toaster />
         <Scripts />
       </body>
     </html>

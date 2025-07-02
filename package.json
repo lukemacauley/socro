@@ -29,10 +29,12 @@
     "convex": "^1.25.2",
     "isbot": "^5.1.27",
     "lucide-react": "^0.525.0",
+    "next-themes": "^0.4.6",
     "openai": "^5.8.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.5.3",
+    "sonner": "^2.0.5",
     "svix": "^1.68.0",
     "tailwind-merge": "^3.3.1"
   },

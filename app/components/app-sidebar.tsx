@@ -23,9 +23,8 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/react-router";
-import type { data } from "react-router";
 
-const NAVIGATION: {
+export const NAVIGATION: {
   title: string;
   url: string;
   icon?: LucideIcon;
