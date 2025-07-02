@@ -12,17 +12,33 @@ function createGraphClient(accessToken: string) {
 }
 
 export async function loader(args: Route.LoaderArgs) {
+  const startTime = performance.now();
+
+  const authStart = performance.now();
   const { userId } = await getAuth(args);
+  console.log(
+    `[PERF] getAuth: ${(performance.now() - authStart).toFixed(2)}ms`
+  );
 
   if (!userId) {
     return { user: null };
   }
 
+  const clerkStart = performance.now();
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+  console.log(
+    `[PERF] createClerkClient: ${(performance.now() - clerkStart).toFixed(2)}ms`
+  );
 
+  const tokenStart = performance.now();
   const microsoftAuth = await clerk.users.getUserOauthAccessToken(
     userId,
     "microsoft"
+  );
+  console.log(
+    `[PERF] getUserOauthAccessToken: ${(performance.now() - tokenStart).toFixed(
+      2
+    )}ms`
   );
 
   const userAccessToken = microsoftAuth.data?.[0]?.token;
@@ -35,6 +51,7 @@ export async function loader(args: Route.LoaderArgs) {
 
   // Fetch emails on page load (excluding junk/spam)
   let emails = [];
+  const emailStart = performance.now();
   try {
     const emailsResponse = await client
       .api("/me/mailFolders/inbox/messages")
@@ -44,55 +61,71 @@ export async function loader(args: Route.LoaderArgs) {
       .get();
 
     emails = emailsResponse.value;
+    console.log(
+      `[PERF] Fetch emails: ${(performance.now() - emailStart).toFixed(2)}ms`
+    );
   } catch (error) {
     console.error("Error fetching emails:", error);
+    console.log(
+      `[PERF] Fetch emails (failed): ${(performance.now() - emailStart).toFixed(
+        2
+      )}ms`
+    );
   }
 
   const notificationUrl =
     process.env.WEBHOOK_URL + "/api/webhooks/microsoft/email";
 
   // Create subscription with proper token
-  try {
-    const subscription = await fetch(
-      "https://graph.microsoft.com/v1.0/subscriptions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${userAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          changeType: "created",
-          notificationUrl,
-          resource: "me/messages",
-          expirationDateTime: new Date(
-            Date.now() + 4230 * 60 * 1000
-          ).toISOString(),
-        }),
-      }
-    );
+  // const subscriptionStart = performance.now();
+  // try {
+  //   const subscription = await fetch(
+  //     "https://graph.microsoft.com/v1.0/subscriptions",
+  //     {
+  //       method: "POST",
+  //       headers: {
+  //         Authorization: `Bearer ${userAccessToken}`,
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({
+  //         changeType: "created",
+  //         notificationUrl,
+  //         resource: "me/messages",
+  //         expirationDateTime: new Date(
+  //           Date.now() + 4230 * 60 * 1000
+  //         ).toISOString(),
+  //       }),
+  //     }
+  //   );
 
-    if (!subscription.ok) {
-      const error = await subscription.json();
-      console.log("Subscription error:", error);
+  //   if (!subscription.ok) {
+  //     const error = await subscription.json();
+  //     console.log("Subscription error:", error);
+  //     console.log(`[PERF] Create subscription (failed): ${(performance.now() - subscriptionStart).toFixed(2)}ms`);
 
-      if (subscription.status === 401) {
-        // Token expired, trigger re-authorization
-        return {
-          needsAuthorization: true,
-          authUrl: `/auth/microsoft?userId=${userId}`,
-        };
-      }
-
-      return { emails, error };
-    } else {
-      const data = await subscription.json();
-      return { emails, subscription: data };
-    }
-  } catch (error) {
-    console.log("Error:", error);
-    return { emails, error: "Failed to create subscription" };
-  }
+  //     if (subscription.status === 401) {
+  //       // Token expired, trigger re-authorization
+  //       return {
+  //         needsAuthorization: true,
+  //         authUrl: `/auth/microsoft?userId=${userId}`,
+  //       };
+  //     }
+  //     return { emails, error };
+  //   } else {
+  // const data = await subscription.json();
+  // console.log(`[PERF] Create subscription: ${(performance.now() - subscriptionStart).toFixed(2)}ms`);
+  console.log(
+    `[PERF] Total loader time: ${(performance.now() - startTime).toFixed(2)}ms`
+  );
+  console.log({ emails });
+  return { emails, subscription: null };
+  // }
+  // } catch (error) {
+  //   console.log("Error:", error);
+  //   console.log(`[PERF] Create subscription (error): ${(performance.now() - subscriptionStart).toFixed(2)}ms`);
+  //   console.log(`[PERF] Total loader time: ${(performance.now() - startTime).toFixed(2)}ms`);
+  //   return { emails, error: "Failed to create subscription" };
+  // }
 }
 
 export default function Profile({ loaderData }: Route.ComponentProps) {

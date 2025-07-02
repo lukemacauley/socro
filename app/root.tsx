@@ -15,7 +15,10 @@ import {
   SignedOut,
   UserButton,
   SignInButton,
+  useAuth,
 } from "@clerk/react-router";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { ConvexReactClient } from "convex/react";
 
 export async function loader(args: Route.LoaderArgs) {
   return rootAuthLoader(args);
@@ -52,6 +55,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+
 export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <ClerkProvider
@@ -59,17 +64,11 @@ export default function App({ loaderData }: Route.ComponentProps) {
       signUpFallbackRedirectUrl="/"
       signInFallbackRedirectUrl="/"
     >
-      <header className="flex items-center justify-center py-8 px-4">
-        <SignedOut>
-          <SignInButton />
-        </SignedOut>
-        <SignedIn>
-          <UserButton />
-        </SignedIn>
-      </header>
-      <main>
-        <Outlet />
-      </main>
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <main>
+          <Outlet />
+        </main>
+      </ConvexProviderWithClerk>
     </ClerkProvider>
   );
 }

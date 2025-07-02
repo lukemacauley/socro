@@ -1,6 +1,15 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  index,
+  route,
+  layout,
+} from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
+  layout("routes/layout.tsx", [
+    index("routes/home.tsx"),
+    route("emails/:id", "routes/emails/chat.tsx"),
+    route("emails", "routes/emails/all.tsx"),
+  ]),
   route("/api/webhooks/microsoft/email", "routes/email.tsx"),
 ] satisfies RouteConfig;
