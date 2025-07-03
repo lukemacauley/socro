@@ -14,9 +14,6 @@ importers:
       '@clerk/backend':
         specifier: ^2.3.1
         version: 2.3.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@clerk/clerk-react':
-        specifier: ^5.32.3
-        version: 5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@clerk/react-router':
         specifier: ^1.6.3
         version: 1.6.3(react-dom@19.1.0(react@19.1.0))(react-router@7.6.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
