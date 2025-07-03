@@ -1,22 +1,29 @@
 import { httpRouter } from "convex/server";
+import type { WebhookEvent } from "@clerk/backend";
+import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { type WebhookEvent } from "@clerk/backend";
-import { Webhook } from "svix";
 
 const http = httpRouter();
 
-// Microsoft Graph webhook endpoint
 http.route({
   path: "/webhook/microsoft",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
+    console.log("[WEBHOOK HTTP] Received webhook request");
+    console.log("[WEBHOOK HTTP] Request URL:", request.url);
+    console.log("[WEBHOOK HTTP] Request method:", request.method);
+
     try {
       // Verify webhook validation token if present
       const validationToken = new URL(request.url).searchParams.get(
         "validationToken"
       );
       if (validationToken) {
+        console.log(
+          "[WEBHOOK HTTP] Validation request received, token:",
+          validationToken
+        );
         return new Response(validationToken, {
           status: 200,
           headers: { "Content-Type": "text/plain" },
@@ -24,32 +31,50 @@ http.route({
       }
 
       const body = await request.json();
+      console.log(
+        "[WEBHOOK HTTP] Webhook body:",
+        JSON.stringify(body, null, 2)
+      );
 
       // Process webhook notifications
       if (body.value && Array.isArray(body.value)) {
+        console.log(
+          `[WEBHOOK HTTP] Processing ${body.value.length} notifications`
+        );
+
         for (const notification of body.value) {
-          if (
-            notification.changeType === "created" &&
-            notification.resourceData
-          ) {
+          console.log(`[WEBHOOK HTTP] Notification:`, {
+            changeType: notification.changeType,
+            resource: notification.resource,
+            subscriptionId: notification.subscriptionId,
+            hasResourceData: !!notification.resourceData,
+          });
+
+          if (notification.changeType === "created") {
+            console.log("[WEBHOOK HTTP] Processing new email notification");
             // Process new email
             await ctx.runMutation(internal.webhooks.processEmailNotification, {
               notification,
             });
+          } else {
+            console.log(
+              `[WEBHOOK HTTP] Ignoring notification with changeType: ${notification.changeType}`
+            );
           }
         }
+      } else {
+        console.log("[WEBHOOK HTTP] No notifications in webhook body");
       }
 
       return new Response("OK", { status: 200 });
     } catch (error) {
-      console.error("Webhook error:", error);
+      console.error("[WEBHOOK HTTP] Error processing webhook:", error);
       return new Response("Error processing webhook", { status: 500 });
     }
   }),
 });
 
 // Clerk webhook endpoint
-// This endpoint handles Clerk user events such as creation, update, and deletion.
 http.route({
   path: "/clerk-users-webhook",
   method: "POST",
@@ -58,20 +83,40 @@ http.route({
     if (!event) {
       return new Response("Error occured", { status: 400 });
     }
-
-    console.log({ webhookEvent: event });
-
     switch (event.type) {
       case "user.created": // intentional fallthrough
       case "user.updated":
         await ctx.runMutation(internal.users.upsertFromClerk, {
           data: event.data,
         });
+
+        console.log({ data: event.data });
+
+        // Check if user has Microsoft OAuth and set up webhook
+        console.log("[CLERK WEBHOOK] Checking for Microsoft OAuth...");
+        const hasMicrosoftOAuth = event.data.external_accounts?.some(
+          (account) => account.provider === "oauth_microsoft"
+        );
+
+        if (hasMicrosoftOAuth) {
+          console.log(
+            "[CLERK WEBHOOK] User has Microsoft OAuth, setting up email webhook..."
+          );
+          // Schedule the Microsoft webhook setup as a separate action
+          await ctx.scheduler.runAfter(
+            0,
+            internal.webhooks.setupMicrosoftWebhook,
+            {
+              clerkUserId: event.data.id,
+            }
+          );
+        }
         break;
 
       case "user.deleted": {
         const clerkUserId = event.data.id!;
         await ctx.runMutation(internal.users.deleteFromClerk, { clerkUserId });
+        console.log("[CLERK WEBHOOK] User deleted", clerkUserId);
         break;
       }
       default:

@@ -1,4 +1,5 @@
 import { Outlet, useLocation, Link } from "react-router";
+import { Fragment } from "react/jsx-runtime";
 import { AppSidebar } from "~/components/app-sidebar";
 import {
   Breadcrumb,
@@ -20,7 +21,11 @@ export default function Layout() {
   const pathSegments = location.pathname.split("/").filter(Boolean);
 
   // Build breadcrumb items based on current path
-  const breadcrumbItems: any = [];
+  const breadcrumbItems: {
+    label: string;
+    href: string;
+    isLast: boolean;
+  }[] = [];
 
   // // Always show Home as first item
   // breadcrumbItems.push({
@@ -66,8 +71,8 @@ export default function Layout() {
             <Breadcrumb>
               <BreadcrumbList>
                 {breadcrumbItems.map((item, index) => (
-                  <>
-                    <BreadcrumbItem key={item.href}>
+                  <Fragment key={index}>
+                    <BreadcrumbItem>
                       {item.isLast ? (
                         <BreadcrumbPage>{item.label}</BreadcrumbPage>
                       ) : (
@@ -77,9 +82,9 @@ export default function Layout() {
                       )}
                     </BreadcrumbItem>
                     {index < breadcrumbItems.length - 1 && (
-                      <BreadcrumbSeparator key={`sep-${index}`} />
+                      <BreadcrumbSeparator />
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </BreadcrumbList>
             </Breadcrumb>
