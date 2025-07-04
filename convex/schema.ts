@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { conversationStatus, messageType, attachmentValidator } from "./lib/validators";
 
 const applicationTables = {
   users: defineTable({
@@ -19,11 +20,7 @@ const applicationTables = {
     fromEmail: v.string(),
     fromName: v.optional(v.string()),
     userId: v.id("users"),
-    status: v.union(
-      v.literal("new"),
-      v.literal("in_progress"),
-      v.literal("resolved")
-    ),
+    status: conversationStatus,
     lastActivity: v.number(),
   })
     .index("by_user", ["userId"])
@@ -33,20 +30,11 @@ const applicationTables = {
   messages: defineTable({
     conversationId: v.id("conversations"),
     content: v.string(),
-    type: v.union(
-      v.literal("email"),
-      v.literal("ai_response"),
-      v.literal("user_note")
-    ),
+    type: messageType,
     sender: v.optional(v.string()), // email sender or "ai" or user ID
     timestamp: v.number(),
     emailId: v.optional(v.string()), // Microsoft Graph message ID if applicable
-    attachments: v.optional(v.array(v.object({
-      id: v.string(),
-      name: v.string(),
-      contentType: v.string(),
-      size: v.number(),
-    }))),
+    attachments: v.optional(v.array(attachmentValidator)),
   })
     .index("by_conversation", ["conversationId"])
     .index("by_timestamp", ["timestamp"]),

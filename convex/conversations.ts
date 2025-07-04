@@ -1,27 +1,19 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
+import {
+  getCurrentUser,
+  getCurrentUserId,
+  verifyConversationOwnership,
+} from "./lib/utils";
+import { conversationStatus } from "./lib/validators";
 
 export const list = query({
   args: {
-    status: v.optional(
-      v.union(v.literal("new"), v.literal("in_progress"), v.literal("resolved"))
-    ),
+    status: v.optional(conversationStatus),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_external_id", (q) => q.eq("externalId", identity.subject))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const user = await getCurrentUser(ctx);
 
     let conversations = await ctx.db
       .query("conversations")
@@ -59,11 +51,7 @@ export const get = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
 
     const messages = await ctx.db
       .query("messages")
@@ -83,19 +71,11 @@ export const get = query({
 export const updateStatus = mutation({
   args: {
     conversationId: v.id("conversations"),
-    status: v.union(
-      v.literal("new"),
-      v.literal("in_progress"),
-      v.literal("resolved")
-    ),
+    status: conversationStatus,
   },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
 
     await ctx.db.patch(args.conversationId, {
       status: args.status,
@@ -111,11 +91,7 @@ export const addUserNote = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
 
     await ctx.db.insert("messages", {
       conversationId: args.conversationId,
@@ -139,19 +115,7 @@ export const createTestConversation = mutation({
     senderName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_external_id", (q) => q.eq("externalId", identity.subject))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const user = await getCurrentUser(ctx);
 
     const userId = user._id;
     // Create conversation

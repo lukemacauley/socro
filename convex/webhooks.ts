@@ -7,6 +7,8 @@ import {
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
 import { createClerkClient } from "@clerk/backend";
+import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
+import { attachmentValidator } from "./lib/validators";
 
 export const processEmailNotification = internalMutation({
   args: {
@@ -265,10 +267,7 @@ export const findConversationByEmailId = internalQuery({
 export const getUserSettings = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("userSettings")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
+    return await getUserSettingsByUserId(ctx, args.userId);
   },
 });
 
@@ -299,16 +298,7 @@ export const addEmailMessage = internalMutation({
     content: v.string(),
     emailId: v.string(),
     sender: v.string(),
-    attachments: v.optional(
-      v.array(
-        v.object({
-          id: v.string(),
-          name: v.string(),
-          contentType: v.string(),
-          size: v.number(),
-        })
-      )
-    ),
+    attachments: v.optional(v.array(attachmentValidator)),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("messages", {
@@ -329,10 +319,7 @@ export const updateUserMicrosoftAuth = internalMutation({
     subscriptionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const existingSettings = await ctx.db
-      .query("userSettings")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
+    const existingSettings = await getUserSettingsByUserId(ctx, args.userId);
 
     if (existingSettings) {
       await ctx.db.patch(existingSettings._id, {
@@ -583,29 +570,3 @@ async function checkExistingSubscription(
   return null;
 }
 
-async function getMicrosoftAccessToken(clerkUserId: string): Promise<string> {
-  console.log("[WEBHOOK] Getting fresh access token from Clerk...");
-  const clerk = createClerkClient({
-    secretKey: process.env.CLERK_SECRET_KEY!,
-  });
-
-  try {
-    const microsoftAuth = await clerk.users.getUserOauthAccessToken(
-      clerkUserId,
-      "microsoft"
-    );
-
-    const accessToken = microsoftAuth.data?.[0]?.token;
-
-    if (!accessToken) {
-      console.error("[WEBHOOK] No access token received from Clerk");
-      throw new Error("No access token received from Clerk");
-    }
-
-    console.log("[WEBHOOK] Successfully got fresh access token from Clerk");
-    return accessToken;
-  } catch (error) {
-    console.error("[WEBHOOK] Error getting access token from Clerk:", error);
-    throw new Error("[WEBHOOK] Error getting access token from Clerk:" + error);
-  }
-}
