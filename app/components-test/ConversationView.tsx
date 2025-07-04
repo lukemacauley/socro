@@ -13,6 +13,7 @@ export function ConversationView({
   const updateStatus = useMutation(api.conversations.updateStatus);
   const addUserNote = useMutation(api.conversations.addUserNote);
   const generateAiResponse = useAction(api.ai.generateResponse);
+  const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
   const [newNote, setNewNote] = useState("");
 
@@ -57,6 +58,45 @@ export function ConversationView({
       toast.success("AI response generated");
     } catch (error) {
       toast.error("Failed to generate AI response");
+    }
+  };
+
+  const handleDownloadAttachment = async (emailId: string, attachmentId: string, fileName: string) => {
+    try {
+      toast.info("Downloading attachment...");
+      
+      const result = await downloadAttachment({
+        emailId,
+        attachmentId,
+      });
+      
+      if (result) {
+        // Convert base64 to blob
+        const byteCharacters = atob(result.content);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: result.contentType });
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast.success("Attachment downloaded");
+      } else {
+        toast.error("Failed to download attachment");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("Failed to download attachment");
     }
   };
 
@@ -132,6 +172,51 @@ export function ConversationView({
               </span>
             </div>
             <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+            
+            {/* Display attachments if any */}
+            {message.attachments && message.attachments.length > 0 && (
+              <div className="mt-3 border-t pt-3">
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Attachments ({message.attachments.length})
+                </p>
+                <div className="space-y-2">
+                  {message.attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <svg
+                          className="w-5 h-5 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                          />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium">{attachment.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {attachment.contentType} • {(attachment.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDownloadAttachment(message.emailId!, attachment.id, attachment.name)}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

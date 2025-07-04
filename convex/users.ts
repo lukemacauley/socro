@@ -1,4 +1,4 @@
-import { internalMutation, query, type QueryCtx } from "./_generated/server";
+import { internalMutation, internalQuery, query, type QueryCtx } from "./_generated/server";
 import { type UserJSON } from "@clerk/backend";
 import { v, type Validator } from "convex/values";
 
@@ -20,6 +20,13 @@ export const getByClerkId = query({
       .query("users")
       .withIndex("by_external_id", (q) => q.eq("externalId", args.clerkId))
       .first();
+  },
+});
+
+export const getById = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.userId);
   },
 });
 

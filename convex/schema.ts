@@ -41,14 +41,18 @@ const applicationTables = {
     sender: v.optional(v.string()), // email sender or "ai" or user ID
     timestamp: v.number(),
     emailId: v.optional(v.string()), // Microsoft Graph message ID if applicable
+    attachments: v.optional(v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      contentType: v.string(),
+      size: v.number(),
+    }))),
   })
     .index("by_conversation", ["conversationId"])
     .index("by_timestamp", ["timestamp"]),
 
   userSettings: defineTable({
     userId: v.id("users"),
-    microsoftAccessToken: v.optional(v.string()),
-    microsoftRefreshToken: v.optional(v.string()),
     webhookSubscriptionId: v.optional(v.string()),
     autoResponseEnabled: v.boolean(),
     responseTemplate: v.optional(v.string()),

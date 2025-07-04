@@ -7,7 +7,6 @@ import {
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
 import { createClerkClient } from "@clerk/backend";
-import { Id } from "./_generated/dataModel";
 
 export const processEmailNotification = internalMutation({
   args: {
@@ -68,9 +67,6 @@ export const fetchAndProcessEmail = internalAction({
       }
     );
 
-    let accessToken = userSettings?.microsoftAccessToken;
-    let userId: Id<"users"> | undefined = userSettings?.userId;
-
     if (!userSettings) {
       console.error(
         "[WEBHOOK] No user settings found for subscription:",
@@ -79,22 +75,24 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
-    if (!accessToken) {
-      console.error(
-        "[WEBHOOK] No Microsoft access token found for user:",
-        userId
-      );
+    const userId = userSettings.userId;
+    console.log("[WEBHOOK] Found user settings, user ID:", userId);
+
+    // Get user to fetch their Clerk ID
+    const user = await ctx.runQuery(internal.users.getById, { userId });
+    if (!user) {
+      console.error("[WEBHOOK] User not found:", userId);
       return;
     }
 
-    console.log("[WEBHOOK] Found user settings, user ID:", userId);
+    const accessToken = await getMicrosoftAccessToken(user.externalId);
 
-    // Fetch the full email from Microsoft Graph API
+    // Fetch the full email from Microsoft Graph API including attachments
     let email;
     try {
       console.log("[WEBHOOK] Fetching email from Microsoft Graph API...");
       const response = await fetch(
-        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,receivedDateTime,isRead`,
+        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,receivedDateTime,isRead,hasAttachments&$expand=attachments($select=id,name,contentType,size)`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -111,14 +109,6 @@ export const fetchAndProcessEmail = internalAction({
           error: errorText,
         });
 
-        if (response.status === 401) {
-          console.error(
-            "[WEBHOOK] Microsoft access token expired for user:",
-            userId
-          );
-          // TODO: Implement token refresh logic here
-          return;
-        }
         throw new Error(
           `Failed to fetch email: ${response.status} ${response.statusText}`
         );
@@ -130,6 +120,8 @@ export const fetchAndProcessEmail = internalAction({
         subject: email.subject,
         from: email.from?.emailAddress?.address,
         receivedDateTime: email.receivedDateTime,
+        hasAttachments: email.hasAttachments,
+        attachmentCount: email.attachments?.length || 0,
       });
     } catch (error) {
       console.error(
@@ -185,13 +177,38 @@ export const fetchAndProcessEmail = internalAction({
       console.log("[WEBHOOK] Email body is HTML, stripped tags");
     }
 
-    // Add email message
+    // Add email message with attachments
     console.log("[WEBHOOK] Adding email message to conversation...");
+
+    // Process attachments if any
+    let attachments = undefined;
+    if (email.hasAttachments && email.attachments) {
+      console.log(
+        `[WEBHOOK] Processing ${email.attachments.length} attachments`
+      );
+      attachments = email.attachments.map((att: any) => ({
+        id: att.id,
+        name: att.name,
+        contentType: att.contentType,
+        size: att.size,
+      }));
+
+      // Log attachment details
+      attachments.forEach((att: any) => {
+        console.log(
+          `[WEBHOOK] Attachment: ${att.name} (${att.contentType}, ${(
+            att.size / 1024
+          ).toFixed(2)} KB)`
+        );
+      });
+    }
+
     await ctx.runMutation(internal.webhooks.addEmailMessage, {
       conversationId,
       content: emailContent,
       emailId: email.id,
       sender: email.from?.emailAddress?.address || "unknown@email.com",
+      attachments,
     });
     console.log("[WEBHOOK] Email message added successfully");
 
@@ -245,6 +262,16 @@ export const findConversationByEmailId = internalQuery({
   },
 });
 
+export const getUserSettings = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("userSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+  },
+});
+
 export const createConversation = internalMutation({
   args: {
     userId: v.id("users"),
@@ -272,6 +299,16 @@ export const addEmailMessage = internalMutation({
     content: v.string(),
     emailId: v.string(),
     sender: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("messages", {
@@ -281,6 +318,7 @@ export const addEmailMessage = internalMutation({
       sender: args.sender,
       timestamp: Date.now(),
       emailId: args.emailId,
+      attachments: args.attachments,
     });
   },
 });
@@ -288,8 +326,6 @@ export const addEmailMessage = internalMutation({
 export const updateUserMicrosoftAuth = internalMutation({
   args: {
     userId: v.id("users"),
-    accessToken: v.string(),
-    refreshToken: v.optional(v.string()),
     subscriptionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -300,8 +336,6 @@ export const updateUserMicrosoftAuth = internalMutation({
 
     if (existingSettings) {
       await ctx.db.patch(existingSettings._id, {
-        microsoftAccessToken: args.accessToken,
-        ...(args.refreshToken && { microsoftRefreshToken: args.refreshToken }),
         ...(args.subscriptionId && {
           webhookSubscriptionId: args.subscriptionId,
         }),
@@ -309,8 +343,6 @@ export const updateUserMicrosoftAuth = internalMutation({
     } else {
       await ctx.db.insert("userSettings", {
         userId: args.userId,
-        microsoftAccessToken: args.accessToken,
-        microsoftRefreshToken: args.refreshToken,
         webhookSubscriptionId: args.subscriptionId,
         autoResponseEnabled: false,
       });
@@ -318,12 +350,10 @@ export const updateUserMicrosoftAuth = internalMutation({
   },
 });
 
-// Public action to store Microsoft auth data from the frontend
+// Public action to store Microsoft webhook subscription ID
 export const storeMicrosoftAuth = action({
   args: {
     clerkUserId: v.string(),
-    accessToken: v.string(),
-    refreshToken: v.optional(v.string()),
     subscriptionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -333,13 +363,58 @@ export const storeMicrosoftAuth = action({
       throw new Error("User not found");
     }
 
-    // Update the user's Microsoft auth settings
+    // Update the user's Microsoft webhook subscription
     await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
       userId: user._id,
-      accessToken: args.accessToken,
-      refreshToken: args.refreshToken,
       subscriptionId: args.subscriptionId,
     });
+  },
+});
+
+// Public action to download attachment
+export const downloadAttachment = action({
+  args: {
+    emailId: v.string(),
+    attachmentId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(api.users.current);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const accessToken = await getMicrosoftAccessToken(user.externalId);
+
+    try {
+      // Download attachment from Microsoft Graph
+      const response: Response = await fetch(
+        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}/attachments/${args.attachmentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error(
+          "[DOWNLOAD] Failed to download attachment:",
+          response.status
+        );
+        throw new Error("Failed to download attachment");
+      }
+
+      const attachment = await response.json();
+
+      return {
+        content: attachment.contentBytes, // Base64 encoded content
+        contentType: attachment.contentType,
+        size: attachment.size,
+      };
+    } catch (error) {
+      console.error("[DOWNLOAD] Error downloading attachment:", error);
+      throw new Error("Failed to download attachment");
+    }
   },
 });
 
@@ -367,26 +442,7 @@ export const setupMicrosoftWebhook = internalAction({
         );
         return;
       }
-
-      // Get Microsoft access token from Clerk
-      const clerk = createClerkClient({
-        secretKey: process.env.CLERK_SECRET_KEY!,
-      });
-
-      console.log(
-        "[WEBHOOK SETUP] Getting Microsoft OAuth token from Clerk..."
-      );
-      const microsoftAuth = await clerk.users.getUserOauthAccessToken(
-        args.clerkUserId,
-        "microsoft"
-      );
-
-      const accessToken = microsoftAuth.data?.[0]?.token;
-
-      if (!accessToken) {
-        console.error("[WEBHOOK SETUP] No Microsoft access token found");
-        return;
-      }
+      const accessToken = await getMicrosoftAccessToken(user.externalId);
 
       console.log(
         "[WEBHOOK SETUP] Got Microsoft access token, checking existing subscriptions..."
@@ -396,20 +452,25 @@ export const setupMicrosoftWebhook = internalAction({
       const webhookUrl = `${process.env.CONVEX_SITE_URL}/webhook/microsoft`;
 
       // Check if we already have an active subscription with the correct URL
-      const existingSubscription = await checkExistingSubscription(
+      const existingSubscriptionId = await checkExistingSubscription(
         accessToken,
         webhookUrl
       );
 
-      if (existingSubscription) {
+      if (existingSubscriptionId) {
         console.log(
-          "[WEBHOOK SETUP] Active subscription already exists with correct URL, updating access token only"
+          "[WEBHOOK SETUP] Active subscription already exists, updating user settings"
         );
-        // Just update the access token
+
+        // Update user settings with the existing subscription ID
         await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
           userId: user._id,
-          accessToken: accessToken,
+          subscriptionId: existingSubscriptionId,
         });
+
+        console.log(
+          "[WEBHOOK SETUP] Updated user settings with existing subscription ID"
+        );
         return;
       }
       console.log(
@@ -448,10 +509,9 @@ export const setupMicrosoftWebhook = internalAction({
         subscription.id
       );
 
-      // Store auth and subscription ID in Convex
+      // Store subscription ID in Convex
       await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
         userId: user._id,
-        accessToken: accessToken,
         subscriptionId: subscription.id,
       });
 
@@ -471,7 +531,7 @@ export const setupMicrosoftWebhook = internalAction({
 async function checkExistingSubscription(
   accessToken: string,
   expectedWebhookUrl: string
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     const response = await fetch(
       "https://graph.microsoft.com/v1.0/subscriptions",
@@ -497,7 +557,7 @@ async function checkExistingSubscription(
           "[WEBHOOK SETUP] Found active subscription with correct URL:",
           activeSubscription.id
         );
-        return true;
+        return activeSubscription.id;
       }
 
       // Log if we found subscriptions with wrong URLs
@@ -520,5 +580,32 @@ async function checkExistingSubscription(
   } catch (error) {
     console.error("[WEBHOOK SETUP] Error checking subscriptions:", error);
   }
-  return false;
+  return null;
+}
+
+async function getMicrosoftAccessToken(clerkUserId: string): Promise<string> {
+  console.log("[WEBHOOK] Getting fresh access token from Clerk...");
+  const clerk = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY!,
+  });
+
+  try {
+    const microsoftAuth = await clerk.users.getUserOauthAccessToken(
+      clerkUserId,
+      "microsoft"
+    );
+
+    const accessToken = microsoftAuth.data?.[0]?.token;
+
+    if (!accessToken) {
+      console.error("[WEBHOOK] No access token received from Clerk");
+      throw new Error("No access token received from Clerk");
+    }
+
+    console.log("[WEBHOOK] Successfully got fresh access token from Clerk");
+    return accessToken;
+  } catch (error) {
+    console.error("[WEBHOOK] Error getting access token from Clerk:", error);
+    throw new Error("[WEBHOOK] Error getting access token from Clerk:" + error);
+  }
 }
