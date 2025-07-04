@@ -3,6 +3,7 @@ import type { Id } from "convex/_generated/dataModel";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 export function ConversationView({
   conversationId,
@@ -61,15 +62,19 @@ export function ConversationView({
     }
   };
 
-  const handleDownloadAttachment = async (emailId: string, attachmentId: string, fileName: string) => {
+  const handleDownloadAttachment = async (
+    emailId: string,
+    attachmentId: string,
+    fileName: string
+  ) => {
     try {
       toast.info("Downloading attachment...");
-      
+
       const result = await downloadAttachment({
         emailId,
         attachmentId,
       });
-      
+
       if (result) {
         // Convert base64 to blob
         const byteCharacters = atob(result.content);
@@ -79,17 +84,17 @@ export function ConversationView({
         }
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: result.contentType });
-        
+
         // Create download link
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
         link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
+
         toast.success("Attachment downloaded");
       } else {
         toast.error("Failed to download attachment");
@@ -171,8 +176,16 @@ export function ConversationView({
                 {new Date(message.timestamp).toLocaleString()}
               </span>
             </div>
-            <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-            
+            {message.type === "ai_response" ? (
+              <div className="prose prose-sm">
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+              </div>
+            ) : (
+              <div className="prose prose-sm whitespace-pre-wrap">
+                {message.content}
+              </div>
+            )}
+
             {/* Display attachments if any */}
             {message.attachments && message.attachments.length > 0 && (
               <div className="mt-3 border-t pt-3">
@@ -200,14 +213,23 @@ export function ConversationView({
                           />
                         </svg>
                         <div>
-                          <p className="text-sm font-medium">{attachment.name}</p>
+                          <p className="text-sm font-medium">
+                            {attachment.name}
+                          </p>
                           <p className="text-xs text-gray-500">
-                            {attachment.contentType} • {(attachment.size / 1024).toFixed(1)} KB
+                            {attachment.contentType} •{" "}
+                            {(attachment.size / 1024).toFixed(1)} KB
                           </p>
                         </div>
                       </div>
                       <button
-                        onClick={() => handleDownloadAttachment(message.emailId!, attachment.id, attachment.name)}
+                        onClick={() =>
+                          handleDownloadAttachment(
+                            message.emailId!,
+                            attachment.id,
+                            attachment.name
+                          )
+                        }
                         className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                       >
                         Download

@@ -27,17 +27,24 @@ export const generateResponse = action({
     }
 
     // Build prompt for Anthropic
-    const systemPrompt = `You are an AI email assistant. You help users manage their email conversations by providing suggested responses and insights. 
+    const systemPrompt = `You are an AI legal email assistant specializing in contract review and legal document analysis. You help lawyers and legal professionals manage their email conversations by providing suggested responses and insights about legal documents.
 
 Current email details:
 - Subject: ${args.emailSubject}
 - From: ${args.senderName || "Unknown sender"}
 
-Provide a helpful, professional response suggestion. Keep it concise and appropriate for email communication.`;
+When analyzing legal documents or contracts:
+1. Identify specific clauses or sections mentioned in the email
+2. Provide precise analysis of any requested changes
+3. Flag potential legal issues or concerns
+4. Suggest appropriate legal language for responses
+5. Maintain a professional, legally-sound tone
+
+If the email mentions specific changes (e.g., "change clause 12"), focus your response on that specific request and provide actionable legal guidance.`;
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
+      max_tokens: 20000,
       temperature: 0.7,
       system: systemPrompt,
       messages: [

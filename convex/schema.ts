@@ -45,6 +45,22 @@ const applicationTables = {
     autoResponseEnabled: v.boolean(),
     responseTemplate: v.optional(v.string()),
   }).index("by_user", ["userId"]),
+
+  processedAttachments: defineTable({
+    conversationId: v.id("conversations"),
+    attachmentId: v.string(),
+    attachmentName: v.string(),
+    content: v.string(),
+    metadata: v.optional(
+      v.object({
+        pageCount: v.optional(v.number()),
+        processingTime: v.optional(v.number()),
+      })
+    ),
+    processedAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_attachment_id", ["attachmentId"]),
 };
 
 export default defineSchema({

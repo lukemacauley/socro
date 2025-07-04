@@ -21,6 +21,7 @@ import type * as lib_types from "../lib/types.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as router from "../router.js";
+import type * as userSettings from "../userSettings.js";
 import type * as users from "../users.js";
 import type * as webhooks from "../webhooks.js";
 
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "lib/utils": typeof lib_utils;
   "lib/validators": typeof lib_validators;
   router: typeof router;
+  userSettings: typeof userSettings;
   users: typeof users;
   webhooks: typeof webhooks;
 }>;

@@ -6,9 +6,9 @@ import {
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
-import { createClerkClient } from "@clerk/backend";
 import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
 import { attachmentValidator } from "./lib/validators";
+import Reducto, { toFile } from "reductoai";
 
 export const processEmailNotification = internalMutation({
   args: {
@@ -184,6 +184,8 @@ export const fetchAndProcessEmail = internalAction({
 
     // Process attachments if any
     let attachments = undefined;
+    let processedAttachmentContent = "";
+
     if (email.hasAttachments && email.attachments) {
       console.log(
         `[WEBHOOK] Processing ${email.attachments.length} attachments`
@@ -203,6 +205,181 @@ export const fetchAndProcessEmail = internalAction({
           ).toFixed(2)} KB)`
         );
       });
+
+      // Process legal document attachments with Reducto
+      const supportedTypes = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "text/plain",
+      ];
+
+      for (const attachment of email.attachments) {
+        if (supportedTypes.includes(attachment.contentType)) {
+          try {
+            console.log(
+              `[WEBHOOK] Processing attachment with Reducto: ${attachment.name}`
+            );
+
+            // Fetch attachment content
+            const attachmentResponse = await fetch(
+              `https://graph.microsoft.com/v1.0/me/messages/${email.id}/attachments/${attachment.id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              }
+            );
+
+            if (attachmentResponse.ok) {
+              const attachmentData = await attachmentResponse.json();
+              // Convert base64 to Uint8Array (Convex doesn't have Buffer)
+              console.log(
+                `[REDUCTO] Converting base64 to Uint8Array for ${attachment.name}`
+              );
+              const base64 = attachmentData.contentBytes;
+              const binaryString = atob(base64);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+
+              // Initialize Reducto client
+              console.log(
+                `[REDUCTO] Initializing client for ${attachment.name}`
+              );
+              const reductoClient = new Reducto({
+                apiKey: process.env.REDUCTO_API_KEY,
+              });
+
+              // Upload and process with Reducto
+              console.log(
+                `[REDUCTO] Creating file object from Uint8Array (${bytes.length} bytes)`
+              );
+              const file = await toFile(bytes, attachment.name);
+
+              console.log(`[REDUCTO] Uploading file to Reducto...`);
+              const uploadStart = Date.now();
+              const upload = await reductoClient.upload({ file });
+              console.log(
+                `[REDUCTO] Upload complete in ${Date.now() - uploadStart}ms`
+              );
+              console.log(
+                `[REDUCTO] Upload response:`,
+                JSON.stringify(upload, null, 2)
+              );
+
+              console.log(`[REDUCTO] Starting document parsing...`);
+              const parseStart = Date.now();
+              const result = await reductoClient.parse.run({
+                document_url: upload,
+                options: {
+                  extraction_mode: "hybrid", // Use hybrid mode for better legal document extraction
+                  chunking: {
+                    chunk_mode: "variable",
+                    chunk_size: 1000,
+                  },
+                },
+                advanced_options: {
+                  enable_change_tracking: true, // Now this will work with hybrid mode
+                  add_page_markers: true,
+                  ocr_system: "highres",
+                  page_range: {
+                    start: 1,
+                    end: 50, // Process up to 50 pages for legal documents
+                  },
+                },
+                experimental_options: {},
+              });
+              console.log(
+                `[REDUCTO] Parsing complete in ${Date.now() - parseStart}ms`
+              );
+              console.log(`[REDUCTO] Parse response summary:`, {
+                job_id: result.job_id,
+                duration: result.duration,
+                result_type: result.result.type,
+                usage: result.usage,
+                pdf_url: result.pdf_url,
+              });
+
+              if (result.result.type === "full") {
+                console.log(`[REDUCTO] Full result details:`, {
+                  chunks_count: result.result.chunks.length,
+                  total_blocks: result.result.chunks.reduce(
+                    (sum, chunk) => sum + chunk.blocks.length,
+                    0
+                  ),
+                  first_chunk_preview:
+                    result.result.chunks[0]?.content.substring(0, 200) + "...",
+                });
+              }
+
+              // Store processed attachment
+              console.log(`[REDUCTO] Storing processed content in database...`);
+              const processedContent =
+                result.result.type === "full"
+                  ? result.result.chunks
+                      .map((chunk) => chunk.content)
+                      .join("\n\n")
+                  : `Document processed. Result URL: ${result.result.url}`;
+
+              console.log(
+                `[REDUCTO] Processed content length: ${processedContent.length} characters`
+              );
+
+              await ctx.runMutation(
+                internal.webhooks.storeProcessedAttachment,
+                {
+                  conversationId,
+                  attachmentId: attachment.id,
+                  attachmentName: attachment.name,
+                  processedContent,
+                  metadata: {
+                    pageCount: result.usage?.num_pages || undefined,
+                    processingTime: result.duration || undefined,
+                  },
+                }
+              );
+              console.log(`[REDUCTO] Content stored in database`);
+
+              const content =
+                result.result.type === "full"
+                  ? result.result.chunks
+                      .map((chunk) => chunk.content)
+                      .join("\n\n")
+                  : `Document processed. Result URL: ${result.result.url}`;
+              processedAttachmentContent += `\n\n--- Attachment: ${attachment.name} ---\n${content}`;
+              console.log(
+                `[REDUCTO] Successfully processed attachment: ${attachment.name}`
+              );
+              console.log(
+                `[REDUCTO] Total processed content length so far: ${processedAttachmentContent.length} characters`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `[REDUCTO] Error processing attachment ${attachment.name}:`,
+              error
+            );
+            console.error(`[REDUCTO] Error details:`, {
+              message: error instanceof Error ? error.message : "Unknown error",
+              stack: error instanceof Error ? error.stack : undefined,
+              attachment: {
+                name: attachment.name,
+                type: attachment.contentType,
+                size: attachment.size,
+              },
+            });
+
+            // If it's a fetch error, it might be CORS or network issue
+            if (error instanceof Error && error.message.includes("fetch")) {
+              console.error(
+                `[REDUCTO] This might be a CORS or network issue. Make sure Reducto API allows requests from Convex.`
+              );
+            }
+          }
+        }
+      }
     }
 
     await ctx.runMutation(internal.webhooks.addEmailMessage, {
@@ -215,14 +392,26 @@ export const fetchAndProcessEmail = internalAction({
     console.log("[WEBHOOK] Email message added successfully");
 
     // Generate AI response if auto-response is enabled
+    console.log("[WEBHOOK] User settings:", userSettings);
+    console.log(
+      "[WEBHOOK] Auto-response enabled:",
+      userSettings?.autoResponseEnabled
+    );
+
     if (userSettings?.autoResponseEnabled) {
       console.log(
         "[WEBHOOK] Auto-response is enabled, generating AI response..."
       );
+      console.log("[WEBHOOK] Email content length:", emailContent.length);
+      console.log(
+        "[WEBHOOK] Processed attachment content length:",
+        processedAttachmentContent.length
+      );
+
       try {
         await ctx.runAction(api.ai.generateResponse, {
           conversationId,
-          emailContent: emailContent,
+          emailContent: emailContent + processedAttachmentContent,
           emailSubject: email.subject || "(No subject)",
           senderName: email.from?.emailAddress?.name,
         });
@@ -234,6 +423,21 @@ export const fetchAndProcessEmail = internalAction({
       console.log(
         "[WEBHOOK] Auto-response is disabled, skipping AI generation"
       );
+      // For testing, let's always generate AI response
+      console.log(
+        "[WEBHOOK] DEBUG: Generating AI response anyway for testing..."
+      );
+      try {
+        await ctx.runAction(api.ai.generateResponse, {
+          conversationId,
+          emailContent: emailContent + processedAttachmentContent,
+          emailSubject: email.subject || "(No subject)",
+          senderName: email.from?.emailAddress?.name,
+        });
+        console.log("[WEBHOOK] DEBUG: AI response generated successfully");
+      } catch (error) {
+        console.error("[WEBHOOK] DEBUG: Error generating AI response:", error);
+      }
     }
 
     console.log("[WEBHOOK] Successfully processed email:", email.id);
@@ -288,6 +492,31 @@ export const createConversation = internalMutation({
       fromName: args.fromName,
       status: "new",
       lastActivity: Date.now(),
+    });
+  },
+});
+
+export const storeProcessedAttachment = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    attachmentId: v.string(),
+    attachmentName: v.string(),
+    processedContent: v.string(),
+    metadata: v.optional(
+      v.object({
+        pageCount: v.optional(v.number()),
+        processingTime: v.optional(v.number()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("processedAttachments", {
+      conversationId: args.conversationId,
+      attachmentId: args.attachmentId,
+      attachmentName: args.attachmentName,
+      content: args.processedContent,
+      metadata: args.metadata,
+      processedAt: Date.now(),
     });
   },
 });
@@ -569,4 +798,3 @@ async function checkExistingSubscription(
   }
   return null;
 }
-
