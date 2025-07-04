@@ -15,17 +15,23 @@ const applicationTables = {
     .index("by_email", ["email"]),
 
   conversations: defineTable({
-    emailId: v.string(), // Microsoft Graph email ID
-    subject: v.string(),
-    fromEmail: v.string(),
-    fromName: v.optional(v.string()),
+    threadId: v.string(), // Microsoft Graph conversation ID - unique thread identifier
     userId: v.id("users"),
+    subject: v.string(),
     status: conversationStatus,
+    // Thread metadata
+    initialEmailId: v.string(), // ID of the first email in the thread
+    latestEmailId: v.string(), // ID of the most recent email
+    participants: v.array(v.object({
+      email: v.string(),
+      name: v.optional(v.string()),
+    })),
+    createdAt: v.number(),
     lastActivity: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_status", ["status"])
-    .index("by_email_id", ["emailId"]),
+    .index("by_status", ["status"]) 
+    .index("by_thread", ["threadId", "userId"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),
@@ -37,7 +43,8 @@ const applicationTables = {
     attachments: v.optional(v.array(attachmentValidator)),
   })
     .index("by_conversation", ["conversationId"])
-    .index("by_timestamp", ["timestamp"]),
+    .index("by_timestamp", ["timestamp"])
+    .index("by_email_id", ["emailId"]),
 
   userSettings: defineTable({
     userId: v.id("users"),

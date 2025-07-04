@@ -25,25 +25,36 @@ export const list = query({
       conversations = conversations.filter((c) => c.status === args.status);
     }
 
-    // Get latest message for each conversation
-    const conversationsWithLatest = await Promise.all(
+    // Get latest message and message count for each conversation
+    const conversationsWithDetails = await Promise.all(
       conversations.map(async (conversation) => {
-        const latestMessage = await ctx.db
+        const messages = await ctx.db
           .query("messages")
           .withIndex("by_conversation", (q) =>
             q.eq("conversationId", conversation._id)
           )
-          .order("desc")
-          .first();
+          .collect();
+        
+        const latestMessage = messages
+          .sort((a, b) => b.timestamp - a.timestamp)[0] || null;
+        
+        // Get the most recent participant for display
+        const fromParticipant = conversation.participants[conversation.participants.length - 1] || {
+          email: "unknown@email.com",
+          name: null,
+        };
 
         return {
           ...conversation,
           latestMessage,
+          messageCount: messages.length,
+          fromEmail: fromParticipant.email,
+          fromName: fromParticipant.name,
         };
       })
     );
 
-    return conversationsWithLatest;
+    return conversationsWithDetails;
   },
 });
 
@@ -107,38 +118,4 @@ export const addUserNote = mutation({
   },
 });
 
-export const createTestConversation = mutation({
-  args: {
-    subject: v.string(),
-    content: v.string(),
-    senderEmail: v.string(),
-    senderName: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-
-    const userId = user._id;
-    // Create conversation
-    const conversationId = await ctx.db.insert("conversations", {
-      userId,
-      emailId: `test-${Date.now()}`,
-      subject: args.subject,
-      fromEmail: args.senderEmail,
-      fromName: args.senderName,
-      status: "new",
-      lastActivity: Date.now(),
-    });
-
-    // Add email message
-    await ctx.db.insert("messages", {
-      conversationId,
-      content: args.content,
-      type: "email",
-      sender: args.senderEmail,
-      timestamp: Date.now(),
-      emailId: `test-msg-${Date.now()}`,
-    });
-
-    return conversationId;
-  },
-});
+// Removed createTestConversation - focus on real email threading

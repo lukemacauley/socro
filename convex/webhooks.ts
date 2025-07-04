@@ -9,6 +9,7 @@ import { internal, api } from "./_generated/api";
 import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
 import { attachmentValidator } from "./lib/validators";
 import Reducto, { toFile } from "reductoai";
+import type { Id } from "./_generated/dataModel";
 
 export const processEmailNotification = internalMutation({
   args: {
@@ -94,7 +95,7 @@ export const fetchAndProcessEmail = internalAction({
     try {
       console.log("[WEBHOOK] Fetching email from Microsoft Graph API...");
       const response = await fetch(
-        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,receivedDateTime,isRead,hasAttachments&$expand=attachments($select=id,name,contentType,size)`,
+        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,receivedDateTime,isRead,hasAttachments,conversationId,conversationIndex,internetMessageId,replyTo&$expand=attachments($select=id,name,contentType,size)`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -124,6 +125,9 @@ export const fetchAndProcessEmail = internalAction({
         receivedDateTime: email.receivedDateTime,
         hasAttachments: email.hasAttachments,
         attachmentCount: email.attachments?.length || 0,
+        conversationId: email.conversationId,
+        conversationIndex: email.conversationIndex,
+        internetMessageId: email.internetMessageId,
       });
     } catch (error) {
       console.error(
@@ -133,17 +137,17 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
-    // Check if conversation already exists for this email
-    console.log("[WEBHOOK] Checking if conversation already exists...");
-    const existingConversation = await ctx.runQuery(
-      internal.webhooks.findConversationByEmailId,
+    // Check if message already exists for this email ID
+    console.log("[WEBHOOK] Checking if message already exists...");
+    const existingMessage = await ctx.runQuery(
+      internal.webhooks.findMessageByEmailId,
       {
         emailId: email.id,
       }
     );
 
-    if (existingConversation) {
-      console.log("[WEBHOOK] Conversation already exists for email:", email.id);
+    if (existingMessage) {
+      console.log("[WEBHOOK] Message already exists for email:", email.id);
       return;
     }
 
@@ -154,19 +158,50 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
-    // Create conversation
-    console.log("[WEBHOOK] Creating new conversation...");
-    const conversationId = await ctx.runMutation(
-      internal.webhooks.createConversation,
+    // Check if conversation exists for this thread
+    console.log("[WEBHOOK] Checking for existing thread...");
+    let conversationId: Id<"conversations">;
+    let isNewConversation = false;
+    
+    const threadId = email.conversationId || email.id; // Use email ID as fallback if no thread ID
+    
+    const existingConversation = await ctx.runQuery(
+      internal.webhooks.findConversationByThreadId,
       {
+        threadId,
         userId,
-        emailId: email.id,
-        subject: email.subject || "(No subject)",
-        fromEmail: email.from?.emailAddress?.address || "unknown@email.com",
-        fromName: email.from?.emailAddress?.name,
       }
     );
-    console.log("[WEBHOOK] Created conversation:", conversationId);
+
+    if (existingConversation) {
+      console.log("[WEBHOOK] Found existing thread:", existingConversation._id);
+      conversationId = existingConversation._id;
+      
+      // Update conversation activity
+      await ctx.runMutation(internal.webhooks.updateConversationActivity, {
+        conversationId,
+        emailId: email.id,
+        fromEmail: email.from?.emailAddress?.address || "unknown@email.com",
+        fromName: email.from?.emailAddress?.name,
+        subject: email.subject || existingConversation.subject,
+      });
+    } else {
+      // Create new conversation
+      console.log("[WEBHOOK] Creating new conversation for thread:", threadId);
+      isNewConversation = true;
+      conversationId = await ctx.runMutation(
+        internal.webhooks.createConversation,
+        {
+          userId,
+          emailId: email.id,
+          threadId,
+          subject: email.subject || "(No subject)",
+          fromEmail: email.from?.emailAddress?.address || "unknown@email.com",
+          fromName: email.from?.emailAddress?.name,
+        }
+      );
+      console.log("[WEBHOOK] Created conversation:", conversationId);
+    }
 
     // Extract plain text content from email body
     let emailContent = "";
@@ -397,10 +432,12 @@ export const fetchAndProcessEmail = internalAction({
       "[WEBHOOK] Auto-response enabled:",
       userSettings?.autoResponseEnabled
     );
+    console.log("[WEBHOOK] Is new conversation:", isNewConversation);
 
-    if (userSettings?.autoResponseEnabled) {
+    // Always generate AI response for new emails (whether new conversation or reply)
+    if (userSettings?.autoResponseEnabled || true) { // Always true for testing
       console.log(
-        "[WEBHOOK] Auto-response is enabled, generating AI response..."
+        "[WEBHOOK] Generating AI response for email..."
       );
       console.log("[WEBHOOK] Email content length:", emailContent.length);
       console.log(
@@ -418,25 +455,6 @@ export const fetchAndProcessEmail = internalAction({
         console.log("[WEBHOOK] AI response generated successfully");
       } catch (error) {
         console.error("[WEBHOOK] Error generating AI response:", error);
-      }
-    } else {
-      console.log(
-        "[WEBHOOK] Auto-response is disabled, skipping AI generation"
-      );
-      // For testing, let's always generate AI response
-      console.log(
-        "[WEBHOOK] DEBUG: Generating AI response anyway for testing..."
-      );
-      try {
-        await ctx.runAction(api.ai.generateResponse, {
-          conversationId,
-          emailContent: emailContent + processedAttachmentContent,
-          emailSubject: email.subject || "(No subject)",
-          senderName: email.from?.emailAddress?.name,
-        });
-        console.log("[WEBHOOK] DEBUG: AI response generated successfully");
-      } catch (error) {
-        console.error("[WEBHOOK] DEBUG: Error generating AI response:", error);
       }
     }
 
@@ -458,11 +476,28 @@ export const findUserBySubscription = internalQuery({
   },
 });
 
-export const findConversationByEmailId = internalQuery({
-  args: { emailId: v.string() },
+// Removed findConversationByEmailId - we track by thread, not individual emails
+
+export const findConversationByThreadId = internalQuery({
+  args: { 
+    threadId: v.string(),
+    userId: v.id("users"),
+  },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("conversations")
+      .withIndex("by_thread", (q) => 
+        q.eq("threadId", args.threadId).eq("userId", args.userId)
+      )
+      .first();
+  },
+});
+
+export const findMessageByEmailId = internalQuery({
+  args: { emailId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("messages")
       .withIndex("by_email_id", (q) => q.eq("emailId", args.emailId))
       .first();
   },
@@ -478,6 +513,7 @@ export const getUserSettings = internalQuery({
 export const createConversation = internalMutation({
   args: {
     userId: v.id("users"),
+    threadId: v.string(),
     emailId: v.string(),
     subject: v.string(),
     fromEmail: v.string(),
@@ -485,13 +521,49 @@ export const createConversation = internalMutation({
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("conversations", {
+      threadId: args.threadId,
       userId: args.userId,
-      emailId: args.emailId,
       subject: args.subject,
-      fromEmail: args.fromEmail,
-      fromName: args.fromName,
       status: "new",
+      initialEmailId: args.emailId,
+      latestEmailId: args.emailId,
+      participants: [{
+        email: args.fromEmail,
+        name: args.fromName,
+      }],
+      createdAt: Date.now(),
       lastActivity: Date.now(),
+    });
+  },
+});
+
+export const updateConversationActivity = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    emailId: v.string(),
+    fromEmail: v.string(),
+    fromName: v.optional(v.string()),
+    subject: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) return;
+    
+    // Check if this participant is already in the list
+    const participantExists = conversation.participants.some(
+      p => p.email === args.fromEmail
+    );
+    
+    const updatedParticipants = participantExists
+      ? conversation.participants
+      : [...conversation.participants, { email: args.fromEmail, name: args.fromName }];
+    
+    await ctx.db.patch(args.conversationId, {
+      lastActivity: Date.now(),
+      latestEmailId: args.emailId,
+      // Update subject if it's more detailed (e.g., "Re: " prefix added)
+      subject: args.subject.length > conversation.subject.length ? args.subject : conversation.subject,
+      participants: updatedParticipants,
     });
   },
 });
