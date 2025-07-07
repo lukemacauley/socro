@@ -39,13 +39,13 @@ export const NAVIGATION: {
     title: "Emails",
     icon: MessagesSquare,
     url: "/emails",
-    isActive: true,
-    items: [
-      { title: "All", url: "/emails" },
-      { title: "New", url: "/emails/new" },
-      { title: "In Progress", url: "/emails/progress" },
-      { title: "Resolved", url: "/emails/resolved" },
-    ],
+    // isActive: true,
+    // items: [
+    //   { title: "All", url: "/emails" },
+    //   { title: "New", url: "/emails/new" },
+    //   { title: "In Progress", url: "/emails/progress" },
+    //   { title: "Resolved", url: "/emails/resolved" },
+    // ],
   },
   {
     title: "Vault",

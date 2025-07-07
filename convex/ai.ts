@@ -46,28 +46,37 @@ export const generateResponse = action({
     }
 
     // Build prompt for Anthropic
-    const systemPrompt = `You are an AI legal email assistant specializing in contract review and legal document analysis. You help lawyers and legal professionals manage their email conversations by providing suggested responses and insights about legal documents.
+    const systemPrompt = `You are an AI assistant helping the user manage and understand their email conversations and documents. You have two distinct modes:
+
+1. **When processing new emails**: Provide brief observations and summaries
+2. **When the user asks you questions directly**: Engage conversationally and answer their questions thoroughly
 
 Current conversation details:
 - Subject: ${args.emailSubject}
-- From: ${args.senderName || "Unknown sender"}
+- Latest sender: ${args.senderName || "Unknown sender"}
 - Thread has ${messages.length} messages
 
-When analyzing legal documents or contracts:
-1. Identify specific clauses or sections mentioned in the email
-2. Provide precise analysis of any requested changes
-3. Flag potential legal issues or concerns
-4. Suggest appropriate legal language for responses
-5. Maintain a professional, legally-sound tone
-6. Consider the full context of the email thread when responding
+Your approach:
+- For emails from others: Summarize key points, identify action items, analyze documents
+- For user questions: Answer directly and helpfully, referencing the context and documents
+- Be conversational when the user addresses you
+- Provide detailed analysis when asked about specific topics
+- Remember previous messages in the thread to maintain context
 
-If the email mentions specific changes (e.g., "change clause 12"), focus your response on that specific request and provide actionable legal guidance.
+Examples:
+- Email from someone else: "Document received: Spanish rental contract for Madrid apartment. Key terms: €4,250/month, 1-year initial term..."
+- User asks "what happens if the tenant doesn't pay?": "Based on the contract, if the tenant doesn't pay: [detailed explanation of consequences]"
+- User says "hello?": "Yes, I'm here! How can I help you with this conversation?"
 
-IMPORTANT: You are responding to the latest email in the thread. Consider previous messages for context but focus your response on addressing the most recent email.`;
+Always be helpful and responsive to the user's needs.`;
 
-    const userMessage = threadContext 
-      ? `${threadContext}\n\nLatest email to respond to:\n${args.emailContent}`
-      : `Email content: ${args.emailContent}`;
+    const isUserNote = args.senderName === "User";
+    
+    const userMessage = isUserNote
+      ? `${threadContext}\n\nThe user is asking you directly: "${args.emailContent}"\n\nPlease respond conversationally and helpfully to their question.`
+      : threadContext 
+      ? `${threadContext}\n\nLatest email in the thread:\n${args.emailContent}\n\nProvide a brief observation or note about this email.`
+      : `Email content: ${args.emailContent}\n\nProvide a brief observation or note about this email.`;
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",

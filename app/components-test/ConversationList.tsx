@@ -1,18 +1,10 @@
 import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
 import { useQuery } from "convex/react";
-import { useState } from "react";
 import { Link } from "react-router";
+import { cn } from "~/lib/utils";
 
 export function ConversationList() {
-  const [selectedConversationId, setSelectedConversationId] =
-    useState<Id<"conversations"> | null>(null);
-  const [statusFilter, setStatusFilter] = useState<
-    "new" | "in_progress" | "resolved" | undefined
-  >(undefined);
-  const conversations = useQuery(api.conversations.list, {
-    status: statusFilter,
-  });
+  const conversations = useQuery(api.conversations.list, {});
 
   return (
     <div className="h-full flex flex-col">
@@ -23,11 +15,13 @@ export function ConversationList() {
             <Link
               key={conversation._id}
               to={"/emails/" + conversation._id}
-              className={`p-3 block rounded-lg cursor-pointer transition-colors ${
-                selectedConversationId === conversation._id
-                  ? "bg-blue-50 border border-blue-200"
-                  : "hover:bg-gray-50 border border-transparent"
-              }`}
+              className={cn(
+                "p-3 block rounded-lg cursor-pointer transition-colors",
+                // selectedConversationId === conversation._id
+                //   ? "bg-blue-50 border border-blue-200"
+                // :
+                "hover:bg-gray-50 border border-transparent"
+              )}
             >
               <div className="flex items-start justify-between mb-1">
                 <h3 className="font-medium text-sm truncate flex-1 mr-2">

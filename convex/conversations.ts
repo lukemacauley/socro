@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   getCurrentUser,
   getCurrentUserId,
@@ -34,12 +34,14 @@ export const list = query({
             q.eq("conversationId", conversation._id)
           )
           .collect();
-        
-        const latestMessage = messages
-          .sort((a, b) => b.timestamp - a.timestamp)[0] || null;
-        
+
+        const latestMessage =
+          messages.sort((a, b) => b.timestamp - a.timestamp)[0] || null;
+
         // Get the most recent participant for display
-        const fromParticipant = conversation.participants[conversation.participants.length - 1] || {
+        const fromParticipant = conversation.participants[
+          conversation.participants.length - 1
+        ] || {
           email: "unknown@email.com",
           name: null,
         };
@@ -62,7 +64,11 @@ export const get = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
+    const conversation = await verifyConversationOwnership(
+      ctx,
+      args.conversationId,
+      userId
+    );
 
     const messages = await ctx.db
       .query("messages")
@@ -79,22 +85,6 @@ export const get = query({
   },
 });
 
-export const updateStatus = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    status: conversationStatus,
-  },
-  handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
-
-    await ctx.db.patch(args.conversationId, {
-      status: args.status,
-      lastActivity: Date.now(),
-    });
-  },
-});
-
 export const addUserNote = mutation({
   args: {
     conversationId: v.id("conversations"),
@@ -102,7 +92,11 @@ export const addUserNote = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
+    const conversation = await verifyConversationOwnership(
+      ctx,
+      args.conversationId,
+      userId
+    );
 
     await ctx.db.insert("messages", {
       conversationId: args.conversationId,
@@ -114,6 +108,14 @@ export const addUserNote = mutation({
 
     await ctx.db.patch(args.conversationId, {
       lastActivity: Date.now(),
+    });
+
+    // Trigger AI response for the user note
+    await ctx.scheduler.runAfter(0, api.ai.generateResponse, {
+      conversationId: args.conversationId,
+      emailContent: args.content,
+      emailSubject: conversation.subject || "User Note",
+      senderName: "User",
     });
   },
 });

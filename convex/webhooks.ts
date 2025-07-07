@@ -7,9 +7,10 @@ import {
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
 import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
-import { attachmentValidator } from "./lib/validators";
+import { attachmentValidator, messageType } from "./lib/validators";
 import Reducto, { toFile } from "reductoai";
 import type { Id } from "./_generated/dataModel";
+import { decode as heDecode } from "he";
 
 export const processEmailNotification = internalMutation({
   args: {
@@ -23,6 +24,9 @@ export const processEmailNotification = internalMutation({
       resource: notification.resource,
       clientState: notification.clientState,
     });
+
+    // We'll determine if it's a sent email later by checking the sender
+    const isSentEmail = false; // Temporary, will be determined when we fetch the email
 
     // Extract email ID from the resource path
     // Resource format: "Users/{user-id}/Messages/{message-id}"
@@ -44,6 +48,7 @@ export const processEmailNotification = internalMutation({
     await ctx.scheduler.runAfter(0, internal.webhooks.fetchAndProcessEmail, {
       emailId,
       subscriptionId: notification.subscriptionId,
+      isSentEmail,
     });
 
     console.log("[WEBHOOK] Email processing scheduled successfully");
@@ -54,9 +59,11 @@ export const fetchAndProcessEmail = internalAction({
   args: {
     emailId: v.string(),
     subscriptionId: v.string(),
+    isSentEmail: v.boolean(),
   },
   handler: async (ctx, args) => {
     console.log("[WEBHOOK] Starting to process email:", args.emailId);
+    console.log("[WEBHOOK] Is sent email:", args.isSentEmail);
 
     // Find user by subscription ID
     console.log(
@@ -95,7 +102,7 @@ export const fetchAndProcessEmail = internalAction({
     try {
       console.log("[WEBHOOK] Fetching email from Microsoft Graph API...");
       const response = await fetch(
-        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,receivedDateTime,isRead,hasAttachments,conversationId,conversationIndex,internetMessageId,replyTo&$expand=attachments($select=id,name,contentType,size)`,
+        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,uniqueBody,receivedDateTime,isRead,hasAttachments,conversationId,conversationIndex,replyTo&$expand=attachments($select=id,name,contentType,size)`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -127,7 +134,8 @@ export const fetchAndProcessEmail = internalAction({
         attachmentCount: email.attachments?.length || 0,
         conversationId: email.conversationId,
         conversationIndex: email.conversationIndex,
-        internetMessageId: email.internetMessageId,
+        hasUniqueBody: !!email.uniqueBody,
+        uniqueBodyLength: email.uniqueBody?.content?.length || 0,
       });
     } catch (error) {
       console.error(
@@ -137,7 +145,7 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
-    // Check if message already exists for this email ID
+    // Check if message already exists for this email ID or internetMessageId
     console.log("[WEBHOOK] Checking if message already exists...");
     const existingMessage = await ctx.runQuery(
       internal.webhooks.findMessageByEmailId,
@@ -158,13 +166,21 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
+    // Determine if this is a sent email by checking if sender matches user's email
+    const actualIsSentEmail =
+      email.from?.emailAddress?.address?.toLowerCase() ===
+      user?.email?.toLowerCase();
+    console.log(
+      `[WEBHOOK] Email from: ${email.from?.emailAddress?.address}, User email: ${user?.email}, Is sent: ${actualIsSentEmail}`
+    );
+
     // Check if conversation exists for this thread
     console.log("[WEBHOOK] Checking for existing thread...");
     let conversationId: Id<"conversations">;
     let isNewConversation = false;
-    
+
     const threadId = email.conversationId || email.id; // Use email ID as fallback if no thread ID
-    
+
     const existingConversation = await ctx.runQuery(
       internal.webhooks.findConversationByThreadId,
       {
@@ -176,7 +192,7 @@ export const fetchAndProcessEmail = internalAction({
     if (existingConversation) {
       console.log("[WEBHOOK] Found existing thread:", existingConversation._id);
       conversationId = existingConversation._id;
-      
+
       // Update conversation activity
       await ctx.runMutation(internal.webhooks.updateConversationActivity, {
         conversationId,
@@ -203,15 +219,53 @@ export const fetchAndProcessEmail = internalAction({
       console.log("[WEBHOOK] Created conversation:", conversationId);
     }
 
-    // Extract plain text content from email body
+    // Extract and parse email content
     let emailContent = "";
-    if (email.body?.contentType === "text") {
-      emailContent = email.body.content;
-      console.log("[WEBHOOK] Email body is plain text");
-    } else if (email.body?.contentType === "html") {
-      // Strip HTML tags for a basic plain text version
-      emailContent = email.body.content.replace(/<[^>]*>/g, " ").trim();
-      console.log("[WEBHOOK] Email body is HTML, stripped tags");
+
+    // First, try Microsoft's uniqueBody if available (contains only the unique/new content)
+    if (email.uniqueBody?.content) {
+      console.log("[WEBHOOK] Using uniqueBody from Microsoft Graph");
+      const uniqueBodyType =
+        email.uniqueBody.contentType?.toLowerCase() || "text";
+      let uniqueContent = email.uniqueBody.content;
+
+      console.log(
+        `[WEBHOOK] UniqueBody raw content (first 200 chars): "${uniqueContent}" of type "${uniqueBodyType}"`
+      );
+
+      // Use Microsoft's exact pattern from microsoft-driver.ts
+      if (uniqueBodyType === 'html') {
+        emailContent = heDecode(uniqueContent);
+      } else {
+        emailContent = heDecode(uniqueContent).replace(/\n/g, '<br>');
+      }
+
+      console.log(
+        `[WEBHOOK] UniqueBody extracted: ${emailContent.length} chars, content: "${emailContent}"`
+      );
+    }
+    else {
+      // Fall back to parsing the full body if uniqueBody is not available
+      console.log("[WEBHOOK] UniqueBody not available, using full body");
+      const bodyContent = email.body?.content || "";
+      const bodyContentType = email.body?.contentType?.toLowerCase() || "text";
+
+      // Use Microsoft's exact pattern
+      if (bodyContentType === "html") {
+        emailContent = heDecode(bodyContent);
+      } else {
+        emailContent = heDecode(bodyContent).replace(/\n/g, '<br>');
+      }
+    }
+
+    console.log(
+      `[WEBHOOK] Processed email - Final content length: ${emailContent.length} chars`
+    );
+
+    // Don't save empty emails
+    if (!emailContent || !emailContent.trim()) {
+      console.log("[WEBHOOK] Skipping empty email content");
+      return;
     }
 
     // Add email message with attachments
@@ -423,39 +477,43 @@ export const fetchAndProcessEmail = internalAction({
       emailId: email.id,
       sender: email.from?.emailAddress?.address || "unknown@email.com",
       attachments,
+      messageType: actualIsSentEmail ? "sent_email" : "email",
     });
     console.log("[WEBHOOK] Email message added successfully");
 
-    // Generate AI response if auto-response is enabled
-    console.log("[WEBHOOK] User settings:", userSettings);
-    console.log(
-      "[WEBHOOK] Auto-response enabled:",
-      userSettings?.autoResponseEnabled
-    );
-    console.log("[WEBHOOK] Is new conversation:", isNewConversation);
-
-    // Always generate AI response for new emails (whether new conversation or reply)
-    if (userSettings?.autoResponseEnabled || true) { // Always true for testing
+    // Generate AI response only for received emails (not sent emails)
+    if (!actualIsSentEmail) {
+      console.log("[WEBHOOK] User settings:", userSettings);
       console.log(
-        "[WEBHOOK] Generating AI response for email..."
+        "[WEBHOOK] Auto-response enabled:",
+        userSettings?.autoResponseEnabled
       );
-      console.log("[WEBHOOK] Email content length:", emailContent.length);
-      console.log(
-        "[WEBHOOK] Processed attachment content length:",
-        processedAttachmentContent.length
-      );
+      console.log("[WEBHOOK] Is new conversation:", isNewConversation);
 
-      try {
-        await ctx.runAction(api.ai.generateResponse, {
-          conversationId,
-          emailContent: emailContent + processedAttachmentContent,
-          emailSubject: email.subject || "(No subject)",
-          senderName: email.from?.emailAddress?.name,
-        });
-        console.log("[WEBHOOK] AI response generated successfully");
-      } catch (error) {
-        console.error("[WEBHOOK] Error generating AI response:", error);
+      // Always generate AI response for new emails (whether new conversation or reply)
+      if (userSettings?.autoResponseEnabled || true) {
+        // Always true for testing
+        console.log("[WEBHOOK] Generating AI response for received email...");
+        console.log("[WEBHOOK] Email content length:", emailContent.length);
+        console.log(
+          "[WEBHOOK] Processed attachment content length:",
+          processedAttachmentContent.length
+        );
+
+        try {
+          await ctx.runAction(api.ai.generateResponse, {
+            conversationId,
+            emailContent: emailContent + processedAttachmentContent,
+            emailSubject: email.subject || "(No subject)",
+            senderName: email.from?.emailAddress?.name,
+          });
+          console.log("[WEBHOOK] AI response generated successfully");
+        } catch (error) {
+          console.error("[WEBHOOK] Error generating AI response:", error);
+        }
       }
+    } else {
+      console.log("[WEBHOOK] Skipping AI response for sent email");
     }
 
     console.log("[WEBHOOK] Successfully processed email:", email.id);
@@ -479,14 +537,14 @@ export const findUserBySubscription = internalQuery({
 // Removed findConversationByEmailId - we track by thread, not individual emails
 
 export const findConversationByThreadId = internalQuery({
-  args: { 
+  args: {
     threadId: v.string(),
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("conversations")
-      .withIndex("by_thread", (q) => 
+      .withIndex("by_thread", (q) =>
         q.eq("threadId", args.threadId).eq("userId", args.userId)
       )
       .first();
@@ -527,10 +585,12 @@ export const createConversation = internalMutation({
       status: "new",
       initialEmailId: args.emailId,
       latestEmailId: args.emailId,
-      participants: [{
-        email: args.fromEmail,
-        name: args.fromName,
-      }],
+      participants: [
+        {
+          email: args.fromEmail,
+          name: args.fromName,
+        },
+      ],
       createdAt: Date.now(),
       lastActivity: Date.now(),
     });
@@ -548,21 +608,27 @@ export const updateConversationActivity = internalMutation({
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) return;
-    
+
     // Check if this participant is already in the list
     const participantExists = conversation.participants.some(
-      p => p.email === args.fromEmail
+      (p) => p.email === args.fromEmail
     );
-    
+
     const updatedParticipants = participantExists
       ? conversation.participants
-      : [...conversation.participants, { email: args.fromEmail, name: args.fromName }];
-    
+      : [
+          ...conversation.participants,
+          { email: args.fromEmail, name: args.fromName },
+        ];
+
     await ctx.db.patch(args.conversationId, {
       lastActivity: Date.now(),
       latestEmailId: args.emailId,
       // Update subject if it's more detailed (e.g., "Re: " prefix added)
-      subject: args.subject.length > conversation.subject.length ? args.subject : conversation.subject,
+      subject:
+        args.subject.length > conversation.subject.length
+          ? args.subject
+          : conversation.subject,
       participants: updatedParticipants,
     });
   },
@@ -600,12 +666,13 @@ export const addEmailMessage = internalMutation({
     emailId: v.string(),
     sender: v.string(),
     attachments: v.optional(v.array(attachmentValidator)),
+    messageType: v.optional(messageType),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("messages", {
       conversationId: args.conversationId,
       content: args.content,
-      type: "email",
+      type: args.messageType || "email",
       sender: args.sender,
       timestamp: Date.now(),
       emailId: args.emailId,
@@ -762,11 +829,13 @@ export const setupMicrosoftWebhook = internalAction({
         return;
       }
       console.log(
-        "[WEBHOOK SETUP] Creating new subscription with URL:",
+        "[WEBHOOK SETUP] Creating new subscriptions with URL:",
         webhookUrl
       );
 
-      const subscriptionResponse = await fetch(
+      // Subscribe to Inbox messages
+      console.log("[WEBHOOK SETUP] Subscribing to Inbox...");
+      const inboxSubscriptionResponse = await fetch(
         "https://graph.microsoft.com/v1.0/subscriptions",
         {
           method: "POST",
@@ -777,30 +846,72 @@ export const setupMicrosoftWebhook = internalAction({
           body: JSON.stringify({
             changeType: "created",
             notificationUrl: webhookUrl,
-            resource: "me/messages",
+            resource: "me/mailFolders/Inbox/messages",
             expirationDateTime: new Date(
               Date.now() + 4230 * 60 * 1000 // ~70 hours
             ).toISOString(),
+            clientState: "inbox", // To distinguish between inbox and sent
           }),
         }
       );
 
-      if (!subscriptionResponse.ok) {
-        const error = await subscriptionResponse.json();
-        console.error("[WEBHOOK SETUP] Failed to create subscription:", error);
+      let inboxSubscription = null;
+      if (inboxSubscriptionResponse.ok) {
+        inboxSubscription = await inboxSubscriptionResponse.json();
+        console.log(
+          "[WEBHOOK SETUP] Inbox subscription created:",
+          inboxSubscription.id
+        );
+      }
+
+      // Subscribe to Sent Items
+      console.log("[WEBHOOK SETUP] Subscribing to Sent Items...");
+      const sentSubscriptionResponse = await fetch(
+        "https://graph.microsoft.com/v1.0/subscriptions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            changeType: "created",
+            notificationUrl: webhookUrl,
+            resource: "me/mailFolders/SentItems/messages",
+            expirationDateTime: new Date(
+              Date.now() + 4230 * 60 * 1000 // ~70 hours
+            ).toISOString(),
+            clientState: "sent", // To distinguish between inbox and sent
+          }),
+        }
+      );
+
+      let sentSubscription = null;
+      if (sentSubscriptionResponse.ok) {
+        sentSubscription = await sentSubscriptionResponse.json();
+        console.log(
+          "[WEBHOOK SETUP] Sent Items subscription created:",
+          sentSubscription.id
+        );
+      } else {
+        const error = await sentSubscriptionResponse.json();
+        console.error(
+          "[WEBHOOK SETUP] Failed to create Sent Items subscription:",
+          error
+        );
+      }
+
+      if (!inboxSubscription && !sentSubscription) {
+        console.error("[WEBHOOK SETUP] Failed to create any subscriptions");
         return;
       }
 
-      const subscription = await subscriptionResponse.json();
-      console.log(
-        "[WEBHOOK SETUP] Subscription created successfully:",
-        subscription.id
-      );
-
-      // Store subscription ID in Convex
+      // Store subscription IDs in Convex (we'll use the inbox subscription ID as primary)
+      const primarySubscriptionId =
+        inboxSubscription?.id || sentSubscription?.id;
       await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
         userId: user._id,
-        subscriptionId: subscription.id,
+        subscriptionId: primarySubscriptionId,
       });
 
       console.log(
@@ -832,20 +943,24 @@ async function checkExistingSubscription(
 
     if (response.ok) {
       const data = await response.json();
-      // Check if we have an active subscription for messages with the correct URL
-      const activeSubscription = data.value.find(
+      // Check if we have active subscriptions for both inbox and sent folders
+      const activeSubscriptions = data.value.filter(
         (sub: any) =>
-          sub.resource === "me/messages" &&
+          (sub.resource === "me/mailFolders/Inbox/messages" ||
+            sub.resource === "me/mailFolders/SentItems/messages") &&
           new Date(sub.expirationDateTime) > new Date() &&
           sub.notificationUrl === expectedWebhookUrl
       );
 
-      if (activeSubscription) {
+      if (activeSubscriptions.length > 0) {
         console.log(
-          "[WEBHOOK SETUP] Found active subscription with correct URL:",
-          activeSubscription.id
+          `[WEBHOOK SETUP] Found ${activeSubscriptions.length} active subscription(s) with correct URL`
         );
-        return activeSubscription.id;
+        // Return the first subscription ID (preferably inbox)
+        const inboxSub = activeSubscriptions.find((s: any) =>
+          s.resource.includes("Inbox")
+        );
+        return inboxSub?.id || activeSubscriptions[0].id;
       }
 
       // Log if we found subscriptions with wrong URLs
