@@ -7,6 +7,13 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "~/lib/utils";
 import { Download, Paperclip } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import {
+  optimisticallySendMessage,
+  toUIMessages,
+  useSmoothText,
+  useThreadMessages,
+  type UIMessage,
+} from "@convex-dev/agent/react";
 
 export function ConversationView({
   conversationId,
@@ -14,21 +21,28 @@ export function ConversationView({
   conversationId: Id<"conversations">;
 }) {
   const data = useQuery(api.conversations.get, { conversationId });
-  const addUserNote = useMutation(api.conversations.addUserNote);
+  const messages = useQuery(api.agent.listMessagesForConversation, {
+    conversationId,
+    paginationOpts: { numItems: 50, cursor: null },
+  });
+  const sendMessage = useMutation(api.agent.sendMessage);
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
   const [newNote, setNewNote] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim()) return;
 
+    setIsLoading(true);
     try {
-      await addUserNote({ conversationId, content: newNote });
+      await sendMessage({ conversationId, prompt: newNote });
       setNewNote("");
-      // toast.success("Note added");
     } catch (error) {
-      // toast.error("Failed to add note");
+      toast.error("Failed to send message");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -96,7 +110,7 @@ export function ConversationView({
 
       {/* Messages */}
       <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-16 overflow-y-auto space-y-12">
-        {data?.messages.map((message) => (
+        {messages?.page.reverse().map((message) => (
           <div
             key={message._id}
             className={cn(
@@ -131,8 +145,6 @@ export function ConversationView({
                   <span className="font-medium text-sm">
                     {message.type === "email" && "Received"}
                     {message.type === "sent_email" && "Sent"}
-                    {/* {message.type === "ai_response" && "AI Note"} */}
-                    {/* {message.type === "user_note" && "Your Note"} */}
                   </span>
                   {message.sender && (
                     <span className="text-xs text-zinc-600">
@@ -141,13 +153,10 @@ export function ConversationView({
                     </span>
                   )}
                 </div>
-                {/* <span className="text-xs text-zinc-500">
-                  {new Date(message.timestamp).toLocaleString()}
-                </span> */}
               </div>
               {message.type === "ai_response" ? (
                 <div className="prose max-w-none">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                  <ReactMarkdown>{message.content || ""}</ReactMarkdown>
                 </div>
               ) : message.type === "email" || message.type === "sent_email" ? (
                 <div
@@ -185,7 +194,6 @@ export function ConversationView({
                           </div>
                         </div>
                         <Button
-                          // variant="ghost"
                           size="icon"
                           onClick={() =>
                             handleDownloadAttachment(
@@ -194,9 +202,7 @@ export function ConversationView({
                               attachment.name
                             )
                           }
-                          // className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
-                          {/* Download */}
                           <Download />
                         </Button>
                       </div>
@@ -218,13 +224,14 @@ export function ConversationView({
             onChange={(e) => setNewNote(e.target.value)}
             placeholder="Add a note to this conversation..."
             className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            disabled={!newNote.trim()}
+            disabled={!newNote.trim() || isLoading}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Add Note
+            {isLoading ? "Sending..." : "Add Note"}
           </button>
         </form>
       </div>

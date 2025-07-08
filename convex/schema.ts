@@ -16,6 +16,7 @@ const applicationTables = {
 
   conversations: defineTable({
     threadId: v.string(), // Microsoft Graph conversation ID - unique thread identifier
+    agentThreadId: v.optional(v.string()), // Convex Agent thread ID for AI conversations
     userId: v.id("users"),
     subject: v.string(),
     status: conversationStatus,

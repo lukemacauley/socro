@@ -27,7 +27,16 @@ export const generateResponse = action({
       throw new Error("Conversation not found");
     }
 
-    const { conversation, messages } = conversationData;
+    const { conversation, messages, processedAttachments } = conversationData;
+
+    // Include attachment content if available
+    let attachmentContext = "";
+    if (processedAttachments && processedAttachments.length > 0) {
+      attachmentContext = "\n\nAttached Documents:\n";
+      for (const attachment of processedAttachments) {
+        attachmentContext += `\n--- ${attachment.attachmentName} ---\n${attachment.content}\n`;
+      }
+    }
 
     // Build conversation history for context
     let threadContext = "";
@@ -73,10 +82,10 @@ Always be helpful and responsive to the user's needs.`;
     const isUserNote = args.senderName === "User";
     
     const userMessage = isUserNote
-      ? `${threadContext}\n\nThe user is asking you directly: "${args.emailContent}"\n\nPlease respond conversationally and helpfully to their question.`
+      ? `${attachmentContext}${threadContext}\n\nThe user is asking you directly: "${args.emailContent}"\n\nPlease respond conversationally and helpfully to their question.`
       : threadContext 
-      ? `${threadContext}\n\nLatest email in the thread:\n${args.emailContent}\n\nProvide a brief observation or note about this email.`
-      : `Email content: ${args.emailContent}\n\nProvide a brief observation or note about this email.`;
+      ? `${attachmentContext}${threadContext}\n\nLatest email in the thread:\n${args.emailContent}\n\nProvide a brief observation or note about this email.`
+      : `${attachmentContext}\n\nEmail content: ${args.emailContent}\n\nProvide a brief observation or note about this email.`;
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -123,9 +132,18 @@ export const getConversationContext = internalQuery({
       .order("asc")
       .collect();
 
+    // Also get processed attachments for this conversation
+    const processedAttachments = await ctx.db
+      .query("processedAttachments")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .collect();
+
     return {
       conversation,
       messages,
+      processedAttachments,
     };
   },
 });
