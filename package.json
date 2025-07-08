@@ -15,6 +15,8 @@
     "@anthropic-ai/sdk": "^0.55.1",
     "@clerk/backend": "^2.3.1",
     "@clerk/react-router": "^1.6.3",
+    "@convex-dev/agent": "^0.1.13",
+    "@convex-dev/agent-playground": "^0.0.14",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.11",

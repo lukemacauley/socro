@@ -1,5 +1,6 @@
-import { query } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { getCurrentUser, getCurrentUserId } from "./lib/utils";
+import { internal } from "./_generated/api";
 
 export const loggedInUser = query({
   handler: async (ctx) => {
@@ -12,3 +13,4 @@ export const loggedInUserId = query({
     return await getCurrentUserId(ctx);
   },
 });
+

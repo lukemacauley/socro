@@ -95,6 +95,7 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
+    // Get access token - Clerk will automatically refresh if needed
     const accessToken = await getMicrosoftAccessToken(user.externalId);
 
     // Fetch the full email from Microsoft Graph API including attachments
@@ -118,6 +119,12 @@ export const fetchAndProcessEmail = internalAction({
           statusText: response.statusText,
           error: errorText,
         });
+
+        // If it's a 401, something is wrong with the token
+        // This shouldn't happen with automatic refresh, but log it
+        if (response.status === 401) {
+          console.error("[WEBHOOK] Unexpected 401 error - token should have been refreshed");
+        }
 
         throw new Error(
           `Failed to fetch email: ${response.status} ${response.statusText}`
@@ -501,13 +508,34 @@ export const fetchAndProcessEmail = internalAction({
         );
 
         try {
-          await ctx.runAction(api.ai.generateResponse, {
-            conversationId,
-            emailContent: emailContent + processedAttachmentContent,
+          // Create a new agent thread for each email
+          console.log("[WEBHOOK] Creating new agent thread for email");
+          const agentThreadId = await ctx.runMutation(internal.agent.createEmailThread, {
+            userId,
             emailSubject: email.subject || "(No subject)",
-            senderName: email.from?.emailAddress?.name,
+            emailId: email.id,
           });
-          console.log("[WEBHOOK] AI response generated successfully");
+          
+          // Process email through agent
+          const aiResponse = await ctx.runAction(internal.agent.processEmailWithAgent, {
+            threadId: agentThreadId,
+            emailContent,
+            emailSubject: email.subject || "(No subject)",
+            senderEmail: email.from?.emailAddress?.address || "unknown@email.com",
+            senderName: email.from?.emailAddress?.name,
+            attachmentContent: processedAttachmentContent || undefined,
+          });
+          
+          console.log("[WEBHOOK] AI response generated successfully via agent");
+          
+          // For now, still save to conversations/messages table for existing UI
+          await ctx.runMutation(internal.webhooks.addEmailMessage, {
+            conversationId,
+            content: aiResponse,
+            emailId: `ai-response-${Date.now()}`,
+            sender: "ai",
+            messageType: "ai_response",
+          });
         } catch (error) {
           console.error("[WEBHOOK] Error generating AI response:", error);
         }
@@ -985,3 +1013,132 @@ async function checkExistingSubscription(
   }
   return null;
 }
+
+// Renew all active webhook subscriptions
+export const renewAllWebhookSubscriptions = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    console.log("[WEBHOOK RENEWAL] Starting subscription renewal process");
+    
+    // Get all users with webhook subscriptions
+    const userSettings = await ctx.runQuery(
+      internal.webhooks.getAllUsersWithWebhooks
+    );
+    
+    let renewed = 0;
+    let failed = 0;
+    
+    for (const settings of userSettings) {
+      try {
+        const user = await ctx.runQuery(internal.users.getById, {
+          userId: settings.userId,
+        });
+        
+        if (!user) continue;
+        
+        console.log(`[WEBHOOK RENEWAL] Renewing subscription for user: ${user.email}`);
+        
+        const accessToken = await getMicrosoftAccessToken(user.externalId);
+        
+        // First, try to update the existing subscription
+        const wasRenewed = await renewSubscription(
+          accessToken,
+          settings.webhookSubscriptionId!
+        );
+        
+        if (wasRenewed) {
+          renewed++;
+          console.log(`[WEBHOOK RENEWAL] Successfully renewed subscription for ${user.email}`);
+        } else {
+          // If renewal failed, create a new subscription
+          console.log(`[WEBHOOK RENEWAL] Renewal failed, creating new subscription for ${user.email}`);
+          await ctx.runAction(internal.webhooks.setupMicrosoftWebhook, {
+            clerkUserId: user.externalId,
+          });
+          renewed++;
+        }
+      } catch (error) {
+        failed++;
+        console.error(`[WEBHOOK RENEWAL] Failed to renew subscription:`, error);
+      }
+    }
+    
+    console.log(`[WEBHOOK RENEWAL] Completed. Renewed: ${renewed}, Failed: ${failed}`);
+  },
+});
+
+async function renewSubscription(
+  accessToken: string,
+  subscriptionId: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/subscriptions/${subscriptionId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          expirationDateTime: new Date(
+            Date.now() + 4230 * 60 * 1000 // ~70 hours
+          ).toISOString(),
+        }),
+      }
+    );
+    
+    return response.ok;
+  } catch (error) {
+    console.error("[WEBHOOK RENEWAL] Error renewing subscription:", error);
+    return false;
+  }
+}
+
+export const getAllUsersWithWebhooks = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("userSettings")
+      .filter((q) => q.neq(q.field("webhookSubscriptionId"), undefined))
+      .collect();
+  },
+});
+
+// Refresh all user OAuth tokens to keep them fresh
+export const refreshAllUserTokens = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    console.log("[TOKEN REFRESH] Starting token refresh for all users");
+    
+    // Get all users with webhook subscriptions
+    const userSettings = await ctx.runQuery(
+      internal.webhooks.getAllUsersWithWebhooks
+    );
+    
+    let refreshed = 0;
+    let failed = 0;
+    
+    for (const settings of userSettings) {
+      try {
+        const user = await ctx.runQuery(internal.users.getById, {
+          userId: settings.userId,
+        });
+        
+        if (!user) continue;
+        
+        // Simply calling getMicrosoftAccessToken will trigger Clerk to refresh if needed
+        await getMicrosoftAccessToken(user.externalId);
+        
+        refreshed++;
+        console.log(`[TOKEN REFRESH] Refreshed token for user: ${user.email}`);
+      } catch (error) {
+        failed++;
+        console.error(`[TOKEN REFRESH] Failed to refresh token:`, error);
+      }
+    }
+    
+    console.log(`[TOKEN REFRESH] Completed. Refreshed: ${refreshed}, Failed: ${failed}`);
+  },
+});
+

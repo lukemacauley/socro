@@ -1,6 +1,7 @@
 import { type QueryCtx, type MutationCtx } from "../_generated/server";
 import { type Id } from "../_generated/dataModel";
 import { createClerkClient } from "@clerk/backend";
+import { GenericActionCtx } from "convex/server";
 
 export async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();

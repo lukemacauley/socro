@@ -7,30 +7,57 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "~/lib/utils";
 import { Download, Paperclip } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import {
+  useThreadMessages,
+  toUIMessages,
+  useSmoothText,
+  type UIMessage,
+  optimisticallySendMessage,
+} from "@convex-dev/agent/react";
 
 export function ConversationView({
-  conversationId,
+  // conversationId,
+  threadId,
 }: {
-  conversationId: Id<"conversations">;
+  // conversationId: Id<"conversations">;
+  threadId: string;
 }) {
-  const data = useQuery(api.conversations.get, { conversationId });
+  // const data = useQuery(api.conversations.get, { conversationId });
   const addUserNote = useMutation(api.conversations.addUserNote);
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
-  const [newNote, setNewNote] = useState("");
+  const messages = useThreadMessages(
+    api.agent.listThreadMessages,
+    { threadId },
+    { initialNumItems: 10, stream: true }
+  );
 
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNote.trim()) return;
+  const [prompt, setPrompt] = useState("Tell me a story");
 
-    try {
-      await addUserNote({ conversationId, content: newNote });
-      setNewNote("");
-      // toast.success("Note added");
-    } catch (error) {
-      // toast.error("Failed to add note");
-    }
-  };
+  function onSendClicked() {
+    if (prompt.trim() === "") return;
+    void sendMessage({ threadId, prompt }).catch(() => setPrompt(prompt));
+    setPrompt("");
+  }
+
+  const sendMessage = useMutation(
+    api.agent.streamAsynchronously
+  ).withOptimisticUpdate(
+    optimisticallySendMessage(api.agent.listThreadMessages)
+  );
+
+  // const handleAddNote = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (!newNote.trim()) return;
+
+  //   try {
+  //     await addUserNote({ conversationId, content: newNote });
+  //     setNewNote("");
+  //     // toast.success("Note added");
+  //   } catch (error) {
+  //     // toast.error("Failed to add note");
+  //   }
+  // };
 
   const handleDownloadAttachment = async (
     emailId: string,
@@ -80,7 +107,7 @@ export function ConversationView({
       {/* Header */}
       <div className="p-4 border-b bg-white">
         <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
+          {/* <div className="flex-1">
             <h1 className="text-xl font-semibold mb-1">
               {data?.conversation.subject}
             </h1>
@@ -90,143 +117,84 @@ export function ConversationView({
                 .map((p) => p.name || p.email)
                 .join(", ")}
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-16 overflow-y-auto space-y-12">
-        {data?.messages.map((message) => (
-          <div
-            key={message._id}
-            className={cn(
-              "flex last:min-h-[calc(100vh-20rem)]",
-              message.type === "sent_email" || message.type === "user_note"
-                ? "justify-end"
-                : "justify-start"
-            )}
-          >
-            <div
-              className={cn(
-                "rounded-lg p-4",
-                message.type === "email"
-                  ? "w-4/5 bg-orange-50 border border-zinc-200"
-                  : message.type === "sent_email"
-                  ? "w-4/5 bg-orange-50 border border-zinc-200"
-                  : message.type === "user_note"
-                  ? "w-4/5 bg-orange-50 border border-zinc-200"
-                  : message.type === "ai_response"
-                  ? "w-full p-0 border-zinc-200"
-                  : "w-full"
-              )}
-            >
-              <div
-                className={
-                  message.type === "email" || message.type === "sent_email"
-                    ? "flex items-center justify-between mb-2"
-                    : "hidden"
-                }
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">
-                    {message.type === "email" && "Received"}
-                    {message.type === "sent_email" && "Sent"}
-                    {/* {message.type === "ai_response" && "AI Note"} */}
-                    {/* {message.type === "user_note" && "Your Note"} */}
-                  </span>
-                  {message.sender && (
-                    <span className="text-xs text-zinc-600">
-                      {message.type === "sent_email" ? "to" : "from"}{" "}
-                      {message.sender}
-                    </span>
-                  )}
-                </div>
-                {/* <span className="text-xs text-zinc-500">
-                  {new Date(message.timestamp).toLocaleString()}
-                </span> */}
-              </div>
-              {message.type === "ai_response" ? (
-                <div className="prose max-w-none">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                </div>
-              ) : message.type === "email" || message.type === "sent_email" ? (
-                <div
-                  className="prose"
-                  dangerouslySetInnerHTML={{ __html: message.content }}
-                />
-              ) : (
-                <div className="prose whitespace-pre-wrap">
-                  {message.content}
-                </div>
-              )}
-
-              {/* Display attachments if any */}
-              {message.attachments && message.attachments.length > 0 && (
-                <div className="mt-3 border-t pt-3">
-                  <p className="text-sm font-medium text-zinc-700 mb-2">
-                    Attachments ({message.attachments.length})
-                  </p>
-                  <div className="space-y-2">
-                    {message.attachments.map((attachment) => (
-                      <div
-                        key={attachment.id}
-                        className="flex items-center justify-between p-2 rounded-lg"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <Paperclip className="size-5" />
-                          <div>
-                            <p className="text-sm font-medium">
-                              {attachment.name}
-                            </p>
-                            <p className="text-xs text-zinc-500">
-                              {attachment.contentType} •{" "}
-                              {(attachment.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          // variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            handleDownloadAttachment(
-                              message.emailId!,
-                              attachment.id,
-                              attachment.name
-                            )
-                          }
-                          // className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                        >
-                          {/* Download */}
-                          <Download />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+        {messages.results?.length > 0 && (
+          <div className="flex flex-col gap-4 overflow-y-auto mb-4">
+            {toUIMessages(messages.results ?? []).map((m) => (
+              <Message key={m.key} message={m} />
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
       {/* Add note form */}
       <div className="p-4 border-t bg-white">
-        <form onSubmit={handleAddNote} className="flex gap-2">
+        <form
+          className="flex gap-2 items-center"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSendClicked();
+          }}
+        >
           <input
             type="text"
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Add a note to this conversation..."
-            className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+            placeholder={
+              messages.results?.length > 0
+                ? "Continue the story..."
+                : "Tell me a story..."
+            }
           />
           <button
             type="submit"
-            disabled={!newNote.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition font-semibold disabled:opacity-50"
+            disabled={!prompt.trim()}
           >
-            Add Note
+            Send
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function Message({ message }: { message: UIMessage }) {
+  const isUser = message.role === "user";
+
+  console.log({ role: message.role, message });
+
+  const [visibleText, { isStreaming, cursor }] = useSmoothText(
+    message.content,
+    {
+      // This tells the hook that it's ok to start streaming immediately.
+      // If this was always passed as true, messages that are already done would
+      // also stream in.
+      // IF this was always passed as false (default), then the streaming message
+      // wouldn't start streaming until the second chunk was received.
+      startStreaming: message.status === "streaming",
+    }
+  );
+
+  return (
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+      <div className={cn("rounded-lg px-4 py-2", isUser ? "bg-orange-50" : "")}>
+        {isUser ? (
+          <div
+            className="prose"
+            dangerouslySetInnerHTML={{ __html: message.content }}
+          />
+        ) : (
+          <div className="prose">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
