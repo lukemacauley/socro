@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "~/lib/utils";
 import { Download, Paperclip } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { useChat } from "@ai-sdk/react";
 
 export function ConversationView({
   conversationId,
@@ -20,16 +21,28 @@ export function ConversationView({
 
   const [newNote, setNewNote] = useState("");
 
+  const { messages, status, append } = useChat({
+    api: `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`,
+  });
+
+  console.log({ status });
+
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim()) return;
 
     try {
-      await addUserNote({ conversationId, content: newNote });
+      const result = await addUserNote({ conversationId, content: newNote });
       setNewNote("");
-      // toast.success("Note added");
+
+      // Trigger streaming AI response
+      await append({
+        role: "user",
+        content: newNote,
+        data: result,
+      });
     } catch (error) {
-      // toast.error("Failed to add note");
+      toast.error("Failed to add note");
     }
   };
 
@@ -222,6 +235,36 @@ export function ConversationView({
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Streaming messages from useChat */}
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={cn(
+              "flex",
+              message.role === "user" ? "justify-end" : "justify-start"
+            )}
+          >
+            <div className={message.role === "user" ? "max-w-4/5" : "w-full"}>
+              <div
+                className={cn(
+                  "rounded-lg p-4",
+                  message.role === "user"
+                    ? "w-full bg-orange-50 border border-zinc-200"
+                    : "w-full p-0 border-zinc-200"
+                )}
+              >
+                {message.role === "assistant" ? (
+                  <div className="prose max-w-none">
+                    <ReactMarkdown>{message.content || ""}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="prose">{message.content}</div>
                 )}
               </div>
             </div>

@@ -3,6 +3,8 @@ import type { WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { streamText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
 
 const http = httpRouter();
 
@@ -142,5 +144,173 @@ async function validateRequest(req: Request): Promise<WebhookEvent | null> {
     return null;
   }
 }
+
+// OPTIONS route for CORS preflight
+http.route({
+  path: "/stream-ai-response",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }),
+});
+
+http.route({
+  path: "/stream-ai-response",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    // Handle CORS
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    // Handle preflight request
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 200, headers: corsHeaders });
+    }
+
+    try {
+      const body = await request.json();
+      console.log("[STREAM] Request body:", JSON.stringify(body, null, 2));
+
+      // useChat sends messages array
+      const msgs = body.messages || [];
+      const lastMessage = msgs[msgs.length - 1];
+
+      // The data we need is in the last message's data field
+      const { conversationId, emailContent, emailSubject, senderName } =
+        lastMessage?.data || {};
+
+      // Get conversation context
+      const data = await ctx.runQuery(internal.ai.getConversationContext, {
+        conversationId,
+      });
+
+      if (!data) {
+        return new Response("Conversation not found", { status: 404 });
+      }
+
+      const { messages, processedAttachments } = data;
+
+      // Build attachment context
+      let attachmentContext = "";
+      if (processedAttachments && processedAttachments.length > 0) {
+        attachmentContext = "\n\nAttached Documents:\n";
+        for (const attachment of processedAttachments) {
+          attachmentContext += `\n--- ${attachment.attachmentName} ---\n${attachment.content}\n`;
+        }
+      }
+
+      // Build conversation history
+      let threadContext = "";
+      const previousMessages = messages.filter((m) => m.type !== "user_note");
+
+      if (previousMessages.length > 1) {
+        threadContext = "\n\nPrevious messages in this thread:\n";
+        for (const msg of previousMessages.slice(0, -1)) {
+          const timestamp = new Date(msg.timestamp).toLocaleString();
+          if (msg.type === "email") {
+            threadContext += `\n[${timestamp}] Email from ${
+              msg.sender
+            }:\n${msg.content.substring(0, 500)}${
+              msg.content.length > 500 ? "..." : ""
+            }\n`;
+          } else if (msg.type === "ai_response") {
+            threadContext += `\n[${timestamp}] Your previous response:\n${msg.content.substring(
+              0,
+              300
+            )}${msg.content.length > 300 ? "..." : ""}\n`;
+          }
+        }
+      }
+
+      // System prompt
+      const systemPrompt = `You are an AI assistant helping the user manage and understand their email conversations and documents. You have two distinct modes:
+
+1. **When processing new emails**: Provide brief observations and summaries
+2. **When the user asks you questions directly**: Engage conversationally and answer their questions thoroughly
+
+Current conversation details:
+- Subject: ${emailSubject}
+- Latest sender: ${senderName || "Unknown sender"}
+- Thread has ${messages.length} messages
+
+Your approach:
+- For emails from others: Summarize key points, identify action items, analyze documents
+- For user questions: Answer directly and helpfully, referencing the context and documents
+- Be conversational when the user addresses you
+- Provide detailed analysis when asked about specific topics
+- Remember previous messages in the thread to maintain context
+
+Examples:
+- Email from someone else: "Document received: Spanish rental contract for Madrid apartment. Key terms: €4,250/month, 1-year initial term..."
+- User asks "what happens if the tenant doesn't pay?": "Based on the contract, if the tenant doesn't pay: [detailed explanation of consequences]"
+- User says "hello?": "Yes, I'm here! How can I help you with this conversation?"
+
+Always be helpful and responsive to the user's needs.`;
+
+      const isUserNote = senderName === "User";
+
+      const userMessage = isUserNote
+        ? `${attachmentContext}${threadContext}\n\nThe user is asking you directly: "${emailContent}"\n\nPlease respond conversationally and helpfully to their question.`
+        : threadContext
+        ? `${attachmentContext}${threadContext}\n\nLatest email in the thread:\n${emailContent}\n\nProvide a brief observation or note about this email.`
+        : `${attachmentContext}\n\nEmail content: ${emailContent}\n\nProvide a brief observation or note about this email.`;
+
+      // Use streamText and return proper data stream response
+      const result = streamText({
+        model: anthropic("claude-3-5-sonnet-20241022"),
+        system: systemPrompt,
+        prompt: userMessage,
+        onFinish: async ({ text }) => {
+          console.log(
+            "[STREAM] Finished streaming, total length:",
+            text.length
+          );
+          // Save the complete response to the database
+          await ctx.runMutation(internal.ai.saveAiResponse, {
+            conversationId,
+            content: text,
+          });
+        },
+      });
+
+      console.log(
+        "[STREAM] Got streamText result, converting to data stream response"
+      );
+
+      // Log the stream chunks as they pass through
+      let chunkCount = 0;
+      result.textStream.pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            chunkCount++;
+            console.log(`[STREAM] Chunk ${chunkCount}:`, chunk);
+            controller.enqueue(chunk);
+          },
+        })
+      );
+
+      // Convert to data stream response that's compatible with useChat
+      return result.toDataStreamResponse({
+        headers: corsHeaders,
+      });
+    } catch (error) {
+      console.error("Error in stream-ai-response:", error);
+      return new Response("Internal server error", {
+        status: 500,
+        headers: corsHeaders,
+      });
+    }
+  }),
+});
 
 export default http;

@@ -1,11 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "./_generated/api";
-import {
-  getCurrentUser,
-  getCurrentUserId,
-  verifyConversationOwnership,
-} from "./lib/utils";
+import { api } from "./_generated/api";
+import { getCurrentUser, verifyConversationOwnership } from "./lib/utils";
 import { conversationStatus } from "./lib/validators";
 
 export const list = query({
@@ -110,13 +106,12 @@ export const addUserNote = mutation({
       lastActivity: Date.now(),
     });
 
-    // Trigger AI response for the user note
-    await ctx.scheduler.runAfter(0, api.ai.generateResponse, {
+    return {
       conversationId: args.conversationId,
       emailContent: args.content,
       emailSubject: conversation.subject || "User Note",
       senderName: "User",
-    });
+    };
   },
 });
 
