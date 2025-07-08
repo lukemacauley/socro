@@ -10,7 +10,7 @@ import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
 import { attachmentValidator, messageType } from "./lib/validators";
 import Reducto, { toFile } from "reductoai";
 import type { Id } from "./_generated/dataModel";
-import { decode as heDecode } from "he";
+import { decode } from "he";
 
 export const processEmailNotification = internalMutation({
   args: {
@@ -234,17 +234,16 @@ export const fetchAndProcessEmail = internalAction({
       );
 
       // Use Microsoft's exact pattern from microsoft-driver.ts
-      if (uniqueBodyType === 'html') {
-        emailContent = heDecode(uniqueContent);
+      if (uniqueBodyType === "html") {
+        emailContent = decode(uniqueContent);
       } else {
-        emailContent = heDecode(uniqueContent).replace(/\n/g, '<br>');
+        emailContent = decode(uniqueContent).replace(/\n/g, "<br>");
       }
 
       console.log(
         `[WEBHOOK] UniqueBody extracted: ${emailContent.length} chars, content: "${emailContent}"`
       );
-    }
-    else {
+    } else {
       // Fall back to parsing the full body if uniqueBody is not available
       console.log("[WEBHOOK] UniqueBody not available, using full body");
       const bodyContent = email.body?.content || "";
@@ -252,9 +251,9 @@ export const fetchAndProcessEmail = internalAction({
 
       // Use Microsoft's exact pattern
       if (bodyContentType === "html") {
-        emailContent = heDecode(bodyContent);
+        emailContent = decode(bodyContent);
       } else {
-        emailContent = heDecode(bodyContent).replace(/\n/g, '<br>');
+        emailContent = decode(bodyContent).replace(/\n/g, "<br>");
       }
     }
 

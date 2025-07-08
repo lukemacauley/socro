@@ -2,7 +2,6 @@ import { action, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import Anthropic from "@anthropic-ai/sdk";
-import type { Doc } from "./_generated/dataModel";
 
 const anthropic = new Anthropic({
   apiKey: process.env.CONVEX_ANTHROPIC_API_KEY!,
@@ -40,16 +39,24 @@ export const generateResponse = action({
 
     // Build conversation history for context
     let threadContext = "";
-    const previousMessages = messages.filter(m => m.type !== "user_note");
-    
+    const previousMessages = messages.filter((m) => m.type !== "user_note");
+
     if (previousMessages.length > 1) {
       threadContext = "\n\nPrevious messages in this thread:\n";
-      for (const msg of previousMessages.slice(0, -1)) { // Exclude the latest message
+      for (const msg of previousMessages.slice(0, -1)) {
+        // Exclude the latest message
         const timestamp = new Date(msg.timestamp).toLocaleString();
         if (msg.type === "email") {
-          threadContext += `\n[${timestamp}] Email from ${msg.sender}:\n${msg.content.substring(0, 500)}${msg.content.length > 500 ? '...' : ''}\n`;
+          threadContext += `\n[${timestamp}] Email from ${
+            msg.sender
+          }:\n${msg.content.substring(0, 500)}${
+            msg.content.length > 500 ? "..." : ""
+          }\n`;
         } else if (msg.type === "ai_response") {
-          threadContext += `\n[${timestamp}] Your previous response:\n${msg.content.substring(0, 300)}${msg.content.length > 300 ? '...' : ''}\n`;
+          threadContext += `\n[${timestamp}] Your previous response:\n${msg.content.substring(
+            0,
+            300
+          )}${msg.content.length > 300 ? "..." : ""}\n`;
         }
       }
     }
@@ -80,10 +87,10 @@ Examples:
 Always be helpful and responsive to the user's needs.`;
 
     const isUserNote = args.senderName === "User";
-    
+
     const userMessage = isUserNote
       ? `${attachmentContext}${threadContext}\n\nThe user is asking you directly: "${args.emailContent}"\n\nPlease respond conversationally and helpfully to their question.`
-      : threadContext 
+      : threadContext
       ? `${attachmentContext}${threadContext}\n\nLatest email in the thread:\n${args.emailContent}\n\nProvide a brief observation or note about this email.`
       : `${attachmentContext}\n\nEmail content: ${args.emailContent}\n\nProvide a brief observation or note about this email.`;
 
