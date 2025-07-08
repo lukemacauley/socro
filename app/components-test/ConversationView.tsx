@@ -1,13 +1,10 @@
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
-import { cn } from "~/lib/utils";
-import { Download, Paperclip } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { useSidebar } from "~/components/ui/sidebar";
+import { useQuery } from "convex/react";
+import { useEffect, useRef } from "react";
+import { MessageItem } from "./MessageItem";
+import { MessageInput } from "./MessageInput";
+import { ConversationHeader } from "./ConversationHeader";
 
 export function ConversationView({
   conversationId,
@@ -15,322 +12,32 @@ export function ConversationView({
   conversationId: Id<"conversations">;
 }) {
   const data = useQuery(api.conversations.get, { conversationId });
-  const addUserNote = useMutation(api.conversations.addUserNote);
-  const generateAiResponse = useAction(api.ai.generateResponse);
-  const downloadAttachment = useAction(api.webhooks.downloadAttachment);
-  const updateStreamingResponse = useMutation(api.ai.updateStreamingResponse);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const [newNote, setNewNote] = useState("");
-
-  const scrollToBottom = () => {
-    scrollRef.current?.scrollIntoView({ behavior: "instant" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    scrollRef.current?.scrollIntoView({ behavior: "instant" });
   }, [data?.messages.length]);
-
-  const handleAddNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNote.trim()) return;
-
-    try {
-      const result = await addUserNote({ conversationId, content: newNote });
-      setNewNote("");
-
-      // Trigger streaming AI response
-      const response = await fetch(
-        `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: "user",
-                content: newNote,
-                data: result,
-              },
-            ],
-          }),
-        }
-      );
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedContent = "";
-      let buffer = "";
-
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        // Decode the chunk and add to buffer
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Parse the AI SDK data stream format
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ""; // Keep incomplete line in buffer
-        
-        for (const line of lines) {
-          if (line.startsWith('0:"')) {
-            // Text content chunk
-            const match = line.match(/^0:"(.*)"/);
-            if (match) {
-              const textChunk = match[1]
-                .replace(/\\n/g, '\n')
-                .replace(/\\"/g, '"')
-                .replace(/\\\\/g, '\\');
-              accumulatedContent += textChunk;
-              
-              // Update the message in the database
-              if (result.aiResponseId) {
-                await updateStreamingResponse({
-                  messageId: result.aiResponseId,
-                  content: accumulatedContent,
-                });
-              }
-            }
-          }
-          // Ignore other message types (f:, e:, d:) for now
-        }
-      }
-    } catch (error) {
-      toast.error("Failed to add note");
-    }
-  };
-
-  const handleGenerateResponse = async () => {
-    const originalEmail = data?.messages.find((m) => m.type === "email");
-    if (!originalEmail) {
-      toast.error("No original email found");
-      return;
-    }
-
-    try {
-      await generateAiResponse({
-        conversationId,
-        emailContent: originalEmail.content,
-        emailSubject: data?.conversation.subject ?? "",
-        senderName:
-          data?.conversation.participants.map((p) => p.name).join(", ") || "",
-      });
-      toast.success("AI response generated");
-    } catch (error) {
-      toast.error("Failed to generate AI response");
-    }
-  };
-
-  const handleDownloadAttachment = async (
-    emailId: string,
-    attachmentId: string,
-    fileName: string
-  ) => {
-    try {
-      toast.info("Downloading attachment...");
-
-      const result = await downloadAttachment({
-        emailId,
-        attachmentId,
-      });
-
-      if (result) {
-        // Convert base64 to blob
-        const byteCharacters = atob(result.content);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: result.contentType });
-
-        // Create download link
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        toast.success("Attachment downloaded");
-      } else {
-        toast.error("Failed to download attachment");
-      }
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Failed to download attachment");
-    }
-  };
-
-  const { state } = useSidebar();
 
   return (
     <div className="h-full flex flex-col relative">
-      {/* Header */}
-      <div className="p-4 border-b bg-white">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold mb-1">
-              {data?.conversation.subject}
-            </h1>
-            <p className="text-sm text-zinc-600">
-              From:{" "}
-              {data?.conversation.participants
-                .map((p) => p.name || p.email)
-                .join(", ")}
-            </p>
-          </div>
-        </div>
-      </div>
+      <ConversationHeader
+        subject={data?.conversation.subject}
+        participants={data?.conversation.participants}
+      />
 
-      {/* Messages */}
       <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-16 overflow-y-auto space-y-12">
         {data?.messages.map((message, index) => (
-          <div
+          <MessageItem
             key={message._id}
-            className={cn(
-              "flex",
-              // Apply min-height to the last message
-              index === data.messages.length - 1 && "min-h-[calc(100vh-20rem)]",
-              message.type === "sent_email" || message.type === "user_note"
-                ? "justify-end"
-                : "justify-start"
-            )}
-          >
-            <div
-              className={
-                ["email", "sent_email", "user_note"].includes(message.type)
-                  ? "max-w-4/5"
-                  : "w-full"
-              }
-            >
-              <div
-                className={cn(
-                  "rounded-lg p-4",
-                  message.type === "email"
-                    ? "w-full bg-orange-50 border border-zinc-200"
-                    : message.type === "sent_email"
-                    ? "w-full bg-orange-50 border border-zinc-200"
-                    : message.type === "user_note"
-                    ? "w-full bg-orange-50 border border-zinc-200"
-                    : message.type === "ai_response"
-                    ? "w-full p-0 border-zinc-200"
-                    : "w-full"
-                )}
-              >
-                <div
-                  className={
-                    message.type === "email" || message.type === "sent_email"
-                      ? "flex items-center justify-between mb-2"
-                      : "hidden"
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">
-                      {message.type === "email" && "Received"}
-                      {message.type === "sent_email" && "Sent"}
-                    </span>
-                    {message.sender && (
-                      <span className="text-xs text-zinc-600">
-                        {message.type === "sent_email" ? "to" : "from"}{" "}
-                        {message.sender}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {message.type === "ai_response" ? (
-                  <div className="prose max-w-none">
-                    <ReactMarkdown>{message.content || ""}</ReactMarkdown>
-                  </div>
-                ) : message.type === "email" ||
-                  message.type === "sent_email" ? (
-                  <div
-                    className="prose"
-                    dangerouslySetInnerHTML={{ __html: message.content }}
-                  />
-                ) : (
-                  <div className="prose">{message.content}</div>
-                )}
-
-                {message.attachments && message.attachments.length > 0 && (
-                  <div className="mt-3 border-t pt-3">
-                    <p className="text-sm font-medium text-zinc-700 mb-2">
-                      Attachments ({message.attachments.length})
-                    </p>
-                    <div className="space-y-2">
-                      {message.attachments.map((attachment) => (
-                        <div
-                          key={attachment.id}
-                          className="flex items-center justify-between p-2 rounded-lg"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <Paperclip className="size-5" />
-                            <div>
-                              <p className="text-sm font-medium">
-                                {attachment.name}
-                              </p>
-                              <p className="text-xs text-zinc-500">
-                                {attachment.contentType} •{" "}
-                                {(attachment.size / 1024).toFixed(1)} KB
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            size="icon"
-                            onClick={() =>
-                              handleDownloadAttachment(
-                                message.emailId!,
-                                attachment.id,
-                                attachment.name
-                              )
-                            }
-                          >
-                            <Download />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+            message={message}
+            isLast={index === data.messages.length - 1}
+          />
         ))}
       </div>
-      {/* if status submitted show loader */}
       <div ref={scrollRef} />
-      {/* Scroll reference for auto-scrolling */}
 
-      {/* Add note form */}
-      <div
-        className="fixed left-0 right-0 bottom-0"
-        style={{
-          left: state === "collapsed" ? "3rem" : "18rem",
-        }}
-      >
-        <div className="p-4 max-w-3xl w-full mx-auto backdrop-blur-md bg-white/50">
-          <form onSubmit={handleAddNote} className="flex gap-2">
-            <input
-              type="text"
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Add a note to this conversation..."
-              className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={!newNote.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Add Note
-            </button>
-          </form>
-        </div>
-      </div>
+      <MessageInput conversationId={conversationId} />
     </div>
   );
 }
