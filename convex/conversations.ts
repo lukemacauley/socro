@@ -106,11 +106,22 @@ export const addUserNote = mutation({
       lastActivity: Date.now(),
     });
 
+    // Create a placeholder AI response that will be populated via streaming
+    const aiResponseId = await ctx.db.insert("messages", {
+      conversationId: args.conversationId,
+      content: "", // Will be populated via streaming
+      type: "ai_response",
+      sender: "ai",
+      timestamp: Date.now(),
+      isStreaming: true,
+    });
+
     return {
       conversationId: args.conversationId,
       emailContent: args.content,
       emailSubject: conversation.subject || "User Note",
       senderName: "User",
+      aiResponseId,
     };
   },
 });

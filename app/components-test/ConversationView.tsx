@@ -7,7 +7,6 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "~/lib/utils";
 import { Download, Paperclip } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { useChat } from "@ai-sdk/react";
 import { useSidebar } from "~/components/ui/sidebar";
 
 export function ConversationView({
@@ -19,14 +18,11 @@ export function ConversationView({
   const addUserNote = useMutation(api.conversations.addUserNote);
   const generateAiResponse = useAction(api.ai.generateResponse);
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
+  const updateStreamingResponse = useMutation(api.ai.updateStreamingResponse);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const [newNote, setNewNote] = useState("");
-
-  const { messages, status, append } = useChat({
-    api: `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`,
-  });
 
   const scrollToBottom = () => {
     scrollRef.current?.scrollIntoView({ behavior: "instant" });
@@ -34,7 +30,7 @@ export function ConversationView({
 
   useEffect(() => {
     scrollToBottom();
-  }, [status === "submitted"]);
+  }, [data?.messages.length]);
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,11 +41,62 @@ export function ConversationView({
       setNewNote("");
 
       // Trigger streaming AI response
-      await append({
-        role: "user",
-        content: newNote,
-        data: result,
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content: newNote,
+                data: result,
+              },
+            ],
+          }),
+        }
+      );
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+      let buffer = "";
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Decode the chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Parse the AI SDK data stream format
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ""; // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (line.startsWith('0:"')) {
+            // Text content chunk
+            const match = line.match(/^0:"(.*)"/);
+            if (match) {
+              const textChunk = match[1]
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\');
+              accumulatedContent += textChunk;
+              
+              // Update the message in the database
+              if (result.aiResponseId) {
+                await updateStreamingResponse({
+                  messageId: result.aiResponseId,
+                  content: accumulatedContent,
+                });
+              }
+            }
+          }
+          // Ignore other message types (f:, e:, d:) for now
+        }
+      }
     } catch (error) {
       toast.error("Failed to add note");
     }
@@ -147,14 +194,8 @@ export function ConversationView({
             key={message._id}
             className={cn(
               "flex",
-              // Apply min-height to the last database message when streaming messages exist
-              index === data.messages.length - 1 &&
-                messages.length > 0 &&
-                "min-h-[calc(100vh-20rem)]",
-              // Or if it's the absolute last message and no streaming
-              index === data.messages.length - 1 &&
-                messages.length === 0 &&
-                "last:min-h-[calc(100vh-20rem)]",
+              // Apply min-height to the last message
+              index === data.messages.length - 1 && "min-h-[calc(100vh-20rem)]",
               message.type === "sent_email" || message.type === "user_note"
                 ? "justify-end"
                 : "justify-start"
@@ -259,45 +300,6 @@ export function ConversationView({
             </div>
           </div>
         ))}
-
-        {/* Streaming messages from useChat */}
-        {messages.map((message, index) => {
-          return (
-            <div
-              key={message.id}
-              className={cn(
-                "flex",
-                messages.length - 1 === index && "min-h-[calc(100vh-200px)]",
-
-                // Apply min-height to the last user message
-                // message.role === "user" &&
-                message.role === "user" ? "justify-end" : "justify-start"
-              )}
-            >
-              <div className={message.role === "user" ? "max-w-4/5" : "w-full"}>
-                <div
-                  className={cn(
-                    "rounded-lg p-4",
-                    message.role === "user"
-                      ? "w-full bg-orange-50 border border-zinc-200"
-                      : "w-full p-0 border-zinc-200"
-                  )}
-                >
-                  {message.role === "assistant" ? (
-                    <div className="prose max-w-none">
-                      <ReactMarkdown>{message.content || ""}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <div className="prose">{message.content}</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {/* {status === "submitted" && (
-          <div className="animate-spin rounded-full h-6 w-6 border-t-1 border-x-1 border-orange-500" />
-        )} */}
       </div>
       {/* if status submitted show loader */}
       <div ref={scrollRef} />

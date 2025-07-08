@@ -1,4 +1,9 @@
-import { action, internalMutation, internalQuery } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import Anthropic from "@anthropic-ai/sdk";
@@ -173,5 +178,20 @@ export const saveAiResponse = internalMutation({
       status: "in_progress",
       lastActivity: Date.now(),
     });
+  },
+});
+
+export const updateStreamingResponse = mutation({
+  args: {
+    messageId: v.id("messages"),
+    content: v.string(),
+    isComplete: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const updates: any = { content: args.content };
+    if (args.isComplete) {
+      updates.isStreaming = false;
+    }
+    await ctx.db.patch(args.messageId, updates);
   },
 });

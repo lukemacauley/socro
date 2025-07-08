@@ -2,7 +2,7 @@ import { httpRouter } from "convex/server";
 import type { WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { streamText } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 
@@ -186,8 +186,13 @@ http.route({
       const lastMessage = msgs[msgs.length - 1];
 
       // The data we need is in the last message's data field
-      const { conversationId, emailContent, emailSubject, senderName } =
-        lastMessage?.data || {};
+      const {
+        conversationId,
+        emailContent,
+        emailSubject,
+        senderName,
+        aiResponseId,
+      } = lastMessage?.data || {};
 
       // Get conversation context
       const data = await ctx.runQuery(internal.ai.getConversationContext, {
@@ -275,11 +280,14 @@ Always be helpful and responsive to the user's needs.`;
             "[STREAM] Finished streaming, total length:",
             text.length
           );
-          // Save the complete response to the database
-          await ctx.runMutation(internal.ai.saveAiResponse, {
-            conversationId,
-            content: text,
-          });
+          // Mark the response as complete
+          if (aiResponseId) {
+            await ctx.runMutation(api.ai.updateStreamingResponse, {
+              messageId: aiResponseId,
+              content: text,
+              isComplete: true,
+            });
+          }
         },
       });
 
