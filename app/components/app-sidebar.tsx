@@ -16,6 +16,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  useSidebar,
 } from "~/components/ui/sidebar";
 import {
   SignedIn,
@@ -57,12 +58,13 @@ export const NAVIGATION: {
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { state } = useSidebar();
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <Link to="/" className="px-2">
-          <h1 className="font-semibold text-xl tracking-widest leading-relaxed text-blue-800 uppercase">
-            CONGAS
+          <h1 className="font-semibold text-xl tracking-widest leading-relaxed text-blue-800 uppercase transition-all">
+            {state === "collapsed" ? "C" : "CONGAS"}
           </h1>
         </Link>
       </SidebarHeader>
