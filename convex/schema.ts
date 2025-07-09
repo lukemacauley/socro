@@ -49,6 +49,7 @@ const applicationTables = {
     emailId: v.optional(v.string()), // Microsoft Graph message ID if applicable
     attachments: v.optional(v.array(attachmentValidator)),
     isStreaming: v.optional(v.boolean()), // For AI streaming responses
+    streamId: v.optional(v.string()), // For persistent text streaming
   })
     .index("by_conversation", ["conversationId"])
     .index("by_timestamp", ["timestamp"])

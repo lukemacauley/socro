@@ -3,10 +3,16 @@ import {
   internalMutation,
   internalQuery,
   mutation,
+  query,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  type StreamId,
+  StreamIdValidator,
+} from "@convex-dev/persistent-text-streaming";
+import { streamingComponent } from "./streaming";
 
 const anthropic = new Anthropic({
   apiKey: process.env.CONVEX_ANTHROPIC_API_KEY!,
@@ -193,5 +199,72 @@ export const updateStreamingResponse = mutation({
       updates.isStreaming = false;
     }
     await ctx.db.patch(args.messageId, updates);
+  },
+});
+
+// Get the stream body for a message
+export const getMessageStreamBody = query({
+  args: {
+    streamId: StreamIdValidator,
+  },
+  handler: async (ctx, args) => {
+    return await streamingComponent.getStreamBody(
+      ctx,
+      args.streamId as StreamId
+    );
+  },
+});
+
+// Create AI response with stream
+export const createAiResponseWithStream = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    streamId: v.id("streams"),
+  },
+  handler: async (ctx, args) => {
+    const messageId = await ctx.db.insert("messages", {
+      conversationId: args.conversationId,
+      content: "",
+      type: "ai_response",
+      sender: "ai",
+      timestamp: Date.now(),
+      isStreaming: true,
+      streamId: args.streamId,
+    });
+
+    return messageId;
+  },
+});
+
+// Finalize streaming message
+export const finalizeStreamingMessage = internalMutation({
+  args: {
+    streamId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find the message with this streamId
+    const messages = await ctx.db
+      .query("messages")
+      .filter((q) => q.eq(q.field("streamId"), args.streamId))
+      .collect();
+
+    if (messages.length === 0) {
+      console.error("No message found with streamId:", args.streamId);
+      return;
+    }
+
+    const message = messages[0];
+
+    // Get the full text from the stream
+    const streamData = await streamingComponent.getStreamBody(
+      ctx,
+      args.streamId as StreamId
+    );
+
+    // Update the message with the final content
+    await ctx.db.patch(message._id, {
+      content: streamData.text,
+      isStreaming: false,
+    });
   },
 });

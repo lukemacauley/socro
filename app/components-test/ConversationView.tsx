@@ -2,9 +2,10 @@ import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { useEffect, useRef } from "react";
-import { MessageItem } from "./MessageItem";
+import { MessageItem } from "./MessageItem.client";
 import { MessageInput } from "./MessageInput";
 import { ConversationHeader } from "./ConversationHeader";
+import { ClientOnly } from "~/lib/client-only";
 
 export function ConversationView({
   conversationId,
@@ -26,18 +27,24 @@ export function ConversationView({
         participants={data?.conversation.participants}
       />
 
-      <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-16 overflow-y-auto space-y-12">
-        {data?.messages.map((message, i) => (
-          <MessageItem
-            key={message._id}
-            message={message}
-            isLast={i === data.messages.length - 1}
-          />
-        ))}
-      </div>
+      <ClientOnly>
+        {() => (
+          <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-16 overflow-y-auto space-y-12">
+            {data?.messages.map((message, i) => (
+              <MessageItem
+                key={message._id}
+                message={message}
+                isLast={i === data.messages.length - 1}
+              />
+            ))}
+          </div>
+        )}
+      </ClientOnly>
       <div ref={scrollRef} />
 
-      <MessageInput conversationId={conversationId} />
+      <ClientOnly>
+        {() => <MessageInput conversationId={conversationId} />}
+      </ClientOnly>
     </div>
   );
 }

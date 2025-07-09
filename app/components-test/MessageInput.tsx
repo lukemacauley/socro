@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useStreamingResponse } from "~/hooks/useStreamingResponse";
-
 export function MessageInput({
   conversationId,
 }: {
@@ -31,13 +30,11 @@ export function MessageInput({
       await streamResponse(
         `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`,
         {
-          messages: [
-            {
-              role: "user",
-              content: newNote,
-              data: result,
-            },
-          ],
+          streamId: result.streamId,
+          conversationId: result.conversationId,
+          emailContent: result.emailContent,
+          emailSubject: result.emailSubject,
+          senderName: result.senderName,
         },
         result.aiResponseId
       );

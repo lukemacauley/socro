@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { getCurrentUser, verifyConversationOwnership } from "./lib/utils";
 import { conversationStatus } from "./lib/validators";
+import { streamingComponent } from "./streaming";
 
 export const list = query({
   args: {
@@ -106,6 +107,9 @@ export const addUserNote = mutation({
       lastActivity: Date.now(),
     });
 
+    // Create a stream for the AI response
+    const streamId = await streamingComponent.createStream(ctx);
+
     // Create a placeholder AI response that will be populated via streaming
     const aiResponseId = await ctx.db.insert("messages", {
       conversationId: args.conversationId,
@@ -114,6 +118,7 @@ export const addUserNote = mutation({
       sender: "ai",
       timestamp: Date.now(),
       isStreaming: true,
+      streamId,
     });
 
     return {
@@ -122,6 +127,7 @@ export const addUserNote = mutation({
       emailSubject: conversation.subject || "User Note",
       senderName: "User",
       aiResponseId,
+      streamId,
     };
   },
 });

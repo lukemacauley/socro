@@ -6,6 +6,7 @@ import type { Doc } from "convex/_generated/dataModel";
 import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
+import { useStream } from "@convex-dev/persistent-text-streaming/react";
 
 interface MessageItemProps {
   message: Doc<"messages"> & {
@@ -22,6 +23,20 @@ interface MessageItemProps {
 
 export function MessageItem({ message, isLast }: MessageItemProps) {
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
+
+  // Use streaming if this message has a streamId and is streaming
+  const shouldStream =
+    message.isStreaming && !!message.streamId && message.streamId !== "";
+
+  const streamData = useStream(
+    api.ai.getMessageStreamBody,
+    new URL(`${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`),
+    !!shouldStream,
+    message.streamId as any
+  );
+
+  // Use streamed content if available, otherwise fall back to stored content
+  const displayContent = streamData?.text || message.content;
 
   const handleDownloadAttachment = async (
     emailId: string,
@@ -65,6 +80,8 @@ export function MessageItem({ message, isLast }: MessageItemProps) {
       toast.error("Failed to download attachment");
     }
   };
+
+  console.log({ displayContent });
 
   return (
     <div
@@ -119,7 +136,10 @@ export function MessageItem({ message, isLast }: MessageItemProps) {
           </div>
           {message.type === "ai_response" ? (
             <div className="prose max-w-none">
-              <ReactMarkdown>{message.content || ""}</ReactMarkdown>
+              <ReactMarkdown>{displayContent || ""}</ReactMarkdown>
+              {/* {message.isStreaming && streamData?.status === "streaming" && (
+                <span className="inline-block w-1 h-4 bg-gray-400 animate-pulse ml-1" />
+              )} */}
             </div>
           ) : message.type === "email" || message.type === "sent_email" ? (
             <div
