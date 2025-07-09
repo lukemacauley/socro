@@ -3,7 +3,7 @@ import type { WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { streamText } from "ai";
+import { smoothStream, streamText } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 
 const http = httpRouter();
@@ -275,6 +275,7 @@ Always be helpful and responsive to the user's needs.`;
         model: anthropic("claude-3-5-sonnet-20241022"),
         system: systemPrompt,
         prompt: userMessage,
+        experimental_transform: smoothStream(),
         onFinish: async ({ text }) => {
           console.log(
             "[STREAM] Finished streaming, total length:",

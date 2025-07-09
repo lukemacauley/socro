@@ -27,11 +27,11 @@ export function ConversationView({
       />
 
       <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-16 overflow-y-auto space-y-12">
-        {data?.messages.map((message, index) => (
+        {data?.messages.map((message, i) => (
           <MessageItem
             key={message._id}
             message={message}
-            isLast={index === data.messages.length - 1}
+            isLast={i === data.messages.length - 1}
           />
         ))}
       </div>

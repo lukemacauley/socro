@@ -7,9 +7,6 @@ import {
   MessagesSquare,
 } from "lucide-react";
 import { NavMain } from "~/components/nav-main";
-import { NavProjects } from "~/components/nav-projects";
-// import { NavUser } from "~/components/nav-user";
-import { TeamSwitcher } from "~/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +20,7 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/react-router";
+import { Link } from "react-router";
 
 export const NAVIGATION: {
   title: string;
@@ -58,9 +56,13 @@ export const NAVIGATION: {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      {/* <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
-      </SidebarHeader> */}
+      <SidebarHeader>
+        <Link to="/" className="p-2">
+          <h1 className="font-semibold text-xl uppercase tracking-widest">
+            CONGAS
+          </h1>
+        </Link>
+      </SidebarHeader>
       <SidebarContent>
         <NavMain items={NAVIGATION} />
         {/* <NavProjects projects={data.projects} /> */}

@@ -1,5 +1,6 @@
 import { useMutation } from "convex/react";
 import { api } from "convex/_generated/api";
+import type { Id } from "convex/_generated/dataModel";
 
 export function useStreamingResponse() {
   const updateStreamingResponse = useMutation(api.ai.updateStreamingResponse);
@@ -47,7 +48,7 @@ export function useStreamingResponse() {
             // Update the message in the database
             if (aiResponseId) {
               await updateStreamingResponse({
-                messageId: aiResponseId,
+                messageId: aiResponseId as Id<"messages">,
                 content: accumulatedContent,
               });
             }

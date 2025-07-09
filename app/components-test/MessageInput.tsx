@@ -1,8 +1,10 @@
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import { useState, type FormEvent } from "react";
+import { ArrowUp } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { Button } from "~/components/ui/button";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useStreamingResponse } from "~/hooks/useStreamingResponse";
 
@@ -51,22 +53,18 @@ export function MessageInput({
         left: state === "collapsed" ? "3rem" : "18rem",
       }}
     >
-      <div className="p-4 max-w-3xl w-full mx-auto backdrop-blur-md bg-white/50">
+      <div className="p-4 max-w-4xl w-full mx-auto backdrop-blur-md bg-white/50 border-t-4 border-x-4 border-orange-100 rounded-t-xl">
         <form onSubmit={handleAddNote} className="flex gap-2">
           <input
             type="text"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
             placeholder="Add a note to this conversation..."
-            className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 focus:outline-none focus:ring-0"
           />
-          <button
-            type="submit"
-            disabled={!newNote.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add Note
-          </button>
+          <Button type="submit" disabled={!newNote.trim()} size="icon">
+            <ArrowUp className="size-5" />
+          </Button>
         </form>
       </div>
     </div>
