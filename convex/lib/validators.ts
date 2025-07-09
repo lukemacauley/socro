@@ -10,6 +10,7 @@ export const conversationStatus = v.union(
 // Single source of truth for message types
 export const messageType = v.union(
   v.literal("email"),
+  v.literal("sent_email"),
   v.literal("ai_response"),
   v.literal("user_note")
 );

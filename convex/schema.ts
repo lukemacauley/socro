@@ -1,6 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { conversationStatus, messageType, attachmentValidator } from "./lib/validators";
+import {
+  conversationStatus,
+  messageType,
+  attachmentValidator,
+} from "./lib/validators";
 
 const applicationTables = {
   users: defineTable({
@@ -22,15 +26,18 @@ const applicationTables = {
     // Thread metadata
     initialEmailId: v.string(), // ID of the first email in the thread
     latestEmailId: v.string(), // ID of the most recent email
-    participants: v.array(v.object({
-      email: v.string(),
-      name: v.optional(v.string()),
-    })),
+    participants: v.array(
+      v.object({
+        email: v.string(),
+        name: v.optional(v.string()),
+      })
+    ),
     createdAt: v.number(),
     lastActivity: v.number(),
+    agentThreadId: v.optional(v.string()), // ID for agent-specific threads
   })
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]) 
+    .index("by_status", ["status"])
     .index("by_thread", ["threadId", "userId"]),
 
   messages: defineTable({
@@ -40,7 +47,9 @@ const applicationTables = {
     sender: v.optional(v.string()), // email sender or "ai" or user ID
     timestamp: v.number(),
     emailId: v.optional(v.string()), // Microsoft Graph message ID if applicable
+    streamId: v.optional(v.string()), // Microsoft Graph message ID if applicable
     attachments: v.optional(v.array(attachmentValidator)),
+    isStreaming: v.optional(v.boolean()),
   })
     .index("by_conversation", ["conversationId"])
     .index("by_timestamp", ["timestamp"])
