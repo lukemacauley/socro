@@ -41,7 +41,7 @@ export function StreamingMessage({
 
   return (
     <div className="rounded-lg p-0 border-zinc-200">
-      <div className="prose max-w-none">
+      <div className="prose prose-sm max-w-none">
         <ReactMarkdown>{text || ""}</ReactMarkdown>
       </div>
       {status === "error" && (
