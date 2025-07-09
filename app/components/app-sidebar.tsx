@@ -16,6 +16,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  useSidebar,
 } from "~/components/ui/sidebar";
 import {
   SignedIn,
@@ -23,6 +24,7 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/react-router";
+import { Link } from "react-router";
 
 export const NAVIGATION: {
   title: string;
@@ -39,13 +41,13 @@ export const NAVIGATION: {
     title: "Emails",
     icon: MessagesSquare,
     url: "/emails",
-    isActive: true,
-    items: [
-      { title: "All", url: "/emails" },
-      { title: "New", url: "/emails/new" },
-      { title: "In Progress", url: "/emails/progress" },
-      { title: "Resolved", url: "/emails/resolved" },
-    ],
+    // isActive: true,
+    // items: [
+    //   { title: "All", url: "/emails" },
+    //   { title: "New", url: "/emails/new" },
+    //   { title: "In Progress", url: "/emails/progress" },
+    //   { title: "Resolved", url: "/emails/resolved" },
+    // ],
   },
   {
     title: "Vault",
@@ -56,11 +58,16 @@ export const NAVIGATION: {
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { state } = useSidebar();
   return (
     <Sidebar collapsible="icon" {...props}>
-      {/* <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
-      </SidebarHeader> */}
+      <SidebarHeader>
+        <Link to="/" className="px-2">
+          <h1 className="font-semibold text-xl tracking-widest leading-relaxed text-blue-800 uppercase transition-all">
+            {state === "collapsed" ? "C" : "CONGAS"}
+          </h1>
+        </Link>
+      </SidebarHeader>
       <SidebarContent>
         <NavMain items={NAVIGATION} />
         {/* <NavProjects projects={data.projects} /> */}

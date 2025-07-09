@@ -43,7 +43,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <ScrollRestoration />
-        <Toaster />
+        <Toaster position="top-right" expand />
         <Scripts />
       </body>
     </html>

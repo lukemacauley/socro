@@ -2,7 +2,6 @@ import { action, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import Anthropic from "@anthropic-ai/sdk";
-import type { Doc } from "./_generated/dataModel";
 
 const anthropic = new Anthropic({
   apiKey: process.env.CONVEX_ANTHROPIC_API_KEY!,
@@ -14,6 +13,7 @@ export const generateResponse = action({
     emailContent: v.string(),
     emailSubject: v.string(),
     senderName: v.optional(v.string()),
+    streamId: v.string(),
   },
   handler: async (ctx, args): Promise<string> => {
     const conversationData = await ctx.runQuery(
@@ -27,47 +27,73 @@ export const generateResponse = action({
       throw new Error("Conversation not found");
     }
 
-    const { conversation, messages } = conversationData;
+    const { messages, processedAttachments } = conversationData;
+
+    // Include attachment content if available
+    let attachmentContext = "";
+    if (processedAttachments && processedAttachments.length > 0) {
+      attachmentContext = "\n\nAttached Documents:\n";
+      for (const attachment of processedAttachments) {
+        attachmentContext += `\n--- ${attachment.attachmentName} ---\n${attachment.content}\n`;
+      }
+    }
 
     // Build conversation history for context
     let threadContext = "";
-    const previousMessages = messages.filter(m => m.type !== "user_note");
-    
+    const previousMessages = messages.filter((m) => m.type !== "user_note");
+
     if (previousMessages.length > 1) {
       threadContext = "\n\nPrevious messages in this thread:\n";
-      for (const msg of previousMessages.slice(0, -1)) { // Exclude the latest message
+      for (const msg of previousMessages.slice(0, -1)) {
+        // Exclude the latest message
         const timestamp = new Date(msg.timestamp).toLocaleString();
         if (msg.type === "email") {
-          threadContext += `\n[${timestamp}] Email from ${msg.sender}:\n${msg.content.substring(0, 500)}${msg.content.length > 500 ? '...' : ''}\n`;
+          threadContext += `\n[${timestamp}] Email from ${
+            msg.sender
+          }:\n${msg.content.substring(0, 500)}${
+            msg.content.length > 500 ? "..." : ""
+          }\n`;
         } else if (msg.type === "ai_response") {
-          threadContext += `\n[${timestamp}] Your previous response:\n${msg.content.substring(0, 300)}${msg.content.length > 300 ? '...' : ''}\n`;
+          threadContext += `\n[${timestamp}] Your previous response:\n${msg.content.substring(
+            0,
+            300
+          )}${msg.content.length > 300 ? "..." : ""}\n`;
         }
       }
     }
 
     // Build prompt for Anthropic
-    const systemPrompt = `You are an AI legal email assistant specializing in contract review and legal document analysis. You help lawyers and legal professionals manage their email conversations by providing suggested responses and insights about legal documents.
+    const systemPrompt = `You are an AI assistant helping the user manage and understand their email conversations and documents. You have two distinct modes:
+
+1. **When processing new emails**: Provide brief observations and summaries
+2. **When the user asks you questions directly**: Engage conversationally and answer their questions thoroughly
 
 Current conversation details:
 - Subject: ${args.emailSubject}
-- From: ${args.senderName || "Unknown sender"}
+- Latest sender: ${args.senderName || "Unknown sender"}
 - Thread has ${messages.length} messages
 
-When analyzing legal documents or contracts:
-1. Identify specific clauses or sections mentioned in the email
-2. Provide precise analysis of any requested changes
-3. Flag potential legal issues or concerns
-4. Suggest appropriate legal language for responses
-5. Maintain a professional, legally-sound tone
-6. Consider the full context of the email thread when responding
+Your approach:
+- For emails from others: Summarize key points, identify action items, analyze documents
+- For user questions: Answer directly and helpfully, referencing the context and documents
+- Be conversational when the user addresses you
+- Provide detailed analysis when asked about specific topics
+- Remember previous messages in the thread to maintain context
 
-If the email mentions specific changes (e.g., "change clause 12"), focus your response on that specific request and provide actionable legal guidance.
+Examples:
+- Email from someone else: "Document received: Spanish rental contract for Madrid apartment. Key terms: €4,250/month, 1-year initial term..."
+- User asks "what happens if the tenant doesn't pay?": "Based on the contract, if the tenant doesn't pay: [detailed explanation of consequences]"
+- User says "hello?": "Yes, I'm here! How can I help you with this conversation?"
 
-IMPORTANT: You are responding to the latest email in the thread. Consider previous messages for context but focus your response on addressing the most recent email.`;
+Always be helpful and responsive to the user's needs.`;
 
-    const userMessage = threadContext 
-      ? `${threadContext}\n\nLatest email to respond to:\n${args.emailContent}`
-      : `Email content: ${args.emailContent}`;
+    const isUserNote = args.senderName === "User";
+
+    const userMessage = isUserNote
+      ? `${attachmentContext}${threadContext}\n\nThe user is asking you directly: "${args.emailContent}"\n\nPlease respond conversationally and helpfully to their question.`
+      : threadContext
+      ? `${attachmentContext}${threadContext}\n\nLatest email in the thread:\n${args.emailContent}\n\nProvide a brief observation or note about this email.`
+      : `${attachmentContext}\n\nEmail content: ${args.emailContent}\n\nProvide a brief observation or note about this email.`;
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -92,6 +118,7 @@ IMPORTANT: You are responding to the latest email in the thread. Consider previo
     await ctx.runMutation(internal.ai.saveAiResponse, {
       conversationId: args.conversationId,
       content: aiResponse,
+      streamId: args.streamId,
     });
 
     return aiResponse;
@@ -114,9 +141,18 @@ export const getConversationContext = internalQuery({
       .order("asc")
       .collect();
 
+    // Also get processed attachments for this conversation
+    const processedAttachments = await ctx.db
+      .query("processedAttachments")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .collect();
+
     return {
       conversation,
       messages,
+      processedAttachments,
     };
   },
 });
@@ -125,19 +161,51 @@ export const saveAiResponse = internalMutation({
   args: {
     conversationId: v.id("conversations"),
     content: v.string(),
+    streamId: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("messages", {
+    const messageId = await ctx.db.insert("messages", {
       conversationId: args.conversationId,
       content: args.content,
       type: "ai_response",
       sender: "ai",
       timestamp: Date.now(),
+      streamId: args.streamId,
     });
 
     await ctx.db.patch(args.conversationId, {
       status: "in_progress",
       lastActivity: Date.now(),
     });
+  },
+});
+
+export const getMessageByStreamId = internalQuery({
+  args: { streamId: v.string() },
+  handler: async (ctx, args) => {
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_streamId", (q) => q.eq("streamId", args.streamId))
+      .first();
+
+    if (!message) {
+      return null;
+    }
+
+    const conversation = await ctx.db.get(message.conversationId);
+    if (!conversation) {
+      return null;
+    }
+
+    const result = {
+      message,
+      conversation,
+      conversationId: message.conversationId,
+      emailContent: message.content,
+      emailSubject: conversation.subject,
+      senderName: message.type === "user_note" ? "User" : message.sender,
+    };
+
+    return result;
   },
 });

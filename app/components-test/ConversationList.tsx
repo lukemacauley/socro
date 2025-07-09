@@ -1,83 +1,39 @@
 import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
 import { useQuery } from "convex/react";
-import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { Link } from "react-router";
 
 export function ConversationList() {
-  const [selectedConversationId, setSelectedConversationId] =
-    useState<Id<"conversations"> | null>(null);
-  const [statusFilter, setStatusFilter] = useState<
-    "new" | "in_progress" | "resolved" | undefined
-  >(undefined);
-  const conversations = useQuery(api.conversations.list, {
-    status: statusFilter,
-  });
+  const conversations = useQuery(api.conversations.list, {});
 
   return (
     <div className="h-full flex flex-col">
-      {/* Conversation list */}
       <div className="flex-1 overflow-y-auto">
-        <div className="space-y-1 p-2">
-          {conversations?.map((conversation) => (
+        <div className="space-y-1 p-4">
+          {conversations?.map((c) => (
             <Link
-              key={conversation._id}
-              to={"/emails/" + conversation._id}
-              className={`p-3 block rounded-lg cursor-pointer transition-colors ${
-                selectedConversationId === conversation._id
-                  ? "bg-blue-50 border border-blue-200"
-                  : "hover:bg-gray-50 border border-transparent"
-              }`}
+              key={c._id}
+              to={"/emails/" + c._id}
+              className="flex items-center w-full justify-between gap-4 rounded-lg hover:bg-blue-50 px-3 py-2"
             >
-              <div className="flex items-start justify-between mb-1">
-                <h3 className="font-medium text-sm truncate flex-1 mr-2">
-                  {conversation.subject}
-                </h3>
-                <StatusBadge status={conversation.status} />
+              <div className="min-w-0 flex-1 flex items-center gap-4">
+                <div className="w-96 flex-shrink-0">
+                  {c.fromName || c.fromEmail}
+                </div>
+                <div className="font-semibold flex-none truncate">
+                  {c.subject}
+                </div>
+                <div className="text-sm text-zinc-500 line-clamp-1">
+                  <ReactMarkdown>{c.latestMessage.content}</ReactMarkdown>
+                </div>
               </div>
-
-              <p className="text-xs text-gray-600 mb-1">
-                From: {conversation.fromName || conversation.fromEmail}
-              </p>
-
-              {conversation.latestMessage && (
-                <p className="text-xs text-gray-500 truncate">
-                  {conversation.latestMessage.type === "ai_response" && "AI: "}
-                  {conversation.latestMessage.content}
-                </p>
-              )}
-
-              <p className="text-xs text-gray-400 mt-1">
-                {new Date(conversation.lastActivity).toLocaleDateString()}
-              </p>
+              <div className="flex-shrink-0 text-sm text-zinc-600">
+                {new Date(c.lastActivity).toLocaleDateString()}
+              </div>
             </Link>
           ))}
         </div>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({
-  status,
-}: {
-  status: "new" | "in_progress" | "resolved";
-}) {
-  const colors = {
-    new: "bg-green-100 text-green-700",
-    in_progress: "bg-yellow-100 text-yellow-700",
-    resolved: "bg-gray-100 text-gray-700",
-  };
-
-  const labels = {
-    new: "New",
-    in_progress: "In Progress",
-    resolved: "Resolved",
-  };
-
-  return (
-    <span className={`px-2 py-1 text-xs rounded-full ${colors[status]}`}>
-      {labels[status]}
-    </span>
   );
 }

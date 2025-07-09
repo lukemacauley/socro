@@ -1,17 +1,12 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import {
-  getCurrentUser,
-  getCurrentUserId,
-  verifyConversationOwnership,
-} from "./lib/utils";
-import { conversationStatus } from "./lib/validators";
+import { getCurrentUser, verifyConversationOwnership } from "./lib/utils";
+import { type Id } from "./_generated/dataModel";
+import { streamingComponent } from "./streaming";
+import { type StreamId } from "@convex-dev/persistent-text-streaming";
 
 export const list = query({
-  args: {
-    status: v.optional(conversationStatus),
-  },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
 
@@ -20,10 +15,6 @@ export const list = query({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .take(50);
-
-    if (args.status) {
-      conversations = conversations.filter((c) => c.status === args.status);
-    }
 
     // Get latest message and message count for each conversation
     const conversationsWithDetails = await Promise.all(
@@ -34,12 +25,14 @@ export const list = query({
             q.eq("conversationId", conversation._id)
           )
           .collect();
-        
-        const latestMessage = messages
-          .sort((a, b) => b.timestamp - a.timestamp)[0] || null;
-        
+
+        const latestMessage =
+          messages.sort((a, b) => b.timestamp - a.timestamp)[0] || null;
+
         // Get the most recent participant for display
-        const fromParticipant = conversation.participants[conversation.participants.length - 1] || {
+        const fromParticipant = conversation.participants[
+          conversation.participants.length - 1
+        ] || {
           email: "unknown@email.com",
           name: null,
         };
@@ -62,7 +55,11 @@ export const get = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
+    const conversation = await verifyConversationOwnership(
+      ctx,
+      args.conversationId,
+      userId
+    );
 
     const messages = await ctx.db
       .query("messages")
@@ -79,43 +76,33 @@ export const get = query({
   },
 });
 
-export const updateStatus = mutation({
+export const sendMessage = mutation({
   args: {
+    prompt: v.string(),
     conversationId: v.id("conversations"),
-    status: conversationStatus,
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    messageId: Id<"messages">;
+    streamId: StreamId;
+  }> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
 
-    await ctx.db.patch(args.conversationId, {
-      status: args.status,
-      lastActivity: Date.now(),
-    });
-  },
-});
+    await verifyConversationOwnership(ctx, args.conversationId, userId);
 
-export const addUserNote = mutation({
-  args: {
-    conversationId: v.id("conversations"),
-    content: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(ctx, args.conversationId, userId);
+    const responseStreamId = await streamingComponent.createStream(ctx);
 
-    await ctx.db.insert("messages", {
+    const messageId = await ctx.db.insert("messages", {
       conversationId: args.conversationId,
-      content: args.content,
+      content: args.prompt,
+      streamId: responseStreamId,
       type: "user_note",
       sender: userId,
       timestamp: Date.now(),
     });
 
-    await ctx.db.patch(args.conversationId, {
-      lastActivity: Date.now(),
-    });
+    return { messageId, streamId: responseStreamId };
   },
 });
-
-// Removed createTestConversation - focus on real email threading
