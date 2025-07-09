@@ -208,13 +208,54 @@ http.route({
       const body = await request.json();
       console.log("[STREAM] Request body:", JSON.stringify(body, null, 2));
 
-      // useChat sends messages array
-      const msgs = body.messages || [];
-      const lastMessage = msgs[msgs.length - 1];
+      let conversationId, emailContent, emailSubject, senderName;
+      let streamId = body.streamId as StreamId | undefined;
 
-      // The data we need is in the last message's data field
-      const { conversationId, emailContent, emailSubject, senderName } =
-        lastMessage?.data || {};
+      // Check if this is a streamId-only request from useStream hook
+      if (body.streamId && !body.messages) {
+        console.log("[STREAM] Handling streamId-only request", {
+          streamId: body.streamId,
+        });
+
+        // Get message details from streamId
+        const messageData = await ctx.runQuery(
+          internal.ai.getMessageByStreamId,
+          {
+            streamId: body.streamId,
+          }
+        );
+
+        if (!messageData) {
+          console.error(
+            "[STREAM] Message not found for streamId:",
+            body.streamId
+          );
+          return new Response("Message not found", {
+            status: 404,
+            headers: corsHeaders,
+          });
+        }
+
+        console.log("[STREAM] Found message data", {
+          streamId: body.streamId,
+          conversationId: messageData.conversationId,
+          messageType: messageData.message.type,
+          senderName: messageData.senderName,
+        });
+
+        conversationId = messageData.conversationId;
+        emailContent = messageData.emailContent;
+        emailSubject = messageData.emailSubject;
+        senderName = messageData.senderName;
+      } else {
+        // Handle messages array format (from useChat or other sources)
+        const msgs = body.messages || [];
+        const lastMessage = msgs[msgs.length - 1];
+
+        // The data we need is in the last message's data field
+        ({ conversationId, emailContent, emailSubject, senderName } =
+          lastMessage?.data || {});
+      }
 
       // Get conversation context
       const data = await ctx.runQuery(internal.ai.getConversationContext, {
@@ -222,7 +263,10 @@ http.route({
       });
 
       if (!data) {
-        return new Response("Conversation not found", { status: 404 });
+        return new Response("Conversation not found", {
+          status: 404,
+          headers: corsHeaders,
+        });
       }
 
       const { messages, processedAttachments } = data;
@@ -310,22 +354,32 @@ Always be helpful and responsive to the user's needs.`;
       //   },
       // });
 
-      // Create a new stream if streamId is not provided
-      const streamId = body.streamId
-        ? (body.streamId as StreamId)
-        : await streamingComponent.createStream(ctx);
+      // Use existing streamId or create a new one
+      if (!streamId) {
+        streamId = await streamingComponent.createStream(ctx);
+        console.log("[STREAM] Created new streamId:", streamId);
+      } else {
+        console.log("[STREAM] Using existing streamId:", streamId);
+      }
 
       let fullText = "";
 
       // Start streaming and persisting at the same time while
       // we immediately return a streaming response to the client
+      console.log("[STREAM] Starting stream with streamingComponent.stream", {
+        streamId,
+        conversationId,
+        senderName,
+      });
+
       const response = await streamingComponent.stream(
         ctx,
         request,
         streamId,
         async (_, __, ___, append) => {
+          console.log("[STREAM] Creating Anthropic stream");
           const stream = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
+            model: "claude-sonnet-4-20250514",
             system: systemPrompt,
             messages: [
               {
@@ -333,15 +387,16 @@ Always be helpful and responsive to the user's needs.`;
                 content: userMessage,
               },
             ],
-            max_tokens: 100_000,
+            max_tokens: 60_000,
             stream: true,
           });
 
           console.log(
-            "[STREAM] Got streamText result, converting to data stream response"
+            "[STREAM] Got Anthropic stream, starting to process chunks"
           );
 
           // Append each chunk to the persistent stream as they come in from Anthropic
+          let chunkCount = 0;
           for await (const event of stream) {
             if (
               event.type === "content_block_delta" &&
@@ -350,12 +405,30 @@ Always be helpful and responsive to the user's needs.`;
               const text = event.delta.text || "";
               await append(text);
               fullText += text;
+              chunkCount++;
+              if (chunkCount % 10 === 0) {
+                console.log("[STREAM] Progress", {
+                  streamId,
+                  chunks: chunkCount,
+                  totalLength: fullText.length,
+                });
+              }
             }
           }
+          console.log("[STREAM] Stream complete", {
+            streamId,
+            totalChunks: chunkCount,
+            finalLength: fullText.length,
+          });
 
           // Save the complete response with streamId
           console.log(
-            "[STREAM] Finished streaming, saving response to database"
+            "[STREAM] Finished streaming, saving response to database",
+            {
+              streamId,
+              conversationId,
+              contentLength: fullText.length,
+            }
           );
           await ctx.runMutation(internal.ai.saveAiResponse, {
             conversationId,
@@ -364,6 +437,11 @@ Always be helpful and responsive to the user's needs.`;
           });
         }
       );
+
+      console.log("[STREAM] Returning streaming response to client", {
+        streamId,
+        hasResponse: !!response,
+      });
 
       response.headers.set("Access-Control-Allow-Origin", "*");
       response.headers.set("Vary", "Origin");

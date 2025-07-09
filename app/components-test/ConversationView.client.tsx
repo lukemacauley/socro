@@ -3,7 +3,6 @@ import type { Id } from "convex/_generated/dataModel";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
 import { cn } from "~/lib/utils";
 import { Download, Paperclip } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -22,24 +21,28 @@ export function ConversationView({
   const [input, setInput] = useState("");
   const [drivenIds, setDrivenIds] = useState<Set<string>>(new Set());
   const [isStreaming, setIsStreaming] = useState(false);
+  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
     setInput("");
+    setIsStreaming(true);
 
-    const chatId = await sendMessage({
+    const { streamId } = await sendMessage({
       conversationId,
       prompt: input,
     });
 
-    setDrivenIds((prev) => {
-      prev.add(chatId);
-      return prev;
-    });
+    // Set active stream ID for virtual AI response
+    setActiveStreamId(streamId);
 
-    setIsStreaming(true);
+    // Track this streamId as "driven" so the AI response will stream
+    setDrivenIds((prev) => {
+      const newSet = new Set([...prev, streamId]);
+      return newSet;
+    });
   };
 
   const handleDownloadAttachment = async (
@@ -157,19 +160,42 @@ export function ConversationView({
                     )}
                   </div>
                 </div>
-                {message.type === "ai_response" ? (
-                  <div className="prose max-w-none">
-                    <ReactMarkdown>{message.content || ""}</ReactMarkdown>
-                  </div>
-                ) : message.type === "email" ||
-                  message.type === "sent_email" ? (
-                  <div
-                    className="prose"
-                    dangerouslySetInnerHTML={{ __html: message.content }}
+                {message.type === "ai_response" && message.streamId ? (
+                  <StreamingMessage
+                    message={message}
+                    isDriven={drivenIds.has(message.streamId)}
+                    stopStreaming={() => {
+                      console.log(
+                        "[CONVERSATION_VIEW] stopStreaming called for",
+                        message.streamId
+                      );
+                      setIsStreaming(false);
+                      if (message.streamId) {
+                        setDrivenIds((prev) => {
+                          const newSet = new Set(prev);
+                          if (message.streamId) {
+                            newSet.delete(message.streamId);
+                          }
+                          console.log(
+                            "[CONVERSATION_VIEW] Removed streamId from drivenIds",
+                            {
+                              removed: message.streamId,
+                              remaining: Array.from(newSet),
+                            }
+                          );
+                          return newSet;
+                        });
+                      }
+                    }}
                   />
-                ) : (
-                  <div className="prose">{message.content}</div>
-                )}
+                ) : message.type === "ai_response" ||
+                  message.type === "user_note" ||
+                  message.type === "email" ||
+                  message.type === "sent_email" ? (
+                  <div className="prose max-w-none">
+                    {message.content || ""}
+                  </div>
+                ) : null}
 
                 {/* Display attachments if any */}
                 {message.attachments && message.attachments.length > 0 && (
@@ -217,27 +243,32 @@ export function ConversationView({
           </div>
         ))}
 
-        {/* Streaming AI messages */}
-        {data?.messages.map((message) => (
-          <div key={message._id} className="flex justify-start">
+        {/* Virtual AI Response when streaming */}
+        {activeStreamId && isStreaming && (
+          <div className="flex justify-start">
             <div className="w-full">
-              <StreamingMessage
-                message={message}
-                isDriven={drivenIds.has(message.streamId!)}
-                stopStreaming={() => {
-                  setIsStreaming(false);
-                  if (message.streamId) {
+              <div className="w-full p-0 border-zinc-200">
+                <StreamingMessage
+                  message={{
+                    _id: `virtual-${activeStreamId}`,
+                    content: "",
+                    streamId: activeStreamId,
+                  }}
+                  isDriven={drivenIds.has(activeStreamId)}
+                  stopStreaming={() => {
+                    setIsStreaming(false);
+                    setActiveStreamId(null);
                     setDrivenIds((prev) => {
                       const newSet = new Set(prev);
-                      newSet.delete(message.streamId!);
+                      newSet.delete(activeStreamId);
                       return newSet;
                     });
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Add note form */}

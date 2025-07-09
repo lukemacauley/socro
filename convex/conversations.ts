@@ -4,6 +4,7 @@ import { api } from "./_generated/api";
 import { getCurrentUser, verifyConversationOwnership } from "./lib/utils";
 import { type Id } from "./_generated/dataModel";
 import { streamingComponent } from "./streaming";
+import { type StreamId } from "@convex-dev/persistent-text-streaming";
 
 export const list = query({
   handler: async (ctx, args) => {
@@ -80,8 +81,15 @@ export const sendMessage = mutation({
     prompt: v.string(),
     conversationId: v.id("conversations"),
   },
-  handler: async (ctx, args): Promise<Id<"messages">> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    messageId: Id<"messages">;
+    streamId: StreamId;
+  }> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
+
     await verifyConversationOwnership(ctx, args.conversationId, userId);
 
     const responseStreamId = await streamingComponent.createStream(ctx);
@@ -95,6 +103,6 @@ export const sendMessage = mutation({
       timestamp: Date.now(),
     });
 
-    return messageId;
+    return { messageId, streamId: responseStreamId };
   },
 });

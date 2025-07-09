@@ -49,7 +49,8 @@ const applicationTables = {
   })
     .index("by_conversation", ["conversationId"])
     .index("by_timestamp", ["timestamp"])
-    .index("by_email_id", ["emailId"]),
+    .index("by_email_id", ["emailId"])
+    .index("by_streamId", ["streamId"]),
 
   userSettings: defineTable({
     userId: v.id("users"),

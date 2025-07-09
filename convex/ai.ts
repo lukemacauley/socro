@@ -164,7 +164,7 @@ export const saveAiResponse = internalMutation({
     streamId: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("messages", {
+    const messageId = await ctx.db.insert("messages", {
       conversationId: args.conversationId,
       content: args.content,
       type: "ai_response",
@@ -177,5 +177,35 @@ export const saveAiResponse = internalMutation({
       status: "in_progress",
       lastActivity: Date.now(),
     });
+  },
+});
+
+export const getMessageByStreamId = internalQuery({
+  args: { streamId: v.string() },
+  handler: async (ctx, args) => {
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_streamId", (q) => q.eq("streamId", args.streamId))
+      .first();
+
+    if (!message) {
+      return null;
+    }
+
+    const conversation = await ctx.db.get(message.conversationId);
+    if (!conversation) {
+      return null;
+    }
+
+    const result = {
+      message,
+      conversation,
+      conversationId: message.conversationId,
+      emailContent: message.content,
+      emailSubject: conversation.subject,
+      senderName: message.type === "user_note" ? "User" : message.sender,
+    };
+
+    return result;
   },
 });

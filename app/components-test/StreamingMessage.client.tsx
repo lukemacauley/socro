@@ -23,25 +23,26 @@ export function StreamingMessage({
     api.streaming.getStreamBody,
     new URL(`${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`),
     isDriven,
-    message.streamId as StreamId
+    message.streamId as StreamId | undefined
   );
 
   const isCurrentlyStreaming = useMemo(() => {
     if (!isDriven) return false;
-    return status === "pending" || status === "streaming";
-  }, [isDriven, status]);
+    const streaming = status === "pending" || status === "streaming";
+    return streaming;
+  }, [isDriven, status, message.streamId]);
 
   useEffect(() => {
     if (!isDriven || isCurrentlyStreaming) {
       return;
     }
     stopStreaming();
-  }, [isDriven, isCurrentlyStreaming, stopStreaming]);
+  }, [isDriven, isCurrentlyStreaming, stopStreaming, message.streamId, status]);
 
   return (
     <div className="rounded-lg p-0 border-zinc-200">
       <div className="prose max-w-none">
-        <ReactMarkdown>{text}</ReactMarkdown>
+        <ReactMarkdown>{text || ""}</ReactMarkdown>
       </div>
       {status === "error" && (
         <div className="text-red-500 mt-2">Error loading response</div>
