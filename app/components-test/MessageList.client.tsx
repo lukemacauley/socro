@@ -22,14 +22,14 @@ export const MessageList = memo(function MessageList({
     // Initialize with activeStreamId if present
     return activeStreamId ? new Set([activeStreamId]) : new Set();
   });
-  
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
   // Update drivenIds when activeStreamId changes
   useEffect(() => {
     if (activeStreamId) {
-      setDrivenIds(prev => new Set([...prev, activeStreamId]));
+      setDrivenIds((prev) => new Set([...prev, activeStreamId]));
     }
   }, [activeStreamId]);
 
@@ -37,17 +37,20 @@ export const MessageList = memo(function MessageList({
     scrollRef.current?.scrollIntoView({ behavior: "instant" });
   }, [messages.length]);
 
-  const handleStopStreaming = useCallback((streamId: string) => {
-    setDrivenIds((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(streamId);
-      return newSet;
-    });
-    
-    if (streamId === activeStreamId) {
-      onStreamComplete();
-    }
-  }, [activeStreamId, onStreamComplete]);
+  const handleStopStreaming = useCallback(
+    (streamId: string) => {
+      setDrivenIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(streamId);
+        return newSet;
+      });
+
+      if (streamId === activeStreamId) {
+        onStreamComplete();
+      }
+    },
+    [activeStreamId, onStreamComplete]
+  );
 
   const handleDownloadAttachment = useCallback(
     async (emailId: string, attachmentId: string, fileName: string) => {
@@ -91,18 +94,22 @@ export const MessageList = memo(function MessageList({
 
   return (
     <>
-      <div className="flex-1 max-w-3xl w-full mx-auto pt-10 pb-24 overflow-y-auto space-y-12">
+      <div className="flex-1 max-w-3xl w-full mx-auto py-12 overflow-y-auto space-y-12">
         {messages.map((message) => {
           const isLast = messages[messages.length - 1]._id === message._id;
           return (
             <MessageItem
               key={message._id}
               message={message}
-              isDriven={message.streamId ? drivenIds.has(message.streamId) : false}
+              isDriven={
+                message.streamId ? drivenIds.has(message.streamId) : false
+              }
               isLast={isLast}
               isStreaming={isStreaming}
               activeStreamId={activeStreamId}
-              onStopStreaming={() => message.streamId && handleStopStreaming(message.streamId)}
+              onStopStreaming={() =>
+                message.streamId && handleStopStreaming(message.streamId)
+              }
               onDownloadAttachment={handleDownloadAttachment}
             />
           );

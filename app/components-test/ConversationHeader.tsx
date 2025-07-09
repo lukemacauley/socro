@@ -10,7 +10,7 @@ export const ConversationHeader = memo(function ConversationHeader({
   participants,
 }: ConversationHeaderProps) {
   return (
-    <div className="p-4 border-b bg-white">
+    <div className="sticky top-12 p-4 border-b bg-white">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h1 className="text-xl font-semibold mb-1">{subject}</h1>

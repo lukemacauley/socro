@@ -52,11 +52,11 @@ export const MessageItem = memo(function MessageItem({
           className={cn(
             "rounded-lg p-4",
             message.type === "email"
-              ? "w-full bg-orange-50 border border-zinc-200"
+              ? "w-full bg-blue-50 border border-zinc-200"
               : message.type === "sent_email"
-              ? "w-full bg-orange-50 border border-zinc-200"
+              ? "w-full bg-blue-50 border border-zinc-200"
               : message.type === "user_note"
-              ? "w-full bg-orange-50 border border-zinc-200"
+              ? "w-full bg-blue-50 border border-zinc-200"
               : message.type === "ai_response"
               ? "w-full p-0 border-zinc-200"
               : "w-full"
