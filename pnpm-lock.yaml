@@ -28,7 +28,7 @@ importers:
         version: 1.6.3(react-dom@19.1.0(react@19.1.0))(react-router@7.6.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
       '@convex-dev/agent':
         specifier: ^0.1.13
-        version: 0.1.13(ai@4.3.16(react@19.1.0)(zod@3.25.75))(convex-helpers@0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75))(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)
+        version: 0.1.13(ai@4.3.17(react@19.1.0)(zod@3.25.75))(convex-helpers@0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75))(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)
       '@convex-dev/persistent-text-streaming':
         specifier: ^0.2.3
         version: 0.2.3(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -63,8 +63,8 @@ importers:
         specifier: ^7.5.3
         version: 7.6.3(react-router@7.6.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(typescript@5.8.3)
       ai:
-        specifier: ^4.3.16
-        version: 4.3.16(react@19.1.0)(zod@3.25.75)
+        specifier: ^4.3.17
+        version: 4.3.17(react@19.1.0)(zod@3.25.75)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1438,8 +1438,8 @@ packages:
     resolution: {integrity: sha512-kja8j7PjmncONqaTsB8fQ+wE2mSU2DJ9D4XKoJ5PFWIdRMa6SLSN1ff4mOr4jCbfRSsxR4keIiySJU0N9T5hIQ==}
     engines: {node: '>= 8.0.0'}
 
-  ai@4.3.16:
-    resolution: {integrity: sha512-KUDwlThJ5tr2Vw0A1ZkbDKNME3wzWhuVfAOwIvFUzl1TPVDFAXDFTXio3p+jaKneB+dKNCvFFlolYmmgHttG1g==}
+  ai@4.3.17:
+    resolution: {integrity: sha512-uWqIQ94Nb1GTYtYElGHegJMOzv3r2mCKNFlKrqkft9xrfvIahTI5OdcnD5U9612RFGuUNGmSDTO1/YRNFXobaQ==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
@@ -3267,9 +3267,9 @@ snapshots:
     dependencies:
       csstype: 3.1.3
 
-  '@convex-dev/agent@0.1.13(ai@4.3.16(react@19.1.0)(zod@3.25.75))(convex-helpers@0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75))(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)':
+  '@convex-dev/agent@0.1.13(ai@4.3.17(react@19.1.0)(zod@3.25.75))(convex-helpers@0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75))(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)':
     dependencies:
-      ai: 4.3.16(react@19.1.0)(zod@3.25.75)
+      ai: 4.3.17(react@19.1.0)(zod@3.25.75)
       convex: 1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
       convex-helpers: 0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75)
     optionalDependencies:
@@ -4144,7 +4144,7 @@ snapshots:
     dependencies:
       humanize-ms: 1.2.1
 
-  ai@4.3.16(react@19.1.0)(zod@3.25.75):
+  ai@4.3.17(react@19.1.0)(zod@3.25.75):
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.8(zod@3.25.75)

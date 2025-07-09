@@ -32,6 +32,7 @@ const applicationTables = {
     ),
     createdAt: v.number(),
     lastActivity: v.number(),
+    agentThreadId: v.optional(v.string()), // ID for agent-specific threads
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])

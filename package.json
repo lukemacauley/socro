@@ -28,7 +28,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
-    "ai": "^4.3.16",
+    "ai": "^4.3.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.25.2",
