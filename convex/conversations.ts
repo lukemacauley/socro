@@ -2,12 +2,10 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { getCurrentUser, verifyConversationOwnership } from "./lib/utils";
-import { conversationStatus } from "./lib/validators";
+import { type Id } from "./_generated/dataModel";
+import { streamingComponent } from "./streaming";
 
 export const list = query({
-  args: {
-    status: v.optional(conversationStatus),
-  },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
 
@@ -16,10 +14,6 @@ export const list = query({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .take(50);
-
-    if (args.status) {
-      conversations = conversations.filter((c) => c.status === args.status);
-    }
 
     // Get latest message and message count for each conversation
     const conversationsWithDetails = await Promise.all(
@@ -81,38 +75,26 @@ export const get = query({
   },
 });
 
-export const addUserNote = mutation({
+export const sendMessage = mutation({
   args: {
+    prompt: v.string(),
     conversationId: v.id("conversations"),
-    content: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"messages">> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    const conversation = await verifyConversationOwnership(
-      ctx,
-      args.conversationId,
-      userId
-    );
+    await verifyConversationOwnership(ctx, args.conversationId, userId);
 
-    await ctx.db.insert("messages", {
+    const responseStreamId = await streamingComponent.createStream(ctx);
+
+    const messageId = await ctx.db.insert("messages", {
       conversationId: args.conversationId,
-      content: args.content,
+      content: args.prompt,
+      streamId: responseStreamId,
       type: "user_note",
       sender: userId,
       timestamp: Date.now(),
     });
 
-    await ctx.db.patch(args.conversationId, {
-      lastActivity: Date.now(),
-    });
-
-    return {
-      conversationId: args.conversationId,
-      emailContent: args.content,
-      emailSubject: conversation.subject || "User Note",
-      senderName: "User",
-    };
+    return messageId;
   },
 });
-
-// Removed createTestConversation - focus on real email threading

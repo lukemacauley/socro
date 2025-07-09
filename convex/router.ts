@@ -3,8 +3,11 @@ import type { WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { streamText } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import Anthropic from "@anthropic-ai/sdk";
+import { streamingComponent } from "./streaming";
+import { type StreamId } from "@convex-dev/persistent-text-streaming";
+
+const anthropic = new Anthropic();
 
 const http = httpRouter();
 
@@ -145,6 +148,30 @@ async function validateRequest(req: Request): Promise<WebhookEvent | null> {
   }
 }
 
+http.route({
+  path: "/stream-messages",
+  method: "OPTIONS",
+  handler: httpAction(async (_, request) => {
+    const headers = request.headers;
+    if (
+      headers.get("Origin") !== null &&
+      headers.get("Access-Control-Request-Method") !== null &&
+      headers.get("Access-Control-Request-Headers") !== null
+    ) {
+      return new Response(null, {
+        headers: new Headers({
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST",
+          "Access-Control-Allow-Headers": "Content-Type, Digest, Authorization",
+          "Access-Control-Max-Age": "86400",
+        }),
+      });
+    } else {
+      return new Response();
+    }
+  }),
+});
+
 // OPTIONS route for CORS preflight
 http.route({
   path: "/stream-ai-response",
@@ -266,43 +293,82 @@ Always be helpful and responsive to the user's needs.`;
         : `${attachmentContext}\n\nEmail content: ${emailContent}\n\nProvide a brief observation or note about this email.`;
 
       // Use streamText and return proper data stream response
-      const result = streamText({
-        model: anthropic("claude-3-5-sonnet-20241022"),
-        system: systemPrompt,
-        prompt: userMessage,
-        onFinish: async ({ text }) => {
+      // const result = streamText({
+      //   model: anthropic("claude-3-5-sonnet-20241022"),
+      //   system: systemPrompt,
+      //   prompt: userMessage,
+      //   onFinish: async ({ text }) => {
+      //     console.log(
+      //       "[STREAM] Finished streaming, total length:",
+      //       text.length
+      //     );
+      //     // Save the complete response to the database
+      //     await ctx.runMutation(internal.ai.saveAiResponse, {
+      //       conversationId,
+      //       content: text,
+      //     });
+      //   },
+      // });
+
+      // Create a new stream if streamId is not provided
+      const streamId = body.streamId
+        ? (body.streamId as StreamId)
+        : await streamingComponent.createStream(ctx);
+
+      let fullText = "";
+
+      // Start streaming and persisting at the same time while
+      // we immediately return a streaming response to the client
+      const response = await streamingComponent.stream(
+        ctx,
+        request,
+        streamId,
+        async (_, __, ___, append) => {
+          const stream = await anthropic.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            system: systemPrompt,
+            messages: [
+              {
+                role: "user",
+                content: userMessage,
+              },
+            ],
+            max_tokens: 100_000,
+            stream: true,
+          });
+
           console.log(
-            "[STREAM] Finished streaming, total length:",
-            text.length
+            "[STREAM] Got streamText result, converting to data stream response"
           );
-          // Save the complete response to the database
+
+          // Append each chunk to the persistent stream as they come in from Anthropic
+          for await (const event of stream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              const text = event.delta.text || "";
+              await append(text);
+              fullText += text;
+            }
+          }
+
+          // Save the complete response with streamId
+          console.log(
+            "[STREAM] Finished streaming, saving response to database"
+          );
           await ctx.runMutation(internal.ai.saveAiResponse, {
             conversationId,
-            content: text,
+            content: fullText,
+            streamId: streamId,
           });
-        },
-      });
-
-      console.log(
-        "[STREAM] Got streamText result, converting to data stream response"
+        }
       );
 
-      // Log the stream chunks as they pass through
-      let chunkCount = 0;
-      result.textStream.pipeThrough(
-        new TransformStream({
-          transform(chunk, controller) {
-            chunkCount++;
-            console.log(`[STREAM] Chunk ${chunkCount}:`, chunk);
-            controller.enqueue(chunk);
-          },
-        })
-      );
+      response.headers.set("Access-Control-Allow-Origin", "*");
+      response.headers.set("Vary", "Origin");
 
-      // Convert to data stream response that's compatible with useChat
-      return result.toDataStreamResponse({
-        headers: corsHeaders,
-      });
+      return response;
     } catch (error) {
       console.error("Error in stream-ai-response:", error);
       return new Response("Internal server error", {

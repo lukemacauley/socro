@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "~/lib/utils";
 import { Download, Paperclip } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { useChat } from "@ai-sdk/react";
+import { StreamingMessage } from "./StreamingMessage.client";
 
 export function ConversationView({
   conversationId,
@@ -15,57 +15,33 @@ export function ConversationView({
   conversationId: Id<"conversations">;
 }) {
   const data = useQuery(api.conversations.get, { conversationId });
-  const addUserNote = useMutation(api.conversations.addUserNote);
-  const generateAiResponse = useAction(api.ai.generateResponse);
+
+  const sendMessage = useMutation(api.conversations.sendMessage);
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
-  const [newNote, setNewNote] = useState("");
-
-  const { messages, status, append } = useChat({
-    api: `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`,
-  });
-
-  console.log({ status });
+  const [input, setInput] = useState("");
+  const [drivenIds, setDrivenIds] = useState<Set<string>>(new Set());
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNote.trim()) return;
+    if (!input.trim()) return;
 
-    try {
-      const result = await addUserNote({ conversationId, content: newNote });
-      setNewNote("");
+    setInput("");
 
-      // Trigger streaming AI response
-      await append({
-        role: "user",
-        content: newNote,
-        data: result,
-      });
-    } catch (error) {
-      toast.error("Failed to add note");
-    }
+    const chatId = await sendMessage({
+      conversationId,
+      prompt: input,
+    });
+
+    setDrivenIds((prev) => {
+      prev.add(chatId);
+      return prev;
+    });
+
+    setIsStreaming(true);
   };
 
-  const handleGenerateResponse = async () => {
-    const originalEmail = data?.messages.find((m) => m.type === "email");
-    if (!originalEmail) {
-      toast.error("No original email found");
-      return;
-    }
-
-    try {
-      await generateAiResponse({
-        conversationId,
-        emailContent: originalEmail.content,
-        emailSubject: data?.conversation.subject ?? "",
-        senderName:
-          data?.conversation.participants.map((p) => p.name).join(", ") || "",
-      });
-      toast.success("AI response generated");
-    } catch (error) {
-      toast.error("Failed to generate AI response");
-    }
-  };
   const handleDownloadAttachment = async (
     emailId: string,
     attachmentId: string,
@@ -241,32 +217,24 @@ export function ConversationView({
           </div>
         ))}
 
-        {/* Streaming messages from useChat */}
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn(
-              "flex",
-              message.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
-            <div className={message.role === "user" ? "max-w-4/5" : "w-full"}>
-              <div
-                className={cn(
-                  "rounded-lg p-4",
-                  message.role === "user"
-                    ? "w-full bg-orange-50 border border-zinc-200"
-                    : "w-full p-0 border-zinc-200"
-                )}
-              >
-                {message.role === "assistant" ? (
-                  <div className="prose max-w-none">
-                    <ReactMarkdown>{message.content || ""}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="prose">{message.content}</div>
-                )}
-              </div>
+        {/* Streaming AI messages */}
+        {data?.messages.map((message) => (
+          <div key={message._id} className="flex justify-start">
+            <div className="w-full">
+              <StreamingMessage
+                message={message}
+                isDriven={drivenIds.has(message.streamId!)}
+                stopStreaming={() => {
+                  setIsStreaming(false);
+                  if (message.streamId) {
+                    setDrivenIds((prev) => {
+                      const newSet = new Set(prev);
+                      newSet.delete(message.streamId!);
+                      return newSet;
+                    });
+                  }
+                }}
+              />
             </div>
           </div>
         ))}
@@ -277,17 +245,17 @@ export function ConversationView({
         <form onSubmit={handleAddNote} className="flex gap-2">
           <input
             type="text"
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Add a note to this conversation..."
             className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="submit"
-            disabled={!newNote.trim()}
+            disabled={!input.trim() || isStreaming}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Add Note
+            {isStreaming ? "Sending..." : "Add Note"}
           </button>
         </form>
       </div>

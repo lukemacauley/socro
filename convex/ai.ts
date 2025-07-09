@@ -13,6 +13,7 @@ export const generateResponse = action({
     emailContent: v.string(),
     emailSubject: v.string(),
     senderName: v.optional(v.string()),
+    streamId: v.string(),
   },
   handler: async (ctx, args): Promise<string> => {
     const conversationData = await ctx.runQuery(
@@ -26,7 +27,7 @@ export const generateResponse = action({
       throw new Error("Conversation not found");
     }
 
-    const { conversation, messages, processedAttachments } = conversationData;
+    const { messages, processedAttachments } = conversationData;
 
     // Include attachment content if available
     let attachmentContext = "";
@@ -117,6 +118,7 @@ Always be helpful and responsive to the user's needs.`;
     await ctx.runMutation(internal.ai.saveAiResponse, {
       conversationId: args.conversationId,
       content: aiResponse,
+      streamId: args.streamId,
     });
 
     return aiResponse;
@@ -159,6 +161,7 @@ export const saveAiResponse = internalMutation({
   args: {
     conversationId: v.id("conversations"),
     content: v.string(),
+    streamId: v.string(),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("messages", {
@@ -167,6 +170,7 @@ export const saveAiResponse = internalMutation({
       type: "ai_response",
       sender: "ai",
       timestamp: Date.now(),
+      streamId: args.streamId,
     });
 
     await ctx.db.patch(args.conversationId, {

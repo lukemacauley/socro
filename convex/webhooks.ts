@@ -8,6 +8,7 @@ import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
 import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
 import { attachmentValidator, messageType } from "./lib/validators";
+import { streamingComponent } from "./streaming";
 import Reducto, { toFile } from "reductoai";
 import type { Id } from "./_generated/dataModel";
 import { decode } from "he";
@@ -500,11 +501,16 @@ export const fetchAndProcessEmail = internalAction({
         );
 
         try {
+          // Create a stream for the AI response
+          const streamId = await streamingComponent.createStream(ctx);
+          console.log("[WEBHOOK] Created stream:", streamId);
+
           await ctx.runAction(api.ai.generateResponse, {
             conversationId,
             emailContent: emailContent + processedAttachmentContent,
             emailSubject: email.subject || "(No subject)",
             senderName: email.from?.emailAddress?.name,
+            streamId,
           });
           console.log("[WEBHOOK] AI response generated successfully");
         } catch (error) {
@@ -582,8 +588,6 @@ export const createConversation = internalMutation({
       userId: args.userId,
       subject: args.subject,
       status: "new",
-      initialEmailId: args.emailId,
-      latestEmailId: args.emailId,
       participants: [
         {
           email: args.fromEmail,
@@ -622,7 +626,6 @@ export const updateConversationActivity = internalMutation({
 
     await ctx.db.patch(args.conversationId, {
       lastActivity: Date.now(),
-      latestEmailId: args.emailId,
       // Update subject if it's more detailed (e.g., "Re: " prefix added)
       subject:
         args.subject.length > conversation.subject.length

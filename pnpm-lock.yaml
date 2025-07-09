@@ -29,6 +29,9 @@ importers:
       '@convex-dev/agent':
         specifier: ^0.1.13
         version: 0.1.13(ai@4.3.16(react@19.1.0)(zod@3.25.75))(convex-helpers@0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75))(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)
+      '@convex-dev/persistent-text-streaming':
+        specifier: ^0.2.3
+        version: 0.2.3(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@microsoft/microsoft-graph-client':
         specifier: ^3.0.7
         version: 3.0.7
@@ -385,6 +388,13 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  '@convex-dev/persistent-text-streaming@0.2.3':
+    resolution: {integrity: sha512-v6by8JB2lXyd+ZBH0I5TOsd98zk+tvmfPt6ofRuxC2GtNkqUpy6F7CdijRaXiGW+ozlUiQyRsBzhvhTUwVUAHg==}
+    peerDependencies:
+      convex: '>=1.23.0 <1.35.0'
+      react: ~18.3.1 || ^19.0.0
+      react-dom: ~18.3.1 || ^19.0.0
 
   '@esbuild/aix-ppc64@0.25.4':
     resolution: {integrity: sha512-1VCICWypeQKhVbE9oW/sJaAmjLxhVqacdkvPLEjwlttjfwENRSClS8EjBz0KzRyFSCPDIkuXW34Je/vk7zdB7Q==}
@@ -3264,6 +3274,12 @@ snapshots:
       convex-helpers: 0.1.96(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react@19.1.0)(typescript@5.8.3)(zod@3.25.75)
     optionalDependencies:
       react: 19.1.0
+
+  '@convex-dev/persistent-text-streaming@0.2.3(convex@1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      convex: 1.25.2(@clerk/clerk-react@5.32.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
 
   '@esbuild/aix-ppc64@0.25.4':
     optional: true
