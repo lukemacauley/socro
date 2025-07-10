@@ -63,7 +63,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <Link to="/" className="px-2">
-          <h1 className="font-bold text-xl tracking-wide leading-relaxed text-green-900 uppercase transition-all">
+          <h1 className="font-bold text-xl tracking-wide leading-relaxed text-primary uppercase transition-all">
             {state === "collapsed" ? "C" : "CONGAS"}
           </h1>
         </Link>

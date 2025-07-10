@@ -1,47 +1,41 @@
 import { useStream } from "@convex-dev/persistent-text-streaming/react";
 import { type StreamId } from "@convex-dev/persistent-text-streaming";
 import ReactMarkdown from "react-markdown";
-import { useMemo, useEffect } from "react";
+import { useEffect } from "react";
 import { api } from "convex/_generated/api";
-
-interface StreamingMessageProps {
-  message: {
-    _id: string;
-    content: string;
-    streamId?: string;
-  };
-  isDriven: boolean;
-  stopStreaming: () => void;
-}
+import { Spinner } from "~/components/kibo-ui/spinner";
 
 export function StreamingMessage({
-  message,
+  streamId,
   isDriven,
   stopStreaming,
-}: StreamingMessageProps) {
-  const { text, status } = useStream(
-    api.streaming.getStreamBody,
-    new URL(`${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`),
-    isDriven,
-    message.streamId as StreamId | undefined
+}: {
+  streamId: StreamId | undefined;
+  isDriven: boolean;
+  stopStreaming: () => void;
+}) {
+  const streamUrl = new URL(
+    `${import.meta.env.VITE_CONVEX_SITE_URL}/stream-ai-response`
   );
 
-  const isCurrentlyStreaming = useMemo(() => {
-    if (!isDriven) return false;
-    const streaming = status === "pending" || status === "streaming";
-    return streaming;
-  }, [isDriven, status, message.streamId]);
+  const { text, status } = useStream(
+    api.streaming.getStreamBody,
+    streamUrl,
+    isDriven,
+    streamId
+  );
 
   useEffect(() => {
-    if (!isDriven || isCurrentlyStreaming) {
-      return;
+    // When streaming is done and we were driving, notify parent
+    if (status === "done" && isDriven) {
+      stopStreaming();
     }
-    stopStreaming();
-  }, [isDriven, isCurrentlyStreaming, stopStreaming, message.streamId, status]);
+  }, [status, isDriven, stopStreaming]);
 
   return (
     <div className="rounded-lg p-0 border-zinc-200">
       <div className="prose prose-sm max-w-none">
+        {status === "pending" && !text && <Spinner variant="'ellipsis'" />}
         <ReactMarkdown>{text || ""}</ReactMarkdown>
       </div>
       {status === "error" && (

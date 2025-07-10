@@ -5,6 +5,7 @@ import { useState, useCallback } from "react";
 import { ConversationHeader } from "./ConversationHeader";
 import { MessageList } from "./MessageList.client";
 import { MessageInput } from "./MessageInput.client";
+import type { StreamId } from "@convex-dev/persistent-text-streaming";
 
 export function ConversationView({
   conversationId,
@@ -12,38 +13,30 @@ export function ConversationView({
   conversationId: Id<"conversations">;
 }) {
   const data = useQuery(api.conversations.get, { conversationId });
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
+  const [activeStreamId, setActiveStreamId] = useState<StreamId | null>(null);
 
-  const handleMessageSent = useCallback((streamId: string) => {
-    setIsStreaming(true);
-    setActiveStreamId(streamId);
-  }, []);
-
-  const handleStreamComplete = useCallback(() => {
-    setIsStreaming(false);
-    setActiveStreamId(null);
-  }, []);
+  if (!data) {
+    return null;
+  }
 
   return (
-    <div className="h-full flex flex-col">
+    <>
       <ConversationHeader
         subject={data?.conversation.subject}
         participants={data?.conversation.participants}
       />
-      
+
       <MessageList
         messages={data?.messages || []}
         activeStreamId={activeStreamId}
-        isStreaming={isStreaming}
-        onStreamComplete={handleStreamComplete}
+        onStreamComplete={() => setActiveStreamId(null)}
       />
-      
+
       <MessageInput
         conversationId={conversationId}
-        onMessageSent={handleMessageSent}
-        disabled={isStreaming}
+        onMessageSent={setActiveStreamId}
+        disabled={!!activeStreamId}
       />
-    </div>
+    </>
   );
 }

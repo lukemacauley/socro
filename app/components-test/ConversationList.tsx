@@ -14,20 +14,20 @@ export function ConversationList() {
             <Link
               key={c._id}
               to={"/emails/" + c._id}
-              className="flex items-center w-full justify-between gap-4 rounded-lg hover:bg-blue-50 px-3 py-2"
+              className="flex items-center w-full justify-between gap-4 rounded-md hover:bg-accent px-3 py-2"
             >
               <div className="min-w-0 flex-1 flex items-center gap-4">
-                <div className="w-96 flex-shrink-0">
+                <div className="w-96 flex-shrink-0  text-foreground">
                   {c.fromName || c.fromEmail}
                 </div>
-                <div className="font-semibold flex-none truncate">
+                <div className="font-semibold text-foreground flex-none truncate">
                   {c.subject}
                 </div>
-                <div className="text-sm text-zinc-500 line-clamp-1">
+                <div className="text-sm text-muted-foreground line-clamp-1">
                   <ReactMarkdown>{c.latestMessage.content}</ReactMarkdown>
                 </div>
               </div>
-              <div className="flex-shrink-0 text-sm text-zinc-600">
+              <div className="flex-shrink-0 text-sm text-muted-foreground">
                 {new Date(c.lastActivity).toLocaleDateString()}
               </div>
             </Link>

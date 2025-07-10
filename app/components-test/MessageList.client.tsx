@@ -1,50 +1,31 @@
-import { useEffect, useRef, useState, useCallback, memo } from "react";
-import { MessageItem } from "./MessageItem.client";
-import { StreamingMessage } from "./StreamingMessage.client";
+import { useCallback, memo } from "react";
 import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
-
-interface MessageListProps {
-  messages: any[];
-  activeStreamId: string | null;
-  isStreaming: boolean;
-  onStreamComplete: () => void;
-}
+import {
+  AIConversation,
+  AIConversationContent,
+  AIConversationScrollButton,
+} from "~/components/kibo-ui/ai/conversation";
+import { AIMessage, AIMessageContent } from "~/components/kibo-ui/ai/message";
+import { AIResponse } from "~/components/kibo-ui/ai/response";
+import { StreamingMessage } from "./StreamingMessage.client";
+import type { StreamId } from "@convex-dev/persistent-text-streaming";
+import { AttachmentList } from "./AttachmentList";
 
 export const MessageList = memo(function MessageList({
   messages,
   activeStreamId,
-  isStreaming,
   onStreamComplete,
-}: MessageListProps) {
-  const [drivenIds, setDrivenIds] = useState<Set<string>>(() => {
-    // Initialize with activeStreamId if present
-    return activeStreamId ? new Set([activeStreamId]) : new Set();
-  });
-
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+}: {
+  messages: (typeof api.conversations.get._returnType)["messages"];
+  activeStreamId: StreamId | null;
+  onStreamComplete: () => void;
+}) {
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
-
-  // Update drivenIds when activeStreamId changes
-  useEffect(() => {
-    if (activeStreamId) {
-      setDrivenIds((prev) => new Set([...prev, activeStreamId]));
-    }
-  }, [activeStreamId]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "instant" });
-  }, [messages.length]);
 
   const handleStopStreaming = useCallback(
     (streamId: string) => {
-      setDrivenIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(streamId);
-        return newSet;
-      });
-
       if (streamId === activeStreamId) {
         onStreamComplete();
       }
@@ -93,48 +74,48 @@ export const MessageList = memo(function MessageList({
   );
 
   return (
-    <>
-      <div className="flex-1 max-w-3xl w-full mx-auto py-12 overflow-y-auto space-y-12">
-        {messages.map((message) => {
-          const isLast = messages[messages.length - 1]._id === message._id;
+    <AIConversation className="max-w-3xl mx-auto bg-primary-foreground">
+      <AIConversationContent>
+        {messages.map((m) => {
+          const isAi = m.type === "ai_response";
+          const isEmail = m.type === "email" || m.type === "sent_email";
           return (
-            <MessageItem
-              key={message._id}
-              message={message}
-              isDriven={
-                message.streamId ? drivenIds.has(message.streamId) : false
-              }
-              isLast={isLast}
-              isStreaming={isStreaming}
-              activeStreamId={activeStreamId}
-              onStopStreaming={() =>
-                message.streamId && handleStopStreaming(message.streamId)
-              }
-              onDownloadAttachment={handleDownloadAttachment}
-            />
+            <AIMessage from={isAi ? "assistant" : "user"} key={m._id}>
+              {isAi ? (
+                <AIResponse>{m.content}</AIResponse>
+              ) : isEmail ? (
+                <AIMessageContent>
+                  <div dangerouslySetInnerHTML={{ __html: m.content }} />
+                  {m.attachments && m.emailId && (
+                    <AttachmentList
+                      attachments={m.attachments}
+                      onDownload={(attachmentId, fileName) =>
+                        handleDownloadAttachment(
+                          m.emailId!,
+                          attachmentId,
+                          fileName
+                        )
+                      }
+                    />
+                  )}
+                </AIMessageContent>
+              ) : (
+                <AIMessageContent>{m.content}</AIMessageContent>
+              )}
+            </AIMessage>
           );
         })}
-
-        {/* Virtual AI Response when streaming */}
-        {activeStreamId && isStreaming && (
-          <div className="flex justify-start min-h-[calc(100vh-20rem)]">
-            <div className="w-full">
-              <div className="w-full p-0 border-zinc-200">
-                <StreamingMessage
-                  message={{
-                    _id: `virtual-${activeStreamId}`,
-                    content: "",
-                    streamId: activeStreamId,
-                  }}
-                  isDriven={drivenIds.has(activeStreamId)}
-                  stopStreaming={() => handleStopStreaming(activeStreamId)}
-                />
-              </div>
-            </div>
-          </div>
+        {!!activeStreamId && (
+          <AIMessage from="assistant" key={activeStreamId}>
+            <StreamingMessage
+              streamId={activeStreamId}
+              isDriven={!!activeStreamId}
+              stopStreaming={() => handleStopStreaming(activeStreamId)}
+            />
+          </AIMessage>
         )}
-      </div>
-      <div ref={scrollRef} />
-    </>
+      </AIConversationContent>
+      <AIConversationScrollButton />
+    </AIConversation>
   );
 });

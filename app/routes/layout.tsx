@@ -61,7 +61,7 @@ export default function Layout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -90,7 +90,7 @@ export default function Layout() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4">
+        <div className="flex h-[calc(100vh-3rem)] flex-col bg-primary-foreground">
           <Outlet />
         </div>
       </SidebarInset>

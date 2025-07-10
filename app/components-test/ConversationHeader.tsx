@@ -1,19 +1,17 @@
 import { memo } from "react";
 
-interface ConversationHeaderProps {
-  subject?: string;
-  participants?: Array<{ name?: string; email: string }>;
-}
-
 export const ConversationHeader = memo(function ConversationHeader({
   subject,
   participants,
-}: ConversationHeaderProps) {
+}: {
+  subject?: string;
+  participants?: Array<{ name?: string; email: string }>;
+}) {
   return (
-    <div className="sticky top-12 p-4 border-b bg-white">
+    <div className="sticky top-12 z-1 p-4 border-b border-sidebar-border bg-background">
       <div className="flex items-center gap-8">
-        <div className="flex-none font-bold">{subject}</div>
-        <div className="flex flex-none items-center gap-4 text-zinc-600">
+        <div className="flex-none font-bold text-foreground">{subject}</div>
+        <div className="flex flex-none items-center gap-4 text-muted-foreground">
           {participants?.map((p) => p.name || p.email).join(", ")}
         </div>
       </div>
