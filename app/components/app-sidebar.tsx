@@ -36,7 +36,7 @@ export const NAVIGATION: {
     url: string;
   }[];
 }[] = [
-  { title: "Assistant", icon: MessageSquare, url: "/" },
+  { title: "Assistant", icon: MessageSquare, url: "/assistant" },
   {
     title: "Emails",
     icon: MessagesSquare,
@@ -52,7 +52,7 @@ export const NAVIGATION: {
   {
     title: "Vault",
     icon: Server,
-    url: "vault",
+    url: "/vault",
   },
   { title: "History", icon: History, url: "/history" },
 ];
