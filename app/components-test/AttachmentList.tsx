@@ -20,7 +20,7 @@ export const AttachmentList = memo(function AttachmentList({
 
   return (
     <div className="w-full mt-3 border-t pt-3">
-      <p className="text-sm font-medium text-zinc-700 mb-2">
+      <p className="text-sm font-medium mb-2">
         Attachments ({attachments.length})
       </p>
       <div className="space-y-2">
@@ -33,7 +33,7 @@ export const AttachmentList = memo(function AttachmentList({
               <Paperclip className="size-5" />
               <div>
                 <p className="text-sm font-medium">{attachment.name}</p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   {attachment.contentType} •{" "}
                   {(attachment.size / 1024).toFixed(1)} KB
                 </p>

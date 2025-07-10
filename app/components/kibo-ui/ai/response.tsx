@@ -1,9 +1,5 @@
-import type { HTMLAttributes } from "react";
-import { memo } from "react";
-import ReactMarkdown, { type Options } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { cn } from "~/lib/utils";
 import {
+  type BundledLanguage,
   CodeBlock,
   CodeBlockBody,
   CodeBlockContent,
@@ -12,22 +8,21 @@ import {
   CodeBlockFiles,
   CodeBlockHeader,
   CodeBlockItem,
+  type CodeBlockProps,
   CodeBlockSelect,
   CodeBlockSelectContent,
   CodeBlockSelectItem,
   CodeBlockSelectTrigger,
   CodeBlockSelectValue,
-  type BundledLanguage,
-  type CodeBlockProps,
 } from "../code-block";
-import { useStream } from "@convex-dev/persistent-text-streaming/react";
-import { api } from "convex/_generated/api";
-import type { StreamId } from "@convex-dev/persistent-text-streaming";
+import type { HTMLAttributes } from "react";
+import { memo } from "react";
+import ReactMarkdown, { type Options } from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { cn } from "~/lib/utils";
 
 export type AIResponseProps = HTMLAttributes<HTMLDivElement> & {
   options?: Options;
-  // message: (typeof api.conversations.get._returnType)["messages"][number];
-  // isStreaming: boolean;
   children: Options["children"];
 };
 
@@ -54,10 +49,7 @@ const components: Options["components"] = {
   ),
   a: ({ node, children, className, ...props }) => (
     <a
-      className={cn(
-        "font-medium text-zinc-900 underline' dark:text-zinc-50",
-        className
-      )}
+      className={cn("font-medium text-primary underline", className)}
       rel="noreferrer"
       target="_blank"
       {...props}
@@ -157,7 +149,7 @@ const components: Options["components"] = {
           </CodeBlockSelect>
           <CodeBlockCopyButton
             onCopy={() => console.log("Copied code to clipboard")}
-            onError={() => console.error("Failed to copy code clipboard")}
+            onError={() => console.error("Failed to copy code to clipboard")}
           />
         </CodeBlockHeader>
         <CodeBlockBody>
@@ -175,16 +167,7 @@ const components: Options["components"] = {
 };
 
 export const AIResponse = memo(
-  ({
-    className,
-    options,
-    children,
-    // message,
-    // isStreaming,
-    ...props
-  }: AIResponseProps) => {
-    console.log({ status });
-
+  ({ className, options, children, ...props }: AIResponseProps) => {
     return (
       <div
         className={cn(

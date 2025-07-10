@@ -74,7 +74,7 @@ export const MessageList = memo(function MessageList({
   );
 
   return (
-    <AIConversation className="max-w-3xl mx-auto">
+    <AIConversation className="max-w-3xl mx-auto bg-primary-foreground">
       <AIConversationContent>
         {messages.map((m) => {
           const isAi = m.type === "ai_response";

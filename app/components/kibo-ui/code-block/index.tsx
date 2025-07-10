@@ -194,7 +194,7 @@ const lineNumberClassNames = cn(
   "[&_.line]:before:mr-4",
   "[&_.line]:before:text-[13px]",
   "[&_.line]:before:text-right",
-  "[&_.line]:before:text-zinc-500/50' dark:'[&_.line]:before:text-zinc-400/50",
+  "[&_.line]:before:text-muted-foreground/50",
   "[&_.line]:before:font-mono",
   "[&_.line]:before:select-none"
 );
@@ -247,7 +247,7 @@ const wordHighlightClassNames = cn(
 );
 
 const codeBlockClassName = cn(
-  "mt-0 bg-white text-sm' dark:bg-zinc-950",
+  "mt-0 bg-background text-sm",
   "[&_pre]:py-4",
   "[&_.shiki]:!bg-[var(--shiki-bg)]",
   "[&_code]:w-full",
@@ -346,7 +346,7 @@ export const CodeBlockHeader = ({
 }: CodeBlockHeaderProps) => (
   <div
     className={cn(
-      "flex flex-row items-center border-b bg-zinc-100 p-1' dark:bg-zinc-800",
+      "flex flex-row items-center border-b bg-secondary p-1",
       className
     )}
     {...props}
@@ -407,7 +407,7 @@ export const CodeBlockFilename = ({
 
   return (
     <div
-      className="flex items-center gap-2 bg-zinc-100 px-4 py-1.5 text-zinc-500 text-xs dark:bg-zinc-800 dark:text-zinc-400"
+      className="flex items-center gap-2 bg-secondary px-4 py-1.5 text-muted-foreground text-xs"
       {...props}
     >
       {Icon && <Icon className="h-4 w-4 shrink-0" />}
@@ -432,7 +432,7 @@ export const CodeBlockSelectTrigger = ({
 }: CodeBlockSelectTriggerProps) => (
   <SelectTrigger
     className={cn(
-      "w-fit border-none text-zinc-500 text-xs shadow-none' dark:text-zinc-400",
+      "w-fit border-none text-muted-foreground text-xs shadow-none",
       className
     )}
     {...props}
@@ -523,9 +523,7 @@ export const CodeBlockCopyButton = ({
       variant="ghost"
       {...props}
     >
-      {children ?? (
-        <Icon className="text-zinc-500 dark:text-zinc-400" size={14} />
-      )}
+      {children ?? <Icon className="text-muted-foreground" size={14} />}
     </Button>
   );
 };

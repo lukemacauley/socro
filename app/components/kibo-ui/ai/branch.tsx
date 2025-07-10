@@ -146,8 +146,8 @@ export const AIBranchPrevious = ({
     <Button
       aria-label="Previous branch"
       className={cn(
-        "size-7 shrink-0 rounded-full text-zinc-500 transition-colors' dark:text-zinc-400",
-        "hover:bg-zinc-100 hover:text-foreground' dark:'hover:bg-zinc-800",
+        "size-7 shrink-0 rounded-full text-muted-foreground transition-colors",
+        "hover:bg-accent hover:text-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
         className
       )}
@@ -174,8 +174,8 @@ export const AIBranchNext = ({ className, children }: AIBranchNextProps) => {
     <Button
       aria-label="Next branch"
       className={cn(
-        "size-7 shrink-0 rounded-full text-zinc-500 transition-colors' dark:text-zinc-400",
-        "hover:bg-zinc-100 hover:text-foreground' dark:'hover:bg-zinc-800",
+        "size-7 shrink-0 rounded-full text-muted-foreground transition-colors",
+        "hover:bg-accent hover:text-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
         className
       )}
@@ -200,7 +200,7 @@ export const AIBranchPage = ({ className }: AIBranchPageProps) => {
   return (
     <span
       className={cn(
-        "font-medium text-zinc-500 text-xs tabular-nums' dark:text-zinc-400",
+        "font-medium text-muted-foreground text-xs tabular-nums",
         className
       )}
     >

@@ -1,4 +1,10 @@
-import { Loader2Icon, SendIcon, SquareIcon, XIcon } from "lucide-react";
+import {
+  ArrowUp,
+  Loader2Icon,
+  SendIcon,
+  SquareIcon,
+  XIcon,
+} from "lucide-react";
 import type {
   ComponentProps,
   HTMLAttributes,
@@ -76,7 +82,7 @@ export type AIInputProps = HTMLAttributes<HTMLFormElement>;
 export const AIInput = ({ className, ...props }: AIInputProps) => (
   <form
     className={cn(
-      "w-full divide-y overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm' dark:border-zinc-800 dark:bg-zinc-950",
+      "w-full divide-y overflow-hidden rounded-xl border border-accent bg-background shadow-sm",
       className
     )}
     {...props}
@@ -91,7 +97,7 @@ export type AIInputTextareaProps = ComponentProps<typeof Textarea> & {
 export const AIInputTextarea = ({
   onChange,
   className,
-  placeholder = "What would you like to know?",
+  placeholder = "Type your message here...",
   minHeight = 48,
   maxHeight = 164,
   ...props
@@ -153,7 +159,7 @@ export const AIInputToolbar = ({
   ...props
 }: AIInputToolbarProps) => (
   <div
-    className={cn("flex items-center justify-between p-2", className)}
+    className={cn("flex items-center justify-between p-2.5", className)}
     {...props}
   />
 );
@@ -210,7 +216,7 @@ export const AIInputSubmit = ({
   children,
   ...props
 }: AIInputSubmitProps) => {
-  let Icon = <SendIcon />;
+  let Icon = <ArrowUp className="size-5" />;
 
   if (status === "submitted") {
     Icon = <Loader2Icon className="animate-spin" />;
@@ -249,8 +255,8 @@ export const AIInputModelSelectTrigger = ({
 }: AIInputModelSelectTriggerProps) => (
   <SelectTrigger
     className={cn(
-      "border-none bg-transparent font-medium text-zinc-500 shadow-none transition-colors' dark:text-zinc-400",
-      "hover:bg-zinc-100 hover:text-zinc-950 [&[aria-expanded=true]]:bg-zinc-100 [&[aria-expanded=true]]:text-foreground' dark:'hover:bg-zinc-800 dark:hover:text-zinc-50 dark:[&[aria-expanded=true]]:bg-zinc-800",
+      "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
+      'hover:bg-accent hover:text-foreground [&[aria-expanded="true"]]:bg-accent [&[aria-expanded="true"]]:text-foreground',
       className
     )}
     {...props}

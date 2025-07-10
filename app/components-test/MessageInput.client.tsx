@@ -16,20 +16,20 @@ import {
   AIInputToolbar,
   AIInputTools,
 } from "~/components/kibo-ui/ai/input";
-import { GlobeIcon, MicIcon, PlusIcon } from "lucide-react";
+import { GlobeIcon, MicIcon, Paperclip, PlusIcon } from "lucide-react";
 import type { StreamId } from "@convex-dev/persistent-text-streaming";
 
-const models = [
-  { id: "gpt-4", name: "GPT-4" },
-  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
-  { id: "claude-2", name: "Claude 2" },
-  { id: "claude-instant", name: "Claude Instant" },
-  { id: "palm-2", name: "PaLM 2" },
-  { id: "llama-2-70b", name: "Llama 2 70B" },
-  { id: "llama-2-13b", name: "Llama 2 13B" },
-  { id: "cohere-command", name: "Command" },
-  { id: "mistral-7b", name: "Mistral 7B" },
-];
+// const models = [
+//   { id: "gpt-4", name: "GPT-4" },
+//   { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+//   { id: "claude-2", name: "Claude 2" },
+//   { id: "claude-instant", name: "Claude Instant" },
+//   { id: "palm-2", name: "PaLM 2" },
+//   { id: "llama-2-70b", name: "Llama 2 70B" },
+//   { id: "llama-2-13b", name: "Llama 2 13B" },
+//   { id: "cohere-command", name: "Command" },
+//   { id: "mistral-7b", name: "Mistral 7B" },
+// ];
 
 export const MessageInput = memo(function MessageInput({
   conversationId,
@@ -44,7 +44,7 @@ export const MessageInput = memo(function MessageInput({
   const { state } = useSidebar();
 
   const [input, setInput] = useState("");
-  const [model, setModel] = useState<string>(models[0].id);
+  // const [model, setModel] = useState<string>(models[0].id);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -79,17 +79,17 @@ export const MessageInput = memo(function MessageInput({
           />
           <AIInputToolbar>
             <AIInputTools>
-              <AIInputButton>
-                <PlusIcon size={16} />
+              <AIInputButton variant="outline">
+                <Paperclip size={16} />
               </AIInputButton>
-              <AIInputButton>
+              {/*  <AIInputButton>
                 <MicIcon size={16} />
               </AIInputButton>
               <AIInputButton>
                 <GlobeIcon size={16} />
                 <span>Search</span>
               </AIInputButton>
-              <AIInputModelSelect onValueChange={setModel} value={model}>
+             <AIInputModelSelect onValueChange={setModel} value={model}>
                 <AIInputModelSelectTrigger>
                   <AIInputModelSelectValue />
                 </AIInputModelSelectTrigger>
@@ -100,9 +100,9 @@ export const MessageInput = memo(function MessageInput({
                     </AIInputModelSelectItem>
                   ))}
                 </AIInputModelSelectContent>
-              </AIInputModelSelect>
+              </AIInputModelSelect> */}
             </AIInputTools>
-            <AIInputSubmit disabled={!input || disabled} />
+            <AIInputSubmit disabled={!input || disabled} size="icon" />
           </AIInputToolbar>
         </AIInput>
       </div>

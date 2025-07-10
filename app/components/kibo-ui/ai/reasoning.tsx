@@ -1,14 +1,13 @@
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "~/components/ui/collapsible";
 import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
 import { cn } from "~/lib/utils";
 import { AIResponse } from "./response";
+import {
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "~/components/ui/collapsible";
 
 type AIReasoningContextValue = {
   isStreaming: boolean;
@@ -124,7 +123,7 @@ export const AIReasoningTrigger = memo(
     return (
       <CollapsibleTrigger
         className={cn(
-          "flex items-center gap-2 text-zinc-500 text-sm' dark:text-zinc-400",
+          "flex items-center gap-2 text-muted-foreground text-sm",
           className
         )}
         {...props}
@@ -138,7 +137,7 @@ export const AIReasoningTrigger = memo(
             )}
             <ChevronDownIcon
               className={cn(
-                "size-4 text-zinc-500 transition-transform' dark:text-zinc-400",
+                "size-4 text-muted-foreground transition-transform",
                 isOpen ? "rotate-180" : "rotate-0"
               )}
             />
@@ -158,10 +157,7 @@ export type AIReasoningContentProps = ComponentProps<
 export const AIReasoningContent = memo(
   ({ className, children, ...props }: AIReasoningContentProps) => (
     <CollapsibleContent
-      className={cn(
-        "mt-4 text-zinc-500 text-sm' dark:text-zinc-400",
-        className
-      )}
+      className={cn("mt-4 text-muted-foreground text-sm", className)}
       {...props}
     >
       <AIResponse className="grid gap-2">{children}</AIResponse>

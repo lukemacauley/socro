@@ -76,11 +76,11 @@ export const AIToolHeader = ({
     {...props}
   >
     <div className="flex items-center gap-2">
-      <WrenchIcon className="size-4 text-zinc-500 dark:text-zinc-400" />
+      <WrenchIcon className="size-4 text-muted-foreground" />
       <span className="font-medium text-sm">{name}</span>
       {getStatusBadge(status)}
     </div>
-    <ChevronDownIcon className="size-4 text-zinc-500 transition-transform group-data-[state=open]:rotate-180 dark:text-zinc-400" />
+    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
   </CollapsibleTrigger>
 );
 
@@ -103,11 +103,11 @@ export const AIToolParameters = ({
   ...props
 }: AIToolParametersProps) => (
   <div className={cn("space-y-2", className)} {...props}>
-    <h4 className="font-medium text-zinc-500 text-xs uppercase tracking-wide dark:text-zinc-400">
+    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
       Parameters
     </h4>
-    <div className="rounded-md bg-zinc-100/50 p-3 dark:bg-zinc-800/50">
-      <pre className="overflow-x-auto text-zinc-500 text-xs dark:text-zinc-400">
+    <div className="rounded-md bg-muted/50 p-3">
+      <pre className="overflow-x-auto text-muted-foreground text-xs">
         {JSON.stringify(parameters, null, 2)}
       </pre>
     </div>
@@ -131,7 +131,7 @@ export const AIToolResult = ({
 
   return (
     <div className={cn("space-y-2", className)} {...props}>
-      <h4 className="font-medium text-zinc-500 text-xs uppercase tracking-wide dark:text-zinc-400">
+      <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {error ? "Error" : "Result"}
       </h4>
       <div
