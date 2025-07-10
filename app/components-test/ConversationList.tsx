@@ -1,5 +1,5 @@
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
-import { useQuery } from "convex/react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router";
 

@@ -1,7 +1,7 @@
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
-import { useQuery } from "convex/react";
-import { useState, useCallback } from "react";
+import { useQuery } from "convex-helpers/react/cache";
+import { useState } from "react";
 import { ConversationHeader } from "./ConversationHeader";
 import { MessageList } from "./MessageList.client";
 import { MessageInput } from "./MessageInput.client";

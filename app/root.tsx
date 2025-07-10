@@ -13,6 +13,7 @@ import { ClerkProvider, useAuth } from "@clerk/react-router";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import { Toaster } from "./components/ui/sonner";
+import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 
 export async function loader(args: Route.LoaderArgs) {
   return rootAuthLoader(args);
@@ -60,9 +61,9 @@ export default function App({ loaderData }: Route.ComponentProps) {
       signInFallbackRedirectUrl="/"
     >
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <main>
+        <ConvexQueryCacheProvider>
           <Outlet />
-        </main>
+        </ConvexQueryCacheProvider>
       </ConvexProviderWithClerk>
     </ClerkProvider>
   );
