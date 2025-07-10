@@ -82,7 +82,7 @@ export type AIInputProps = HTMLAttributes<HTMLFormElement>;
 export const AIInput = ({ className, ...props }: AIInputProps) => (
   <form
     className={cn(
-      "w-full divide-y overflow-hidden rounded-xl border border-accent bg-background shadow-sm",
+      "w-full divide-y overflow-hidden rounded-xl border border-accent bg-background/50 backdrop-blur-lg shadow-sm",
       className
     )}
     {...props}
@@ -159,7 +159,7 @@ export const AIInputToolbar = ({
   ...props
 }: AIInputToolbarProps) => (
   <div
-    className={cn("flex items-center justify-between p-2.5", className)}
+    className={cn("flex items-center justify-between pb-2.5 px-2.5", className)}
     {...props}
   />
 );
@@ -191,7 +191,7 @@ export const AIInputButton = ({
   return (
     <Button
       className={cn(
-        "shrink-0 gap-1.5 rounded-lg",
+        "shrink-0 gap-1.5 rounded-md",
         variant === "ghost" && "text-muted-foreground",
         newSize === "default" && "px-3",
         className

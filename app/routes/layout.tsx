@@ -90,7 +90,7 @@ export default function Layout() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex h-[calc(100vh-3rem)] flex-col bg-primary-foreground">
+        <div className="bg-primary-foreground">
           <Outlet />
         </div>
       </SidebarInset>
