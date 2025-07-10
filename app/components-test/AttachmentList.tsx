@@ -9,19 +9,17 @@ interface Attachment {
   size: number;
 }
 
-interface AttachmentListProps {
-  attachments: Attachment[];
-  onDownload: (attachmentId: string, fileName: string) => void;
-}
-
 export const AttachmentList = memo(function AttachmentList({
   attachments,
   onDownload,
-}: AttachmentListProps) {
+}: {
+  attachments: Attachment[];
+  onDownload: (attachmentId: string, fileName: string) => void;
+}) {
   if (!attachments || attachments.length === 0) return null;
 
   return (
-    <div className="mt-3 border-t pt-3">
+    <div className="w-full mt-3 border-t pt-3">
       <p className="text-sm font-medium text-zinc-700 mb-2">
         Attachments ({attachments.length})
       </p>
@@ -36,7 +34,8 @@ export const AttachmentList = memo(function AttachmentList({
               <div>
                 <p className="text-sm font-medium">{attachment.name}</p>
                 <p className="text-xs text-zinc-500">
-                  {attachment.contentType} • {(attachment.size / 1024).toFixed(1)} KB
+                  {attachment.contentType} •{" "}
+                  {(attachment.size / 1024).toFixed(1)} KB
                 </p>
               </div>
             </div>
