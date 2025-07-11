@@ -101,6 +101,8 @@ export const sendMessage = mutation({
       type: "user_note",
       sender: userId,
       timestamp: Date.now(),
+      role: "user",
+      userId,
     });
 
     return { messageId, streamId: responseStreamId };

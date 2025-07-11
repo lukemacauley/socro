@@ -1,0 +1,256 @@
+import { v } from "convex/values";
+import {
+  query,
+  mutation,
+  internalQuery,
+  internalMutation,
+  internalAction,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import { getCurrentUser } from "./lib/utils";
+
+export const getMessages = query({
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity === null) {
+      throw new Error("Not authenticated");
+    }
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .order("asc")
+      .collect();
+
+    // Get streaming chunks for assistant messages
+    const messagesWithChunks = await Promise.all(
+      messages.map(async (message) => {
+        if (message.role === "assistant" && message.isStreaming) {
+          const chunks = await ctx.db
+            .query("streamingChunks")
+            .withIndex("by_message", (q) => q.eq("messageId", message._id))
+            .order("asc")
+            .collect();
+
+          const streamedContent = chunks.map((chunk) => chunk.chunk).join("");
+          return {
+            ...message,
+            content: streamedContent || message.content,
+            chunks: chunks.length,
+          };
+        }
+        return message;
+      })
+    );
+
+    return messagesWithChunks;
+  },
+});
+
+export const sendMessage = mutation({
+  args: {
+    content: v.string(),
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+
+    // Insert user message
+    const userMessageId = await ctx.db.insert("messages", {
+      content: args.content,
+      role: "user",
+      userId: user._id,
+      conversationId: args.conversationId,
+      timestamp: Date.now(),
+      type: "user_note",
+    });
+
+    // Create placeholder assistant message
+    const assistantMessageId = await ctx.db.insert("messages", {
+      content: "",
+      role: "assistant",
+      userId: user._id,
+      conversationId: args.conversationId,
+      isStreaming: true,
+      streamingComplete: false,
+      timestamp: Date.now(),
+      type: "ai_response",
+    });
+
+    // Schedule AI response generation
+    await ctx.scheduler.runAfter(
+      0,
+      internal.messages.generateStreamingResponse,
+      {
+        conversationId: args.conversationId,
+        assistantMessageId,
+      }
+    );
+
+    return { userMessageId, assistantMessageId };
+  },
+});
+
+export const generateStreamingResponse = internalAction({
+  args: {
+    conversationId: v.id("conversations"),
+    assistantMessageId: v.id("messages"),
+  },
+  handler: async (ctx, args) => {
+    // Get conversation history
+    const messages = await ctx.runQuery(
+      internal.messages.getConversationHistory,
+      {
+        conversationId: args.conversationId,
+      }
+    );
+
+    try {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error("ANTHROPIC_API_KEY environment variable is not set");
+      }
+
+      // Format messages for Anthropic API
+      const anthropicMessages = messages
+        .filter((msg: any) => msg.content.trim() !== "")
+        .map((msg: any) => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        }));
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 1000,
+          messages: anthropicMessages,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Anthropic API error: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("No response body reader available");
+      }
+
+      const decoder = new TextDecoder();
+      let chunkIndex = 0;
+      let fullContent = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data);
+
+                if (
+                  parsed.type === "content_block_delta" &&
+                  parsed.delta?.text
+                ) {
+                  const content = parsed.delta.text;
+                  fullContent += content;
+
+                  // Store chunk in database
+                  await ctx.runMutation(internal.messages.addStreamingChunk, {
+                    messageId: args.assistantMessageId,
+                    chunk: content,
+                    chunkIndex,
+                  });
+
+                  chunkIndex++;
+                }
+              } catch (parseError) {
+                // Skip invalid JSON lines
+                continue;
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Mark streaming as complete
+      await ctx.runMutation(internal.messages.completeStreaming, {
+        messageId: args.assistantMessageId,
+        finalContent:
+          fullContent || "I apologize, but I couldn't generate a response.",
+      });
+    } catch (error) {
+      console.error("Streaming error:", error);
+      await ctx.runMutation(internal.messages.completeStreaming, {
+        messageId: args.assistantMessageId,
+        finalContent:
+          "Sorry, I encountered an error while generating the response. Please make sure the ANTHROPIC_API_KEY environment variable is set.",
+      });
+    }
+  },
+});
+
+export const getConversationHistory = internalQuery({
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .filter((q) => q.neq(q.field("isStreaming"), true))
+      .order("asc")
+      .collect();
+  },
+});
+
+export const addStreamingChunk = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    chunk: v.string(),
+    chunkIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("streamingChunks", {
+      messageId: args.messageId,
+      chunk: args.chunk,
+      chunkIndex: args.chunkIndex,
+    });
+  },
+});
+
+export const completeStreaming = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    finalContent: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, {
+      content: args.finalContent,
+      isStreaming: false,
+      streamingComplete: true,
+    });
+  },
+});

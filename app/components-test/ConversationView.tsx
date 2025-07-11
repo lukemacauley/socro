@@ -13,30 +13,19 @@ export function ConversationView({
   conversationId: Id<"conversations">;
 }) {
   const data = useQuery(api.conversations.get, { conversationId });
-  const [activeStreamId, setActiveStreamId] = useState<StreamId | null>(null);
 
   if (!data) {
     return null;
   }
 
   return (
-    <>
+    <div className="h-[calc(100vh-48px)] flex flex-col">
       <ConversationHeader
         subject={data?.conversation.subject}
         participants={data?.conversation.participants}
       />
-
-      <MessageList
-        messages={data?.messages || []}
-        activeStreamId={activeStreamId}
-        onStreamComplete={() => setActiveStreamId(null)}
-      />
-
-      <MessageInput
-        conversationId={conversationId}
-        onMessageSent={setActiveStreamId}
-        disabled={!!activeStreamId}
-      />
-    </>
+      <MessageList conversationId={conversationId} />
+      <MessageInput conversationId={conversationId} />
+    </div>
   );
 }

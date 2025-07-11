@@ -434,6 +434,7 @@ Always be helpful and responsive to the user's needs.`;
             conversationId,
             content: fullText,
             streamId: streamId,
+            userId: body.userId, // Pass userId from request
           });
         }
       );
