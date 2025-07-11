@@ -1,4 +1,4 @@
-import { useCallback, memo } from "react";
+import { useCallback, memo, useMemo } from "react";
 import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
@@ -19,6 +19,27 @@ export const MessageList = memo(function MessageList({
   conversationId: Id<"conversations">;
 }) {
   const messages = useQuery(api.messages.getMessages, { conversationId }) || [];
+
+  return (
+    <AIConversation className="bg-primary-foreground max-w-3xl mx-auto">
+      <AIConversationContent>
+        {messages.map((m) => (
+          <MessageItem message={m} key={m._id} />
+        ))}
+      </AIConversationContent>
+      <AIConversationScrollButton />
+    </AIConversation>
+  );
+});
+
+function MessageItem({
+  message,
+}: {
+  message: (typeof api.messages.getMessages._returnType)[number];
+}) {
+  const isAi = message.type === "ai_response";
+  const isEmail = message.type === "email" || message.type === "sent_email";
+
   const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
   const handleDownloadAttachment = useCallback(
@@ -61,37 +82,29 @@ export const MessageList = memo(function MessageList({
     [downloadAttachment]
   );
 
-  return (
-    <AIConversation className="bg-primary-foreground max-w-3xl mx-auto">
-      <AIConversationContent>
-        {messages.map((m) => {
-          const isAi = m.type === "ai_response";
-          const isEmail = m.type === "email" || m.type === "sent_email";
+  const displayContent = useMemo(() => {
+    return message.content;
+  }, [message.content]);
 
-          return (
-            <AIMessage from={isAi ? "assistant" : "user"} key={m._id}>
-              {isAi ? (
-                <AIResponse>{m.content}</AIResponse>
-              ) : isEmail ? (
-                <AIMessageContent>
-                  <div dangerouslySetInnerHTML={{ __html: m.content }} />
-                  {m.attachments && m.emailId && (
-                    <AttachmentList
-                      attachments={m.attachments}
-                      onDownload={(id, fileName) =>
-                        handleDownloadAttachment(m.emailId!, id, fileName)
-                      }
-                    />
-                  )}
-                </AIMessageContent>
-              ) : (
-                <AIMessageContent>{m.content}</AIMessageContent>
-              )}
-            </AIMessage>
-          );
-        })}
-      </AIConversationContent>
-      <AIConversationScrollButton />
-    </AIConversation>
+  return (
+    <AIMessage from={isAi ? "assistant" : "user"}>
+      {isAi ? (
+        <AIResponse>{displayContent}</AIResponse>
+      ) : isEmail ? (
+        <AIMessageContent>
+          <div dangerouslySetInnerHTML={{ __html: message.content }} />
+          {message.attachments && message.emailId && (
+            <AttachmentList
+              attachments={message.attachments}
+              onDownload={(id, fileName) =>
+                handleDownloadAttachment(message.emailId!, id, fileName)
+              }
+            />
+          )}
+        </AIMessageContent>
+      ) : (
+        <AIMessageContent>{message.content}</AIMessageContent>
+      )}
+    </AIMessage>
   );
-});
+}

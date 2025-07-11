@@ -6,16 +6,15 @@ import {
   internalMutation,
   internalAction,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
-import { getCurrentUser } from "./lib/utils";
+import { api, internal } from "./_generated/api";
+import { verifyConversationOwnership } from "./lib/utils";
+import { Id } from "./_generated/dataModel";
 
 export const getMessages = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    await verifyConversationOwnership(ctx, args.conversationId, userId);
 
     const messages = await ctx.db
       .query("messages")
@@ -55,14 +54,21 @@ export const sendMessage = mutation({
     content: v.string(),
     conversationId: v.id("conversations"),
   },
-  handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    userMessageId: Id<"messages">;
+    assistantMessageId: Id<"messages">;
+  }> => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    await verifyConversationOwnership(ctx, args.conversationId, userId);
 
     // Insert user message
     const userMessageId = await ctx.db.insert("messages", {
       content: args.content,
       role: "user",
-      userId: user._id,
+      userId,
       conversationId: args.conversationId,
       timestamp: Date.now(),
       type: "user_note",
@@ -72,7 +78,7 @@ export const sendMessage = mutation({
     const assistantMessageId = await ctx.db.insert("messages", {
       content: "",
       role: "assistant",
-      userId: user._id,
+      userId,
       conversationId: args.conversationId,
       isStreaming: true,
       streamingComplete: false,
@@ -116,8 +122,8 @@ export const generateStreamingResponse = internalAction({
 
       // Format messages for Anthropic API
       const anthropicMessages = messages
-        .filter((msg: any) => msg.content.trim() !== "")
-        .map((msg: any) => ({
+        .filter((msg) => msg.content.trim() !== "")
+        .map((msg) => ({
           role: msg.role as "user" | "assistant",
           content: msg.content,
         }));
@@ -130,8 +136,8 @@ export const generateStreamingResponse = internalAction({
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-3-haiku-20240307",
-          max_tokens: 1000,
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 50_000,
           messages: anthropicMessages,
           stream: true,
         }),
