@@ -39,7 +39,9 @@ const applicationTables = {
     .index("by_thread", ["threadId", "userId"]),
   messages: defineTable({
     conversationId: v.id("conversations"),
+    userId: v.id("users"),
     content: v.string(),
+    role: v.union(v.literal("user"), v.literal("assistant")),
     type: messageType,
     sender: v.optional(v.string()), // email sender or "ai" or user ID
     timestamp: v.number(),
@@ -47,11 +49,19 @@ const applicationTables = {
     attachments: v.optional(v.array(attachmentValidator)),
     streamId: v.optional(v.string()), // ID for persistent streaming
     isStreaming: v.optional(v.boolean()), // Whether this message is part of a streaming response
+    streamingComplete: v.optional(v.boolean()), // Whether the streaming response is complete
   })
     .index("by_conversation", ["conversationId"])
     .index("by_timestamp", ["timestamp"])
     .index("by_email_id", ["emailId"])
-    .index("by_streamId", ["streamId"]),
+    .index("by_streamId", ["streamId"])
+    .index("by_user", ["userId"]),
+
+  streamingChunks: defineTable({
+    messageId: v.id("messages"),
+    chunk: v.string(),
+    chunkIndex: v.number(),
+  }).index("by_message", ["messageId", "chunkIndex"]),
 
   userSettings: defineTable({
     userId: v.id("users"),

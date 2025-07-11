@@ -14,6 +14,7 @@ export const generateResponse = action({
     emailSubject: v.string(),
     senderName: v.optional(v.string()),
     streamId: v.string(),
+    userId: v.id("users"), // User ID for saving the response
   },
   handler: async (ctx, args): Promise<string> => {
     const conversationData = await ctx.runQuery(
@@ -119,6 +120,7 @@ Always be helpful and responsive to the user's needs.`;
       conversationId: args.conversationId,
       content: aiResponse,
       streamId: args.streamId,
+      userId: args.userId,
     });
 
     return aiResponse;
@@ -162,6 +164,7 @@ export const saveAiResponse = internalMutation({
     conversationId: v.id("conversations"),
     content: v.string(),
     streamId: v.string(),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     const messageId = await ctx.db.insert("messages", {
@@ -171,6 +174,8 @@ export const saveAiResponse = internalMutation({
       sender: "ai",
       timestamp: Date.now(),
       streamId: args.streamId,
+      userId: args.userId,
+      role: "assistant",
     });
 
     await ctx.db.patch(args.conversationId, {

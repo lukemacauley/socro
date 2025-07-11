@@ -478,6 +478,7 @@ export const fetchAndProcessEmail = internalAction({
       sender: email.from?.emailAddress?.address || "unknown@email.com",
       attachments,
       messageType: actualIsSentEmail ? "sent_email" : "email",
+      userId,
     });
     console.log("[WEBHOOK] Email message added successfully");
 
@@ -511,6 +512,7 @@ export const fetchAndProcessEmail = internalAction({
             emailSubject: email.subject || "(No subject)",
             senderName: email.from?.emailAddress?.name,
             streamId,
+            userId,
           });
           console.log("[WEBHOOK] AI response generated successfully");
         } catch (error) {
@@ -669,6 +671,7 @@ export const addEmailMessage = internalMutation({
     sender: v.string(),
     attachments: v.optional(v.array(attachmentValidator)),
     messageType: v.optional(messageType),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("messages", {
@@ -679,6 +682,8 @@ export const addEmailMessage = internalMutation({
       timestamp: Date.now(),
       emailId: args.emailId,
       attachments: args.attachments,
+      role: "assistant",
+      userId: args.userId, // Ensure we have the user ID for the message
     });
   },
 });

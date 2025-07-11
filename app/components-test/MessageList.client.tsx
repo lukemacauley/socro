@@ -1,4 +1,4 @@
-import { useCallback, memo } from "react";
+import { useCallback, memo, useMemo } from "react";
 import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
@@ -9,29 +9,38 @@ import {
 } from "~/components/kibo-ui/ai/conversation";
 import { AIMessage, AIMessageContent } from "~/components/kibo-ui/ai/message";
 import { AIResponse } from "~/components/kibo-ui/ai/response";
-import { StreamingMessage } from "./StreamingMessage.client";
-import type { StreamId } from "@convex-dev/persistent-text-streaming";
 import { AttachmentList } from "./AttachmentList";
+import { useQuery } from "convex-helpers/react/cache";
+import type { Id } from "convex/_generated/dataModel";
 
 export const MessageList = memo(function MessageList({
-  messages,
-  activeStreamId,
-  onStreamComplete,
+  conversationId,
 }: {
-  messages: (typeof api.conversations.get._returnType)["messages"];
-  activeStreamId: StreamId | null;
-  onStreamComplete: () => void;
+  conversationId: Id<"conversations">;
 }) {
-  const downloadAttachment = useAction(api.webhooks.downloadAttachment);
+  const messages = useQuery(api.messages.getMessages, { conversationId }) || [];
 
-  const handleStopStreaming = useCallback(
-    (streamId: string) => {
-      if (streamId === activeStreamId) {
-        onStreamComplete();
-      }
-    },
-    [activeStreamId, onStreamComplete]
+  return (
+    <AIConversation className="bg-primary-foreground max-w-3xl mx-auto">
+      <AIConversationContent>
+        {messages.map((m) => (
+          <MessageItem message={m} key={m._id} />
+        ))}
+      </AIConversationContent>
+      <AIConversationScrollButton />
+    </AIConversation>
   );
+});
+
+function MessageItem({
+  message,
+}: {
+  message: (typeof api.messages.getMessages._returnType)[number];
+}) {
+  const isAi = message.type === "ai_response";
+  const isEmail = message.type === "email" || message.type === "sent_email";
+
+  const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
   const handleDownloadAttachment = useCallback(
     async (emailId: string, attachmentId: string, fileName: string) => {
@@ -73,49 +82,29 @@ export const MessageList = memo(function MessageList({
     [downloadAttachment]
   );
 
+  const displayContent = useMemo(() => {
+    return message.content;
+  }, [message.content]);
+
   return (
-    <AIConversation className="max-w-3xl mx-auto bg-primary-foreground">
-      <AIConversationContent>
-        {messages.map((m) => {
-          const isAi = m.type === "ai_response";
-          const isEmail = m.type === "email" || m.type === "sent_email";
-          return (
-            <AIMessage from={isAi ? "assistant" : "user"} key={m._id}>
-              {isAi ? (
-                <AIResponse>{m.content}</AIResponse>
-              ) : isEmail ? (
-                <AIMessageContent>
-                  <div dangerouslySetInnerHTML={{ __html: m.content }} />
-                  {m.attachments && m.emailId && (
-                    <AttachmentList
-                      attachments={m.attachments}
-                      onDownload={(attachmentId, fileName) =>
-                        handleDownloadAttachment(
-                          m.emailId!,
-                          attachmentId,
-                          fileName
-                        )
-                      }
-                    />
-                  )}
-                </AIMessageContent>
-              ) : (
-                <AIMessageContent>{m.content}</AIMessageContent>
-              )}
-            </AIMessage>
-          );
-        })}
-        {!!activeStreamId && (
-          <AIMessage from="assistant" key={activeStreamId}>
-            <StreamingMessage
-              streamId={activeStreamId}
-              isDriven={!!activeStreamId}
-              stopStreaming={() => handleStopStreaming(activeStreamId)}
+    <AIMessage from={isAi ? "assistant" : "user"}>
+      {isAi ? (
+        <AIResponse>{displayContent}</AIResponse>
+      ) : isEmail ? (
+        <AIMessageContent>
+          <div dangerouslySetInnerHTML={{ __html: message.content }} />
+          {message.attachments && message.emailId && (
+            <AttachmentList
+              attachments={message.attachments}
+              onDownload={(id, fileName) =>
+                handleDownloadAttachment(message.emailId!, id, fileName)
+              }
             />
-          </AIMessage>
-        )}
-      </AIConversationContent>
-      <AIConversationScrollButton />
-    </AIConversation>
+          )}
+        </AIMessageContent>
+      ) : (
+        <AIMessageContent>{message.content}</AIMessageContent>
+      )}
+    </AIMessage>
   );
-});
+}
