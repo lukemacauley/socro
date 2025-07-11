@@ -14,9 +14,9 @@ import {
 import { Paperclip } from "lucide-react";
 
 export const MessageInput = memo(function MessageInput({
-  conversationId,
+  threadId,
 }: {
-  conversationId: Id<"conversations">;
+  threadId: Id<"threads">;
 }) {
   const sendMessage = useMutation(api.messages.sendMessage);
 
@@ -33,11 +33,11 @@ export const MessageInput = memo(function MessageInput({
       setInput("");
 
       await sendMessage({
-        conversationId,
+        threadId,
         content: message,
       });
     },
-    [input, conversationId, sendMessage]
+    [input, threadId, sendMessage]
   );
 
   return (

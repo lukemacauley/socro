@@ -9,8 +9,8 @@ export default [
   index("routes/home.tsx"),
   layout("routes/layout.tsx", [
     route("assistant", "routes/assistant.tsx"),
-    route("emails", "routes/emails/all.tsx"),
-    route("emails/:id", "routes/emails/chat.tsx"),
+    route("threads", "routes/threads/all.tsx"),
+    route("threads/:id", "routes/threads/chat.tsx"),
     route("vault", "routes/vault.tsx"),
     route("history", "routes/history.tsx"),
   ]),

@@ -42,8 +42,8 @@ export default function Layout() {
 
     // Format the label
     let label = segment;
-    if (segment === "emails") {
-      label = "Emails";
+    if (segment === "threads") {
+      label = "Threads";
     } else if (segment === "new") {
       label = "New";
     } else {

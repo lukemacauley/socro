@@ -9,7 +9,7 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
 
   useEffect(() => {
     if (isAuthenticated) {
-      window.location.href = "/emails";
+      window.location.href = "/threads";
     }
   }, [isAuthenticated]);
 

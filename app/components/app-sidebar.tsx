@@ -38,9 +38,9 @@ export const NAVIGATION: {
 }[] = [
   { title: "Assistant", icon: MessageSquare, url: "/assistant" },
   {
-    title: "Emails",
+    title: "Threads",
     icon: MessagesSquare,
-    url: "/emails",
+    url: "/threads",
     // isActive: true,
     // items: [
     //   { title: "All", url: "/emails" },

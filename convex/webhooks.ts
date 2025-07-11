@@ -1,43 +1,42 @@
-import {
-  internalMutation,
-  internalAction,
-  internalQuery,
-  action,
-} from "./_generated/server";
+import { internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
-import { getUserSettingsByUserId, getMicrosoftAccessToken } from "./lib/utils";
-import { attachmentValidator, messageType } from "./lib/validators";
-import { streamingComponent } from "./streaming";
 import Reducto, { toFile } from "reductoai";
-import type { Id } from "./_generated/dataModel";
 import { decode } from "he";
+import { createClerkClient } from "@clerk/backend";
+import type {
+  Attachment,
+  FileAttachment,
+  Message,
+  Subscription,
+} from "@microsoft/microsoft-graph-types";
+import { attachmentSchema } from "./schema";
+
+// ==================== Constants ====================
+const MICROSOFT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+const WEBHOOK_SUBSCRIPTION_DURATION_MINUTES = 4230; // ~70 hours
+const SUPPORTED_ATTACHMENT_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "text/plain",
+];
+
+// ==================== Email Processing ====================
 
 export const processEmailNotification = internalMutation({
   args: {
-    notification: v.any(),
+    subscriptionId: v.string(),
+    resource: v.string(),
+    isSentEmail: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { notification } = args;
-    console.log("[WEBHOOK] Received email notification:", {
-      subscriptionId: notification.subscriptionId,
-      changeType: notification.changeType,
-      resource: notification.resource,
-      clientState: notification.clientState,
-    });
-
-    // We'll determine if it's a sent email later by checking the sender
-    const isSentEmail = false; // Temporary, will be determined when we fetch the email
-
-    // Extract email ID from the resource path
-    // Resource format: "Users/{user-id}/Messages/{message-id}"
-    const resource = notification.resource;
-    const emailId = resource.split("/").pop();
+    const emailId = args.resource.split("/").pop();
 
     if (!emailId) {
       console.error(
         "[WEBHOOK] Could not extract email ID from resource:",
-        resource
+        args.resource
       );
       return;
     }
@@ -48,8 +47,8 @@ export const processEmailNotification = internalMutation({
     // Schedule action to fetch full email details
     await ctx.scheduler.runAfter(0, internal.webhooks.fetchAndProcessEmail, {
       emailId,
-      subscriptionId: notification.subscriptionId,
-      isSentEmail,
+      subscriptionId: args.subscriptionId,
+      isSentEmail: args.isSentEmail || false,
     });
 
     console.log("[WEBHOOK] Email processing scheduled successfully");
@@ -66,584 +65,60 @@ export const fetchAndProcessEmail = internalAction({
     console.log("[WEBHOOK] Starting to process email:", args.emailId);
     console.log("[WEBHOOK] Is sent email:", args.isSentEmail);
 
-    // Find user by subscription ID
-    console.log(
-      "[WEBHOOK] Looking up user by subscription ID:",
-      args.subscriptionId
-    );
-    const userSettings = await ctx.runQuery(
-      internal.webhooks.findUserBySubscription,
-      {
-        subscriptionId: args.subscriptionId,
-      }
-    );
+    const user = await ctx.runQuery(internal.users.getBySubscriptionId, {
+      subscriptionId: args.subscriptionId,
+    });
 
-    if (!userSettings) {
+    if (!user) {
       console.error(
-        "[WEBHOOK] No user settings found for subscription:",
+        "[WEBHOOK] No user found for subscription:",
         args.subscriptionId
       );
       return;
     }
 
-    const userId = userSettings.userId;
-    console.log("[WEBHOOK] Found user settings, user ID:", userId);
-
-    // Get user to fetch their Clerk ID
-    const user = await ctx.runQuery(internal.users.getById, { userId });
-    if (!user) {
-      console.error("[WEBHOOK] User not found:", userId);
-      return;
-    }
-
-    const accessToken = await getMicrosoftAccessToken(user.externalId);
-
-    // Fetch the full email from Microsoft Graph API including attachments
-    let email;
-    try {
-      console.log("[WEBHOOK] Fetching email from Microsoft Graph API...");
-      const response = await fetch(
-        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}?$select=id,subject,from,body,uniqueBody,receivedDateTime,isRead,hasAttachments,conversationId,conversationIndex,replyTo&$expand=attachments($select=id,name,contentType,size)`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[WEBHOOK] Microsoft Graph API error:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-        });
-
-        throw new Error(
-          `Failed to fetch email: ${response.status} ${response.statusText}`
-        );
-      }
-
-      email = await response.json();
-      console.log("[WEBHOOK] Successfully fetched email:", {
-        id: email.id,
-        subject: email.subject,
-        from: email.from?.emailAddress?.address,
-        receivedDateTime: email.receivedDateTime,
-        hasAttachments: email.hasAttachments,
-        attachmentCount: email.attachments?.length || 0,
-        conversationId: email.conversationId,
-        conversationIndex: email.conversationIndex,
-        hasUniqueBody: !!email.uniqueBody,
-        uniqueBodyLength: email.uniqueBody?.content?.length || 0,
-      });
-    } catch (error) {
-      console.error(
-        "[WEBHOOK] Error fetching email from Microsoft Graph:",
-        error
-      );
-      return;
-    }
-
-    // Check if message already exists for this email ID or internetMessageId
-    console.log("[WEBHOOK] Checking if message already exists...");
-    const existingMessage = await ctx.runQuery(
-      internal.webhooks.findMessageByEmailId,
-      {
-        emailId: email.id,
-      }
+    // Get Microsoft access token
+    const accessToken = await ctx.scheduler.runAfter(
+      0,
+      internal.webhooks.getMicrosoftAccessToken,
+      { clerkUserId: user.externalId }
     );
 
-    if (existingMessage) {
-      console.log("[WEBHOOK] Message already exists for email:", email.id);
+    // Fetch the full email from Microsoft Graph API
+    const email = await fetchEmailFromMicrosoft(accessToken, args.emailId);
+
+    if (!email) {
       return;
     }
 
-    if (!userId) {
-      console.error(
-        "[WEBHOOK] No user ID available, cannot create conversation"
-      );
-      return;
-    }
-
-    // Determine if this is a sent email by checking if sender matches user's email
-    const actualIsSentEmail =
-      email.from?.emailAddress?.address?.toLowerCase() ===
-      user?.email?.toLowerCase();
-    console.log(
-      `[WEBHOOK] Email from: ${email.from?.emailAddress?.address}, User email: ${user?.email}, Is sent: ${actualIsSentEmail}`
-    );
-
-    // Check if conversation exists for this thread
-    console.log("[WEBHOOK] Checking for existing thread...");
-    let conversationId: Id<"conversations">;
-    let isNewConversation = false;
-
-    const threadId = email.conversationId || email.id; // Use email ID as fallback if no thread ID
-
-    const existingConversation = await ctx.runQuery(
-      internal.webhooks.findConversationByThreadId,
-      {
-        threadId,
-        userId,
-      }
-    );
-
-    if (existingConversation) {
-      console.log("[WEBHOOK] Found existing thread:", existingConversation._id);
-      conversationId = existingConversation._id;
-
-      // Update conversation activity
-      await ctx.runMutation(internal.webhooks.updateConversationActivity, {
-        conversationId,
-        emailId: email.id,
-        fromEmail: email.from?.emailAddress?.address || "unknown@email.com",
-        fromName: email.from?.emailAddress?.name,
-        subject: email.subject || existingConversation.subject,
-      });
-    } else {
-      // Create new conversation
-      console.log("[WEBHOOK] Creating new conversation for thread:", threadId);
-      isNewConversation = true;
-      conversationId = await ctx.runMutation(
-        internal.webhooks.createConversation,
-        {
-          userId,
-          emailId: email.id,
-          threadId,
-          subject: email.subject || "(No subject)",
-          fromEmail: email.from?.emailAddress?.address || "unknown@email.com",
-          fromName: email.from?.emailAddress?.name,
-        }
-      );
-      console.log("[WEBHOOK] Created conversation:", conversationId);
-    }
-
-    // Extract and parse email content
-    let emailContent = "";
-
-    // First, try Microsoft's uniqueBody if available (contains only the unique/new content)
-    if (email.uniqueBody?.content) {
-      console.log("[WEBHOOK] Using uniqueBody from Microsoft Graph");
-      const uniqueBodyType =
-        email.uniqueBody.contentType?.toLowerCase() || "text";
-      let uniqueContent = email.uniqueBody.content;
-
-      console.log(
-        `[WEBHOOK] UniqueBody raw content (first 200 chars): "${uniqueContent}" of type "${uniqueBodyType}"`
-      );
-
-      // Use Microsoft's exact pattern from microsoft-driver.ts
-      if (uniqueBodyType === "html") {
-        emailContent = decode(uniqueContent);
-      } else {
-        emailContent = decode(uniqueContent).replace(/\n/g, "<br>");
-      }
-
-      console.log(
-        `[WEBHOOK] UniqueBody extracted: ${emailContent.length} chars, content: "${emailContent}"`
-      );
-    } else {
-      // Fall back to parsing the full body if uniqueBody is not available
-      console.log("[WEBHOOK] UniqueBody not available, using full body");
-      const bodyContent = email.body?.content || "";
-      const bodyContentType = email.body?.contentType?.toLowerCase() || "text";
-
-      // Use Microsoft's exact pattern
-      if (bodyContentType === "html") {
-        emailContent = decode(bodyContent);
-      } else {
-        emailContent = decode(bodyContent).replace(/\n/g, "<br>");
-      }
-    }
-
-    console.log(
-      `[WEBHOOK] Processed email - Final content length: ${emailContent.length} chars`
-    );
-
-    // Don't save empty emails
-    if (!emailContent || !emailContent.trim()) {
-      console.log("[WEBHOOK] Skipping empty email content");
-      return;
-    }
-
-    // Add email message with attachments
-    console.log("[WEBHOOK] Adding email message to conversation...");
-
-    // Process attachments if any
-    let attachments = undefined;
-    let processedAttachmentContent = "";
-
-    if (email.hasAttachments && email.attachments) {
-      console.log(
-        `[WEBHOOK] Processing ${email.attachments.length} attachments`
-      );
-      attachments = email.attachments.map((att: any) => ({
-        id: att.id,
-        name: att.name,
-        contentType: att.contentType,
-        size: att.size,
-      }));
-
-      // Log attachment details
-      attachments.forEach((att: any) => {
-        console.log(
-          `[WEBHOOK] Attachment: ${att.name} (${att.contentType}, ${(
-            att.size / 1024
-          ).toFixed(2)} KB)`
-        );
-      });
-
-      // Process legal document attachments with Reducto
-      const supportedTypes = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/msword",
-        "text/plain",
-      ];
-
-      for (const attachment of email.attachments) {
-        if (supportedTypes.includes(attachment.contentType)) {
-          try {
-            console.log(
-              `[WEBHOOK] Processing attachment with Reducto: ${attachment.name}`
-            );
-
-            // Fetch attachment content
-            const attachmentResponse = await fetch(
-              `https://graph.microsoft.com/v1.0/me/messages/${email.id}/attachments/${attachment.id}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                },
-              }
-            );
-
-            if (attachmentResponse.ok) {
-              const attachmentData = await attachmentResponse.json();
-              // Convert base64 to Uint8Array (Convex doesn't have Buffer)
-              console.log(
-                `[REDUCTO] Converting base64 to Uint8Array for ${attachment.name}`
-              );
-              const base64 = attachmentData.contentBytes;
-              const binaryString = atob(base64);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-
-              // Initialize Reducto client
-              console.log(
-                `[REDUCTO] Initializing client for ${attachment.name}`
-              );
-              const reductoClient = new Reducto({
-                apiKey: process.env.REDUCTO_API_KEY,
-              });
-
-              // Upload and process with Reducto
-              console.log(
-                `[REDUCTO] Creating file object from Uint8Array (${bytes.length} bytes)`
-              );
-              const file = await toFile(bytes, attachment.name);
-
-              console.log(`[REDUCTO] Uploading file to Reducto...`);
-              const uploadStart = Date.now();
-              const upload = await reductoClient.upload({ file });
-              console.log(
-                `[REDUCTO] Upload complete in ${Date.now() - uploadStart}ms`
-              );
-              console.log(
-                `[REDUCTO] Upload response:`,
-                JSON.stringify(upload, null, 2)
-              );
-
-              console.log(`[REDUCTO] Starting document parsing...`);
-              const parseStart = Date.now();
-              const result = await reductoClient.parse.run({
-                document_url: upload,
-                options: {
-                  extraction_mode: "hybrid", // Use hybrid mode for better legal document extraction
-                  chunking: {
-                    chunk_mode: "variable",
-                    chunk_size: 1000,
-                  },
-                },
-                advanced_options: {
-                  enable_change_tracking: true, // Now this will work with hybrid mode
-                  add_page_markers: true,
-                  ocr_system: "highres",
-                  page_range: {
-                    start: 1,
-                    end: 50, // Process up to 50 pages for legal documents
-                  },
-                },
-                experimental_options: {},
-              });
-              console.log(
-                `[REDUCTO] Parsing complete in ${Date.now() - parseStart}ms`
-              );
-              console.log(`[REDUCTO] Parse response summary:`, {
-                job_id: result.job_id,
-                duration: result.duration,
-                result_type: result.result.type,
-                usage: result.usage,
-                pdf_url: result.pdf_url,
-              });
-
-              if (result.result.type === "full") {
-                console.log(`[REDUCTO] Full result details:`, {
-                  chunks_count: result.result.chunks.length,
-                  total_blocks: result.result.chunks.reduce(
-                    (sum, chunk) => sum + chunk.blocks.length,
-                    0
-                  ),
-                  first_chunk_preview:
-                    result.result.chunks[0]?.content.substring(0, 200) + "...",
-                });
-              }
-
-              // Store processed attachment
-              console.log(`[REDUCTO] Storing processed content in database...`);
-              const processedContent =
-                result.result.type === "full"
-                  ? result.result.chunks
-                      .map((chunk) => chunk.content)
-                      .join("\n\n")
-                  : `Document processed. Result URL: ${result.result.url}`;
-
-              console.log(
-                `[REDUCTO] Processed content length: ${processedContent.length} characters`
-              );
-
-              await ctx.runMutation(
-                internal.webhooks.storeProcessedAttachment,
-                {
-                  conversationId,
-                  attachmentId: attachment.id,
-                  attachmentName: attachment.name,
-                  processedContent,
-                  metadata: {
-                    pageCount: result.usage?.num_pages || undefined,
-                    processingTime: result.duration || undefined,
-                  },
-                }
-              );
-              console.log(`[REDUCTO] Content stored in database`);
-
-              const content =
-                result.result.type === "full"
-                  ? result.result.chunks
-                      .map((chunk) => chunk.content)
-                      .join("\n\n")
-                  : `Document processed. Result URL: ${result.result.url}`;
-              processedAttachmentContent += `\n\n--- Attachment: ${attachment.name} ---\n${content}`;
-              console.log(
-                `[REDUCTO] Successfully processed attachment: ${attachment.name}`
-              );
-              console.log(
-                `[REDUCTO] Total processed content length so far: ${processedAttachmentContent.length} characters`
-              );
-            }
-          } catch (error) {
-            console.error(
-              `[REDUCTO] Error processing attachment ${attachment.name}:`,
-              error
-            );
-            console.error(`[REDUCTO] Error details:`, {
-              message: error instanceof Error ? error.message : "Unknown error",
-              stack: error instanceof Error ? error.stack : undefined,
-              attachment: {
-                name: attachment.name,
-                type: attachment.contentType,
-                size: attachment.size,
-              },
-            });
-
-            // If it's a fetch error, it might be CORS or network issue
-            if (error instanceof Error && error.message.includes("fetch")) {
-              console.error(
-                `[REDUCTO] This might be a CORS or network issue. Make sure Reducto API allows requests from Convex.`
-              );
-            }
-          }
-        }
-      }
-    }
-
-    await ctx.runMutation(internal.webhooks.addEmailMessage, {
-      conversationId,
-      content: emailContent,
-      emailId: email.id,
-      sender: email.from?.emailAddress?.address || "unknown@email.com",
-      attachments,
-      messageType: actualIsSentEmail ? "sent_email" : "email",
-      userId,
-    });
-    console.log("[WEBHOOK] Email message added successfully");
-
-    // Generate AI response only for received emails (not sent emails)
-    if (!actualIsSentEmail) {
-      console.log("[WEBHOOK] User settings:", userSettings);
-      console.log(
-        "[WEBHOOK] Auto-response enabled:",
-        userSettings?.autoResponseEnabled
-      );
-      console.log("[WEBHOOK] Is new conversation:", isNewConversation);
-
-      // Always generate AI response for new emails (whether new conversation or reply)
-      if (userSettings?.autoResponseEnabled || true) {
-        // Always true for testing
-        console.log("[WEBHOOK] Generating AI response for received email...");
-        console.log("[WEBHOOK] Email content length:", emailContent.length);
-        console.log(
-          "[WEBHOOK] Processed attachment content length:",
-          processedAttachmentContent.length
-        );
-
-        try {
-          // Create a stream for the AI response
-          const streamId = await streamingComponent.createStream(ctx);
-          console.log("[WEBHOOK] Created stream:", streamId);
-
-          await ctx.runAction(api.ai.generateResponse, {
-            conversationId,
-            emailContent: emailContent + processedAttachmentContent,
-            emailSubject: email.subject || "(No subject)",
-            senderName: email.from?.emailAddress?.name,
-            streamId,
-            userId,
-          });
-          console.log("[WEBHOOK] AI response generated successfully");
-        } catch (error) {
-          console.error("[WEBHOOK] Error generating AI response:", error);
-        }
-      }
-    } else {
-      console.log("[WEBHOOK] Skipping AI response for sent email");
-    }
-
-    console.log("[WEBHOOK] Successfully processed email:", email.id);
-  },
-});
-
-export const findUserBySubscription = internalQuery({
-  args: { subscriptionId: v.string() },
-  handler: async (ctx, args) => {
-    const userSettings = await ctx.db
-      .query("userSettings")
-      .filter((q) =>
-        q.eq(q.field("webhookSubscriptionId"), args.subscriptionId)
-      )
-      .first();
-
-    return userSettings;
-  },
-});
-
-// Removed findConversationByEmailId - we track by thread, not individual emails
-
-export const findConversationByThreadId = internalQuery({
-  args: {
-    threadId: v.string(),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("conversations")
-      .withIndex("by_thread", (q) =>
-        q.eq("threadId", args.threadId).eq("userId", args.userId)
-      )
-      .first();
-  },
-});
-
-export const findMessageByEmailId = internalQuery({
-  args: { emailId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("messages")
-      .withIndex("by_email_id", (q) => q.eq("emailId", args.emailId))
-      .first();
-  },
-});
-
-export const getUserSettings = internalQuery({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    return await getUserSettingsByUserId(ctx, args.userId);
-  },
-});
-
-export const createConversation = internalMutation({
-  args: {
-    userId: v.id("users"),
-    threadId: v.string(),
-    emailId: v.string(),
-    subject: v.string(),
-    fromEmail: v.string(),
-    fromName: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("conversations", {
-      threadId: args.threadId,
-      userId: args.userId,
-      subject: args.subject,
-      status: "new",
-      participants: [
-        {
-          email: args.fromEmail,
-          name: args.fromName,
-        },
-      ],
-      createdAt: Date.now(),
-      lastActivity: Date.now(),
+    await ctx.runMutation(internal.threads.processIncomingEmail, {
+      email,
+      externalSubscriptionId: args.subscriptionId,
+      isSentEmail: args.isSentEmail,
     });
   },
 });
 
-export const updateConversationActivity = internalMutation({
+// ==================== User Management ====================
+
+export const updateUserMicrosoftAuth = internalMutation({
   args: {
-    conversationId: v.id("conversations"),
-    emailId: v.string(),
-    fromEmail: v.string(),
-    fromName: v.optional(v.string()),
-    subject: v.string(),
+    userId: v.id("users"),
+    subscriptionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation) return;
-
-    // Check if this participant is already in the list
-    const participantExists = conversation.participants.some(
-      (p) => p.email === args.fromEmail
-    );
-
-    const updatedParticipants = participantExists
-      ? conversation.participants
-      : [
-          ...conversation.participants,
-          { email: args.fromEmail, name: args.fromName },
-        ];
-
-    await ctx.db.patch(args.conversationId, {
-      lastActivity: Date.now(),
-      // Update subject if it's more detailed (e.g., "Re: " prefix added)
-      subject:
-        args.subject.length > conversation.subject.length
-          ? args.subject
-          : conversation.subject,
-      participants: updatedParticipants,
+    await ctx.db.patch(args.userId, {
+      externalSubscriptionId: args.subscriptionId,
     });
   },
 });
 
 export const storeProcessedAttachment = internalMutation({
   args: {
-    conversationId: v.id("conversations"),
+    messageId: v.id("messages"),
     attachmentId: v.string(),
     attachmentName: v.string(),
-    processedContent: v.string(),
+    content: v.string(),
     metadata: v.optional(
       v.object({
         pageCount: v.optional(v.number()),
@@ -652,270 +127,76 @@ export const storeProcessedAttachment = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("processedAttachments", {
-      conversationId: args.conversationId,
+    // Store processed attachment content
+    await ctx.db.insert("messageAttachments", {
+      messageId: args.messageId,
       attachmentId: args.attachmentId,
       attachmentName: args.attachmentName,
-      content: args.processedContent,
-      metadata: args.metadata,
-      processedAt: Date.now(),
-    });
-  },
-});
-
-export const addEmailMessage = internalMutation({
-  args: {
-    conversationId: v.id("conversations"),
-    content: v.string(),
-    emailId: v.string(),
-    sender: v.string(),
-    attachments: v.optional(v.array(attachmentValidator)),
-    messageType: v.optional(messageType),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("messages", {
-      conversationId: args.conversationId,
       content: args.content,
-      type: args.messageType || "email",
-      sender: args.sender,
-      timestamp: Date.now(),
-      emailId: args.emailId,
-      attachments: args.attachments,
-      role: "assistant",
-      userId: args.userId, // Ensure we have the user ID for the message
+      metadata: args.metadata,
+      createdAt: Date.now(),
     });
   },
 });
 
-export const updateUserMicrosoftAuth = internalMutation({
-  args: {
-    userId: v.id("users"),
-    subscriptionId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const existingSettings = await getUserSettingsByUserId(ctx, args.userId);
+// ==================== Webhook Setup ====================
 
-    if (existingSettings) {
-      await ctx.db.patch(existingSettings._id, {
-        ...(args.subscriptionId && {
-          webhookSubscriptionId: args.subscriptionId,
-        }),
-      });
-    } else {
-      await ctx.db.insert("userSettings", {
-        userId: args.userId,
-        webhookSubscriptionId: args.subscriptionId,
-        autoResponseEnabled: false,
-      });
-    }
-  },
-});
-
-// Public action to store Microsoft webhook subscription ID
-export const storeMicrosoftAuth = action({
-  args: {
-    clerkUserId: v.string(),
-    subscriptionId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.runQuery(api.users.current);
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Update the user's Microsoft webhook subscription
-    await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
-      userId: user._id,
-      subscriptionId: args.subscriptionId,
-    });
-  },
-});
-
-// Public action to download attachment
-export const downloadAttachment = action({
-  args: {
-    emailId: v.string(),
-    attachmentId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.runQuery(api.users.current);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const accessToken = await getMicrosoftAccessToken(user.externalId);
-
-    try {
-      // Download attachment from Microsoft Graph
-      const response: Response = await fetch(
-        `https://graph.microsoft.com/v1.0/me/messages/${args.emailId}/attachments/${args.attachmentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        console.error(
-          "[DOWNLOAD] Failed to download attachment:",
-          response.status
-        );
-        throw new Error("Failed to download attachment");
-      }
-
-      const attachment = await response.json();
-
-      return {
-        content: attachment.contentBytes, // Base64 encoded content
-        contentType: attachment.contentType,
-        size: attachment.size,
-      };
-    } catch (error) {
-      console.error("[DOWNLOAD] Error downloading attachment:", error);
-      throw new Error("Failed to download attachment");
-    }
-  },
-});
-
-// Internal action to set up Microsoft webhook automatically
 export const setupMicrosoftWebhook = internalAction({
-  args: {
-    clerkUserId: v.string(),
-  },
+  args: { clerkUserId: v.string() },
   handler: async (ctx, args) => {
-    console.log(
-      "[WEBHOOK SETUP] Starting Microsoft webhook setup for user:",
-      args.clerkUserId
-    );
-
     try {
-      // Get user from Convex
       const user = await ctx.runQuery(api.users.getByClerkId, {
         clerkId: args.clerkUserId,
       });
 
       if (!user) {
-        console.error(
-          "[WEBHOOK SETUP] User not found in Convex:",
-          args.clerkUserId
-        );
-        return;
+        throw new Error("User not found");
       }
-      const accessToken = await getMicrosoftAccessToken(user.externalId);
 
-      console.log(
-        "[WEBHOOK SETUP] Got Microsoft access token, checking existing subscriptions..."
+      const accessToken = await ctx.scheduler.runAfter(
+        0,
+        internal.webhooks.getMicrosoftAccessToken,
+        { clerkUserId: args.clerkUserId }
       );
 
-      // Create webhook URL first
       const webhookUrl = `${process.env.CONVEX_SITE_URL}/webhook/microsoft`;
 
-      // Check if we already have an active subscription with the correct URL
-      const existingSubscriptionId = await checkExistingSubscription(
-        accessToken,
-        webhookUrl
+      // Check for existing subscription
+      const existingSubscriptionId = await ctx.scheduler.runAfter(
+        0,
+        internal.webhooks.checkExistingSubscription,
+        {
+          accessToken,
+          expectedWebhookUrl: webhookUrl,
+        }
       );
 
       if (existingSubscriptionId) {
         console.log(
-          "[WEBHOOK SETUP] Active subscription already exists, updating user settings"
+          "[WEBHOOK SETUP] Found existing subscription:",
+          existingSubscriptionId
         );
-
-        // Update user settings with the existing subscription ID
         await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
           userId: user._id,
           subscriptionId: existingSubscriptionId,
         });
-
-        console.log(
-          "[WEBHOOK SETUP] Updated user settings with existing subscription ID"
-        );
         return;
       }
-      console.log(
-        "[WEBHOOK SETUP] Creating new subscriptions with URL:",
+
+      // Create new subscriptions
+      const subscriptions = await createMicrosoftSubscriptions(
+        accessToken,
         webhookUrl
       );
 
-      // Subscribe to Inbox messages
-      console.log("[WEBHOOK SETUP] Subscribing to Inbox...");
-      const inboxSubscriptionResponse = await fetch(
-        "https://graph.microsoft.com/v1.0/subscriptions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            changeType: "created",
-            notificationUrl: webhookUrl,
-            resource: "me/mailFolders/Inbox/messages",
-            expirationDateTime: new Date(
-              Date.now() + 4230 * 60 * 1000 // ~70 hours
-            ).toISOString(),
-            clientState: "inbox", // To distinguish between inbox and sent
-          }),
-        }
-      );
-
-      let inboxSubscription = null;
-      if (inboxSubscriptionResponse.ok) {
-        inboxSubscription = await inboxSubscriptionResponse.json();
-        console.log(
-          "[WEBHOOK SETUP] Inbox subscription created:",
-          inboxSubscription.id
-        );
+      if (!subscriptions.inbox && !subscriptions.sent) {
+        throw new Error("Failed to create any subscriptions");
       }
 
-      // Subscribe to Sent Items
-      console.log("[WEBHOOK SETUP] Subscribing to Sent Items...");
-      const sentSubscriptionResponse = await fetch(
-        "https://graph.microsoft.com/v1.0/subscriptions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            changeType: "created",
-            notificationUrl: webhookUrl,
-            resource: "me/mailFolders/SentItems/messages",
-            expirationDateTime: new Date(
-              Date.now() + 4230 * 60 * 1000 // ~70 hours
-            ).toISOString(),
-            clientState: "sent", // To distinguish between inbox and sent
-          }),
-        }
-      );
-
-      let sentSubscription = null;
-      if (sentSubscriptionResponse.ok) {
-        sentSubscription = await sentSubscriptionResponse.json();
-        console.log(
-          "[WEBHOOK SETUP] Sent Items subscription created:",
-          sentSubscription.id
-        );
-      } else {
-        const error = await sentSubscriptionResponse.json();
-        console.error(
-          "[WEBHOOK SETUP] Failed to create Sent Items subscription:",
-          error
-        );
-      }
-
-      if (!inboxSubscription && !sentSubscription) {
-        console.error("[WEBHOOK SETUP] Failed to create any subscriptions");
-        return;
-      }
-
-      // Store subscription IDs in Convex (we'll use the inbox subscription ID as primary)
+      // Store primary subscription ID
       const primarySubscriptionId =
-        inboxSubscription?.id || sentSubscription?.id;
+        subscriptions.inbox?.id || subscriptions.sent?.id;
+
       await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
         userId: user._id,
         subscriptionId: primarySubscriptionId,
@@ -923,72 +204,369 @@ export const setupMicrosoftWebhook = internalAction({
 
       console.log(
         "[WEBHOOK SETUP] Microsoft webhook setup complete for user:",
-        args.clerkUserId
+        user._id
       );
     } catch (error) {
       console.error(
         "[WEBHOOK SETUP] Error setting up Microsoft webhook:",
         error
       );
+      throw error;
     }
   },
 });
 
-async function checkExistingSubscription(
-  accessToken: string,
-  expectedWebhookUrl: string
-): Promise<string | null> {
-  try {
-    const response = await fetch(
-      "https://graph.microsoft.com/v1.0/subscriptions",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+export const checkExistingSubscription = internalAction({
+  args: {
+    accessToken: v.string(),
+    expectedWebhookUrl: v.string(),
+  },
+  handler: async (ctx, args): Promise<string | null> => {
+    try {
+      const response = await fetch(
+        `${MICROSOFT_GRAPH_BASE_URL}/subscriptions`,
+        {
+          headers: {
+            Authorization: `Bearer ${args.accessToken}`,
+          },
+        }
+      );
 
-    if (response.ok) {
+      if (!response.ok) {
+        return null;
+      }
+
       const data = await response.json();
-      // Check if we have active subscriptions for both inbox and sent folders
       const activeSubscriptions = data.value.filter(
-        (sub: any) =>
+        (sub: Subscription) =>
           (sub.resource === "me/mailFolders/Inbox/messages" ||
             sub.resource === "me/mailFolders/SentItems/messages") &&
-          new Date(sub.expirationDateTime) > new Date() &&
-          sub.notificationUrl === expectedWebhookUrl
+          new Date(sub.expirationDateTime || "") > new Date() &&
+          sub.notificationUrl === args.expectedWebhookUrl
       );
 
       if (activeSubscriptions.length > 0) {
-        console.log(
-          `[WEBHOOK SETUP] Found ${activeSubscriptions.length} active subscription(s) with correct URL`
-        );
-        // Return the first subscription ID (preferably inbox)
-        const inboxSub = activeSubscriptions.find((s: any) =>
-          s.resource.includes("Inbox")
+        const inboxSub = activeSubscriptions.find((s: Subscription) =>
+          s.resource?.includes("Inbox")
         );
         return inboxSub?.id || activeSubscriptions[0].id;
       }
 
-      // Log if we found subscriptions with wrong URLs
-      const wrongUrlSubscriptions = data.value.filter(
-        (sub: any) =>
-          sub.resource === "me/messages" &&
-          new Date(sub.expirationDateTime) > new Date() &&
-          sub.notificationUrl !== expectedWebhookUrl
+      return null;
+    } catch (error) {
+      console.error("[WEBHOOK SETUP] Error checking subscriptions:", error);
+      return null;
+    }
+  },
+});
+
+// ==================== Authentication ====================
+
+export const getMicrosoftAccessToken = internalAction({
+  args: {
+    clerkUserId: v.string(),
+  },
+  handler: async (ctx, args): Promise<string> => {
+    const clerk = createClerkClient({
+      secretKey: process.env.CLERK_SECRET_KEY!,
+    });
+
+    try {
+      const microsoftAuth = await clerk.users.getUserOauthAccessToken(
+        args.clerkUserId,
+        "microsoft"
       );
 
-      if (wrongUrlSubscriptions.length > 0) {
-        console.log(
-          "[WEBHOOK SETUP] Found subscriptions with incorrect URLs, will create new one:"
-        );
-        wrongUrlSubscriptions.forEach((sub: any) => {
-          console.log(`  - ${sub.id}: ${sub.notificationUrl}`);
-        });
+      const accessToken = microsoftAuth.data?.[0]?.token;
+
+      if (!accessToken) {
+        throw new Error("No access token received from Clerk");
       }
+
+      return accessToken;
+    } catch (error) {
+      console.error("[AUTH] Error getting access token from Clerk:", error);
+      throw new Error(`Failed to get Microsoft access token: ${error}`);
     }
+  },
+});
+
+async function fetchEmailFromMicrosoft(accessToken: string, emailId: string) {
+  try {
+    console.log("[WEBHOOK] Fetching email from Microsoft Graph API...");
+    const response = await fetch(
+      `${MICROSOFT_GRAPH_BASE_URL}/me/messages/${emailId}?$expand=attachments`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[WEBHOOK] Microsoft Graph API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+      return null;
+    }
+
+    const email = await response.json();
+
+    console.log("[WEBHOOK] Successfully fetched email:", {
+      id: email.id,
+      subject: email.subject,
+      from: email.from?.emailAddress?.address,
+      attachmentCount: email.attachments?.length || 0,
+    });
+
+    // Process attachments and ensure all have content
+    if (email.attachments && email.attachments.length > 0) {
+      const processedAttachments: FileAttachment[] = [];
+
+      for (const attachment of email.attachments) {
+        if (
+          (attachment as any)["@odata.type"] ===
+          "#microsoft.graph.fileAttachment"
+        ) {
+          const fileAttachment = attachment as FileAttachment;
+
+          if (!fileAttachment.contentBytes) {
+            // Large file - need to fetch separately
+            console.log(
+              `[WEBHOOK] Fetching large attachment: ${fileAttachment.name}`
+            );
+
+            const attachmentResponse = await fetch(
+              `${MICROSOFT_GRAPH_BASE_URL}/me/messages/${emailId}/attachments/${attachment.id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                },
+              }
+            );
+
+            if (!attachmentResponse.ok) {
+              console.error(
+                `[WEBHOOK] Failed to fetch attachment ${attachment.id}`
+              );
+              continue;
+            }
+
+            const fullAttachment: FileAttachment =
+              await attachmentResponse.json();
+            fileAttachment.contentBytes = fullAttachment.contentBytes;
+          }
+
+          processedAttachments.push(fileAttachment);
+        } else if (
+          (attachment as any)["@odata.type"] ===
+          "#microsoft.graph.itemAttachment"
+        ) {
+          // Handle item attachments (e.g., attached emails, calendar items)
+          console.log(`[WEBHOOK] Item attachment found: ${attachment.name}`);
+          processedAttachments.push(attachment);
+        }
+      }
+
+      // Replace attachments with fully loaded versions
+      email.attachments = processedAttachments;
+      console.log(
+        `[WEBHOOK] Processed ${processedAttachments.length} attachments`
+      );
+    }
+
+    return {
+      ...email,
+      attachments: email?.attachments, //as FileAttachment[] | null | undefined,
+    };
   } catch (error) {
-    console.error("[WEBHOOK SETUP] Error checking subscriptions:", error);
+    console.error(
+      "[WEBHOOK] Error fetching email from Microsoft Graph:",
+      error
+    );
+    return null;
   }
-  return null;
+}
+
+function extractEmailContent(email: Message): string {
+  let emailContent = "";
+
+  // First, try Microsoft's uniqueBody if available
+  if (email.uniqueBody?.content) {
+    const uniqueBodyType =
+      email.uniqueBody.contentType?.toLowerCase() || "text";
+    const uniqueContent = email.uniqueBody.content;
+
+    if (uniqueBodyType === "html") {
+      emailContent = decode(uniqueContent);
+    } else {
+      emailContent = decode(uniqueContent).replace(/\n/g, "<br>");
+    }
+  } else if (email.body?.content) {
+    // Fall back to full body
+    const bodyContentType = email.body.contentType?.toLowerCase() || "text";
+    const bodyContent = email.body.content;
+
+    if (bodyContentType === "html") {
+      emailContent = decode(bodyContent);
+    } else {
+      emailContent = decode(bodyContent).replace(/\n/g, "<br>");
+    }
+  }
+
+  return emailContent;
+}
+
+export const processAttachmentWithReducto = internalAction({
+  args: {
+    emailId: v.string(),
+    attachment: attachmentSchema,
+    messageId: v.id("messages"),
+    accessToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log(`[REDUCTO] Processing attachment: ${args.attachment.name}`);
+
+      // Fetch attachment content
+      const response = await fetch(
+        `${MICROSOFT_GRAPH_BASE_URL}/me/messages/${args.emailId}/attachments/${args.attachment.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${args.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error("[REDUCTO] Failed to fetch attachment");
+        return null;
+      }
+
+      const attachmentData = await response.json();
+      const bytes = base64ToUint8Array(attachmentData.contentBytes);
+
+      // Initialize Reducto client
+      const reductoClient = new Reducto({
+        apiKey: process.env.REDUCTO_API_KEY,
+      });
+
+      // Upload and process with Reducto
+      const file = await toFile(bytes, args.attachment.name);
+      const upload = await reductoClient.upload({ file });
+
+      const result = await reductoClient.parse.run({
+        document_url: upload,
+        options: {
+          extraction_mode: "hybrid",
+          chunking: {
+            chunk_mode: "variable",
+            chunk_size: 1000,
+          },
+        },
+        advanced_options: {
+          enable_change_tracking: true,
+          add_page_markers: true,
+          ocr_system: "highres",
+          page_range: {
+            start: 1,
+            end: 50,
+          },
+        },
+        experimental_options: {},
+      });
+
+      const content =
+        result.result.type === "full"
+          ? result.result.chunks.map((chunk) => chunk.content).join("\n\n")
+          : `Document processed. Result URL: ${result.result.url}`;
+
+      // Store processed attachment
+      await ctx.runMutation(internal.webhooks.storeProcessedAttachment, {
+        messageId: args.messageId,
+        attachmentId: args.attachment.id,
+        attachmentName: args.attachment.name || "attachment",
+        content,
+        metadata: {
+          pageCount: result.usage?.num_pages || undefined,
+          processingTime: result.duration || undefined,
+        },
+      });
+
+      console.log(`[REDUCTO] Successfully processed: ${args.attachment.name}`);
+      return content;
+    } catch (error) {
+      console.error(`[REDUCTO] Error processing attachment:`, error);
+      return null;
+    }
+  },
+});
+
+export const createMicrosoftSubscriptions = async (
+  webhookUrl: string,
+  accessToken: string
+): Promise<{ inbox: Subscription; sent: Subscription }> => {
+  const expirationDateTime = new Date(
+    Date.now() + WEBHOOK_SUBSCRIPTION_DURATION_MINUTES * 60 * 1000
+  ).toISOString();
+
+  const createSubscription = async (
+    resource: string,
+    clientState: string
+  ): Promise<Subscription> => {
+    try {
+      const response = await fetch(
+        `${MICROSOFT_GRAPH_BASE_URL}/subscriptions`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            changeType: "created",
+            notificationUrl: webhookUrl,
+            resource,
+            expirationDateTime,
+            clientState,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        return await response.json();
+      }
+
+      const error = await response.json();
+      throw new Error(
+        `Failed to create subscription for ${clientState}: ${error.message}`
+      );
+    } catch (error) {
+      console.error(
+        `[WEBHOOK SETUP] Error creating ${clientState} subscription:`,
+        error
+      );
+      throw new Error(`Error creating ${clientState} subscription: ${error}`);
+    }
+  };
+
+  const [inbox, sent] = await Promise.all([
+    createSubscription("me/mailFolders/Inbox/messages", "inbox"),
+    createSubscription("me/mailFolders/SentItems/messages", "sent"),
+  ]);
+
+  return { inbox, sent };
+};
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }

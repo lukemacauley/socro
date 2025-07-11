@@ -14,11 +14,11 @@ import { useQuery } from "convex-helpers/react/cache";
 import type { Id } from "convex/_generated/dataModel";
 
 export const MessageList = memo(function MessageList({
-  conversationId,
+  threadId,
 }: {
-  conversationId: Id<"conversations">;
+  threadId: Id<"threads">;
 }) {
-  const messages = useQuery(api.messages.getMessages, { conversationId }) || [];
+  const messages = useQuery(api.messages.getMessages, { threadId }) || [];
 
   return (
     <AIConversation className="bg-primary-foreground max-w-3xl mx-auto">
@@ -37,23 +37,22 @@ function MessageItem({
 }: {
   message: (typeof api.messages.getMessages._returnType)[number];
 }) {
-  const isAi = message.type === "ai_response";
-  const isEmail = message.type === "email" || message.type === "sent_email";
+  const isAi = message.messageType === "ai_response";
+  const isEmail =
+    message.messageType === "received_email" ||
+    message.messageType === "sent_email";
 
-  const downloadAttachment = useAction(api.webhooks.downloadAttachment);
+  // const downloadAttachment = useAction(api.webhooks.downloadAttachment);
 
   const handleDownloadAttachment = useCallback(
     async (emailId: string, attachmentId: string, fileName: string) => {
       try {
         toast.info("Downloading attachment...");
 
-        const result = await downloadAttachment({
-          emailId,
-          attachmentId,
-        });
+        const result = message.attachments?.find((a) => a.id === attachmentId);
 
         if (result) {
-          const byteCharacters = atob(result.content);
+          const byteCharacters = atob(result.contentType); // NEEDS FIX: SHOULD BE RESULT.CONTENT
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -79,7 +78,7 @@ function MessageItem({
         toast.error("Failed to download attachment");
       }
     },
-    [downloadAttachment]
+    []
   );
 
   const displayContent = useMemo(() => {
@@ -93,11 +92,15 @@ function MessageItem({
       ) : isEmail ? (
         <AIMessageContent>
           <div dangerouslySetInnerHTML={{ __html: message.content }} />
-          {message.attachments && message.emailId && (
+          {message.attachments && message.threadId && (
             <AttachmentList
               attachments={message.attachments}
-              onDownload={(id, fileName) =>
-                handleDownloadAttachment(message.emailId!, id, fileName)
+              onDownload={(attachmentId, fileName) =>
+                handleDownloadAttachment(
+                  message.threadId,
+                  attachmentId,
+                  fileName
+                )
               }
             />
           )}

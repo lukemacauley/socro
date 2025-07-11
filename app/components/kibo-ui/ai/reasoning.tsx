@@ -5,6 +5,7 @@ import { createContext, memo, useContext, useEffect, useState } from "react";
 import { cn } from "~/lib/utils";
 import { AIResponse } from "./response";
 import {
+  Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";

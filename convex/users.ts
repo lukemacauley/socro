@@ -1,4 +1,9 @@
-import { internalMutation, internalQuery, query, type QueryCtx } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  query,
+  type QueryCtx,
+} from "./_generated/server";
 import { type UserJSON } from "@clerk/backend";
 import { v, type Validator } from "convex/values";
 
@@ -62,6 +67,18 @@ export const deleteFromClerk = internalMutation({
         `Can't delete user, there is none for Clerk user ID: ${clerkUserId}`
       );
     }
+  },
+});
+
+export const getBySubscriptionId = internalQuery({
+  args: { subscriptionId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_subscription_id", (q) =>
+        q.eq("externalSubscriptionId", args.subscriptionId)
+      )
+      .first();
   },
 });
 

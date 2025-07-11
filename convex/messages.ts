@@ -7,27 +7,25 @@ import {
   internalAction,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { verifyConversationOwnership } from "./lib/utils";
-import { Id } from "./_generated/dataModel";
+import { verifyThreadOwnership } from "./lib/utils";
+import type { Id } from "./_generated/dataModel";
 
 export const getMessages = query({
-  args: { conversationId: v.id("conversations") },
+  args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    await verifyConversationOwnership(ctx, args.conversationId, userId);
+    await verifyThreadOwnership(ctx, args.threadId, userId);
 
     const messages = await ctx.db
       .query("messages")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", args.conversationId)
-      )
+      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
       .order("asc")
       .collect();
 
     // Get streaming chunks for assistant messages
     const messagesWithChunks = await Promise.all(
       messages.map(async (message) => {
-        if (message.role === "assistant" && message.isStreaming) {
+        if (message.role === "ai" && message.isStreaming) {
           const chunks = await ctx.db
             .query("streamingChunks")
             .withIndex("by_message", (q) => q.eq("messageId", message._id))
@@ -52,38 +50,36 @@ export const getMessages = query({
 export const sendMessage = mutation({
   args: {
     content: v.string(),
-    conversationId: v.id("conversations"),
+    threadId: v.id("threads"),
   },
   handler: async (
     ctx,
     args
   ): Promise<{
     userMessageId: Id<"messages">;
-    assistantMessageId: Id<"messages">;
+    responseMessageId: Id<"messages">;
   }> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    await verifyConversationOwnership(ctx, args.conversationId, userId);
+    await verifyThreadOwnership(ctx, args.threadId, userId);
 
     // Insert user message
     const userMessageId = await ctx.db.insert("messages", {
       content: args.content,
       role: "user",
       userId,
-      conversationId: args.conversationId,
-      timestamp: Date.now(),
-      type: "user_note",
+      threadId: args.threadId,
+      messageType: "user_message",
     });
 
     // Create placeholder assistant message
-    const assistantMessageId = await ctx.db.insert("messages", {
+    const responseMessageId = await ctx.db.insert("messages", {
       content: "",
-      role: "assistant",
+      role: "ai",
       userId,
-      conversationId: args.conversationId,
+      threadId: args.threadId,
       isStreaming: true,
       streamingComplete: false,
-      timestamp: Date.now(),
-      type: "ai_response",
+      messageType: "ai_response",
     });
 
     // Schedule AI response generation
@@ -91,28 +87,25 @@ export const sendMessage = mutation({
       0,
       internal.messages.generateStreamingResponse,
       {
-        conversationId: args.conversationId,
-        assistantMessageId,
+        threadId: args.threadId,
+        responseMessageId,
       }
     );
 
-    return { userMessageId, assistantMessageId };
+    return { userMessageId, responseMessageId };
   },
 });
 
 export const generateStreamingResponse = internalAction({
   args: {
-    conversationId: v.id("conversations"),
-    assistantMessageId: v.id("messages"),
+    threadId: v.id("threads"),
+    responseMessageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
     // Get conversation history
-    const messages = await ctx.runQuery(
-      internal.messages.getConversationHistory,
-      {
-        conversationId: args.conversationId,
-      }
-    );
+    const messages = await ctx.runQuery(internal.messages.getThreadHistory, {
+      threadId: args.threadId,
+    });
 
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -122,9 +115,9 @@ export const generateStreamingResponse = internalAction({
 
       // Format messages for Anthropic API
       const anthropicMessages = messages
-        .filter((msg) => msg.content.trim() !== "")
-        .map((msg) => ({
-          role: msg.role as "user" | "assistant",
+        .filter((msg: any) => msg.content.trim() !== "")
+        .map((msg: any) => ({
+          role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
         }));
 
@@ -183,7 +176,7 @@ export const generateStreamingResponse = internalAction({
 
                   // Store chunk in database
                   await ctx.runMutation(internal.messages.addStreamingChunk, {
-                    messageId: args.assistantMessageId,
+                    messageId: args.responseMessageId,
                     chunk: content,
                     chunkIndex,
                   });
@@ -203,14 +196,14 @@ export const generateStreamingResponse = internalAction({
 
       // Mark streaming as complete
       await ctx.runMutation(internal.messages.completeStreaming, {
-        messageId: args.assistantMessageId,
+        messageId: args.responseMessageId,
         finalContent:
           fullContent || "I apologize, but I couldn't generate a response.",
       });
     } catch (error) {
       console.error("Streaming error:", error);
       await ctx.runMutation(internal.messages.completeStreaming, {
-        messageId: args.assistantMessageId,
+        messageId: args.responseMessageId,
         finalContent:
           "Sorry, I encountered an error while generating the response. Please make sure the ANTHROPIC_API_KEY environment variable is set.",
       });
@@ -218,14 +211,12 @@ export const generateStreamingResponse = internalAction({
   },
 });
 
-export const getConversationHistory = internalQuery({
-  args: { conversationId: v.id("conversations") },
+export const getThreadHistory = internalQuery({
+  args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("messages")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", args.conversationId)
-      )
+      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
       .filter((q) => q.neq(q.field("isStreaming"), true))
       .order("asc")
       .collect();
