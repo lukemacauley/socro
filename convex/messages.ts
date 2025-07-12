@@ -207,26 +207,35 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
       if (mostRecentMessage) {
         anthropicMessages.push({
           role: "user",
-          content: `Based on the conversation history above, please draft a professional legal response to this most recent email:
+          content: `Based on the conversation history above, please draft an appropriate response to this most recent email:
+            ---
+            From: ${
+              thread?.fromParticipants.name ||
+              thread?.fromParticipants.email ||
+              "[Sender]"
+            }
+            Subject: ${thread?.subject || "[No Subject]"}
+            Date: ${
+              new Date(mostRecentMessage._creationTime).toLocaleString() ||
+              "[Date]"
+            }
 
----
-From: ${
-            thread?.fromParticipants.name ||
-            thread?.fromParticipants.email ||
-            "[Sender]"
-          }
-Subject: ${thread?.subject || "[No Subject]"}
-Date: ${new Date(mostRecentMessage._creationTime).toLocaleString() || "[Date]"}
+            Email Content:
+            ${mostRecentMessage.content}
+            ---
 
-Email Content:
-${mostRecentMessage.content}
----
+            Please draft a response that:
+            1. Matches the appropriate tone based on the sender and context:
+              - For clients: Professional and clear, avoiding unnecessary legal jargon
+              - For colleagues: Natural and conversational while remaining professional
+              - For opposing counsel: Formal and precise
+              - For internal team: Friendly but efficient
+            2. Directly addresses all points in the above email
+            3. Considers the full conversation history for context
+            4. Maintains consistency with previous responses in this thread
+            5. Follows legal communication best practices where appropriate
 
-Please draft a professional legal response that:
-1. Directly addresses all points in the above email
-2. Considers the full conversation history for context
-3. Maintains consistency with any previous responses in this thread
-4. Follows all legal communication best practices`,
+            Note: If this appears to be a quick internal exchange, keep the response concise and conversational rather than overly formal.`,
         });
       }
 
