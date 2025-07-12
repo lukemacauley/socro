@@ -13,7 +13,6 @@ import type * as http from "../http.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
-import type * as microsoft from "../microsoft.js";
 import type * as router from "../router.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
@@ -39,7 +38,6 @@ declare const fullApi: ApiFromModules<{
   "lib/utils": typeof lib_utils;
   "lib/validators": typeof lib_validators;
   messages: typeof messages;
-  microsoft: typeof microsoft;
   router: typeof router;
   threads: typeof threads;
   users: typeof users;

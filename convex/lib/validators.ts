@@ -1,5 +1,11 @@
 import { v } from "convex/values";
 
+export const nullOrUndefinedString = v.optional(v.union(v.string(), v.null()));
+export const nullOrUndefinedBoolean = v.optional(
+  v.union(v.boolean(), v.null())
+);
+export const nullOrUndefinedNumber = v.optional(v.union(v.number(), v.null()));
+
 // Single source of truth for conversation status
 export const threadStatus = v.union(
   v.literal("new"),
@@ -17,13 +23,13 @@ export const messageType = v.union(
 
 // Attachment object validator
 export const attachmentValidator = v.object({
-  id: v.string(),
-  name: v.string(),
-  contentType: v.string(),
-  size: v.number(),
+  id: nullOrUndefinedString,
+  name: nullOrUndefinedString,
+  contentType: nullOrUndefinedString,
+  size: nullOrUndefinedNumber,
 });
 
 export const emailParticipant = v.object({
-  email: v.string(),
-  name: v.optional(v.string()),
+  email: v.optional(v.union(v.string(), v.null())),
+  name: v.optional(v.union(v.string(), v.null())),
 });

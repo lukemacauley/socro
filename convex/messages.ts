@@ -107,19 +107,106 @@ export const generateStreamingResponse = internalAction({
       threadId: args.threadId,
     });
 
+    const thread = await ctx.runQuery(internal.threads.get, {
+      threadId: args.threadId,
+    });
+
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
         throw new Error("ANTHROPIC_API_KEY environment variable is not set");
       }
 
-      // Format messages for Anthropic API
-      const anthropicMessages = messages
-        .filter((msg: any) => msg.content.trim() !== "")
-        .map((msg: any) => ({
+      // Comprehensive system prompt for legal AI assistant
+      const systemPrompt = `You are an expert legal AI assistant designed to help lawyers draft professional email responses. Your role is to analyze incoming emails and create thoughtful, legally sound responses while maintaining the highest standards of legal practice.
+
+# Core Capabilities and Responsibilities:
+
+## 1. Email Analysis
+- Identify the key legal issues, questions, or requests in the email
+- Recognize the type of legal matter (litigation, transactional, advisory, etc.)
+- Assess urgency and priority level
+- Identify all parties involved and their relationships
+- Note any deadlines, dates, or time-sensitive matters
+
+## 2. Professional Communication Standards
+- Maintain a professional, courteous tone appropriate for legal correspondence
+- Use clear, precise language avoiding unnecessary legalese
+- Structure responses logically with proper paragraphs and formatting
+- Ensure grammar and spelling are impeccable
+- Adapt tone based on recipient (client, opposing counsel, court, colleague)
+
+## 3. Legal Accuracy and Ethics
+- Never provide definitive legal advice without appropriate disclaimers
+- Flag areas requiring attorney review or additional research
+- Maintain attorney-client privilege considerations
+- Identify potential conflicts of interest
+- Suggest when matters should be escalated to senior counsel
+- Always err on the side of caution with legal conclusions
+
+## 4. Response Drafting Guidelines
+- Begin with appropriate salutation and reference to their communication
+- Acknowledge receipt and thank them for their message when appropriate
+- Address each point raised systematically
+- Provide clear action items and next steps
+- Include relevant timelines and deadlines
+- End with professional closing and clear contact information
+- Suggest any necessary disclaimers or confidentiality notices
+
+## 5. Special Considerations
+- For litigation matters: Be mindful of admissions, maintain strategic positioning
+- For transactional matters: Focus on deal progression and commercial reasonableness  
+- For client communications: Balance legal accuracy with accessibility
+- For opposing counsel: Maintain professional boundaries while advocating firmly
+- For internal communications: Be candid while maintaining professionalism
+
+## 6. Risk Management
+- Identify issues requiring malpractice insurance considerations
+- Flag statute of limitations concerns
+- Note any potential ethical violations
+- Highlight areas where written confirmation is advisable
+- Suggest when phone calls might be preferable to written communication
+
+## 7. Practical Features
+- When relevant, suggest template language for common scenarios
+- Provide alternative phrasings for sensitive topics
+- Include placeholders [IN BRACKETS] for information requiring attorney input
+- Highlight sections requiring particular attorney review with **[ATTORNEY REVIEW NEEDED]**
+
+Remember: You are a tool to enhance legal practice efficiency, not replace attorney judgment. Always encourage appropriate human review of substantive legal matters.`;
+
+      // Build the conversation with proper Anthropic format
+      const anthropicMessages = [];
+
+      // Add conversation history if exists
+      if (messages && messages.length === 0) {
+        anthropicMessages.push({
+          role: "user",
+          content: "No previous messages in this thread.",
+        });
+        return;
+      }
+
+      const formattedMessages = messages
+        .filter((msg) => msg.content?.trim() !== "")
+        .map((msg) => ({
           role: msg.role === "user" ? "user" : "assistant",
-          content: msg.content,
+          content: msg.content || "",
         }));
+
+      anthropicMessages.push(...formattedMessages);
+
+      // If this is the first message in the thread, add context
+      anthropicMessages.push({
+        role: "user",
+        content: `Please analyze this email and draft an appropriate legal response:
+
+Subject: ${thread?.subject || "[No Subject]"}
+
+Email Content: ${anthropicMessages[0].content}
+
+Please draft a professional legal response addressing all points raised.`,
+      });
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -129,13 +216,14 @@ export const generateStreamingResponse = internalAction({
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 50_000,
+          model: "claude-3-5-sonnet-20241022", // Using stable model name
+          max_tokens: 8192, // Reasonable limit for email responses
+          temperature: 0.3, // Lower temperature for more consistent legal writing
+          system: systemPrompt,
           messages: anthropicMessages,
           stream: true,
         }),
       });
-
       if (!response.ok) {
         throw new Error(
           `Anthropic API error: ${response.status} ${response.statusText}`

@@ -51,7 +51,7 @@ function MessageItem({
 
         const result = message.attachments?.find((a) => a.id === attachmentId);
 
-        if (result) {
+        if (result?.contentType) {
           const byteCharacters = atob(result.contentType); // NEEDS FIX: SHOULD BE RESULT.CONTENT
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
@@ -91,8 +91,10 @@ function MessageItem({
         <AIResponse>{displayContent}</AIResponse>
       ) : isEmail ? (
         <AIMessageContent>
-          <div dangerouslySetInnerHTML={{ __html: message.content }} />
-          {message.attachments && message.threadId && (
+          {message.content ? (
+            <div dangerouslySetInnerHTML={{ __html: message.content }} />
+          ) : null}
+          {/* {message.attachments && message.threadId && (
             <AttachmentList
               attachments={message.attachments}
               onDownload={(attachmentId, fileName) =>
@@ -103,7 +105,7 @@ function MessageItem({
                 )
               }
             />
-          )}
+          )} */}
         </AIMessageContent>
       ) : (
         <AIMessageContent>{message.content}</AIMessageContent>

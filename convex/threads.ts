@@ -7,8 +7,14 @@ import {
   internalAction,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { messageType } from "./lib/validators";
-import { outlookEmailSchema } from "./schema";
+import {
+  messageType,
+  nullOrUndefinedBoolean,
+  nullOrUndefinedNumber,
+  nullOrUndefinedString,
+  threadStatus,
+} from "./lib/validators";
+import { type Id } from "./_generated/dataModel";
 
 export const getThreads = query({
   args: {
@@ -227,22 +233,54 @@ export const sendThreadMessage = mutation({
 
 export const processIncomingEmail = internalMutation({
   args: {
-    email: outlookEmailSchema,
+    subject: v.string(),
+    fromParticipants: v.object({
+      email: nullOrUndefinedString,
+      name: nullOrUndefinedString,
+    }),
+    toParticipants: v.array(
+      v.object({
+        email: nullOrUndefinedString,
+        name: nullOrUndefinedString,
+      })
+    ),
+    externalThreadId: v.optional(v.string()),
+    lastActivityAt: v.number(),
+    status: threadStatus,
     externalSubscriptionId: v.string(),
-    isSentEmail: v.optional(v.boolean()),
+    content: nullOrUndefinedString,
+    hasAttachments: nullOrUndefinedBoolean,
+    attachments: v.optional(
+      v.union(
+        v.array(
+          v.object({
+            id: nullOrUndefinedString,
+            name: nullOrUndefinedString,
+            contentType: nullOrUndefinedString,
+            size: nullOrUndefinedNumber,
+          })
+        ),
+        v.null()
+      )
+    ),
   },
   handler: async (
     ctx,
     args
   ): Promise<{
-    threadId: string;
-    emailMessageId: string;
-    responseMessageId: string;
+    threadId: Id<"threads">;
+    emailMessageId: Id<"messages">;
+    responseMessageId: Id<"messages">;
   }> => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    if (!userId) {
+    const user = await ctx.runQuery(internal.users.getBySubscriptionId, {
+      subscriptionId: args.externalSubscriptionId,
+    });
+
+    if (!user) {
       throw new Error("Not authenticated");
     }
+
+    const userId = user._id;
 
     // try {
     // Create or update email thread
@@ -255,56 +293,40 @@ export const processIncomingEmail = internalMutation({
 
     let threadId = thread?._id;
 
-    const e = args.email;
-
     if (!threadId) {
       // Create new email thread
       const newThreadId = await ctx.db.insert("threads", {
-        subject: e.subject || "New Email",
+        subject: args.subject,
+        fromParticipants: args.fromParticipants,
+        toParticipants: args.toParticipants,
+        externalThreadId: args.externalThreadId,
+        lastActivityAt: args.lastActivityAt,
+        status: args.status,
         threadType: "email",
-        fromParticipants: {
-          email: e.from?.emailAddress?.address || "",
-          name: e.from?.emailAddress?.name,
-        },
-        toParticipants:
-          e.toRecipients?.map((r) => ({
-            email: r.emailAddress?.address || "",
-            name: r.emailAddress?.name,
-          })) || [],
-        externalThreadId: e.conversationId || "",
         externalSubscriptionId: args.externalSubscriptionId,
-        lastActivityAt: e.receivedDateTime
-          ? new Date(e.receivedDateTime).getTime()
-          : Date.now(),
-        status: "new",
         userId,
       });
       threadId = newThreadId;
     } else {
       // Update existing thread
       await ctx.db.patch(threadId, {
-        lastActivityAt: e.receivedDateTime
-          ? new Date(e.receivedDateTime).getTime()
-          : Date.now(),
+        lastActivityAt: args.lastActivityAt,
       });
     }
 
+    const isSentEmail = args.fromParticipants.email === user.email;
+
+    console.log({ args });
+
     // Create message for the received email
     const emailMessageId = await ctx.db.insert("messages", {
-      content: e.uniqueBody?.content || "",
-      role: "system",
+      content: args.content,
+      attachments: args.attachments,
       userId,
       threadId,
-      messageType: "received_email",
+      messageType: isSentEmail ? "sent_email" : "received_email",
       threadType: "email",
-      attachments: e.hasAttachments
-        ? e.attachments?.map((a) => ({
-            id: a.id || "",
-            name: a.name || "",
-            contentType: a.contentType || "",
-            size: a.size || 0,
-          }))
-        : undefined,
+      role: "system",
     });
 
     //   // Log email received
@@ -341,14 +363,6 @@ export const processIncomingEmail = internalMutation({
     });
 
     // Schedule AI response generation
-    await ctx.scheduler.runAfter(
-      0,
-      internal.messages.generateStreamingResponse,
-      {
-        threadId,
-        responseMessageId,
-      }
-    );
 
     return { threadId, emailMessageId, responseMessageId };
     // } catch (error) {
@@ -387,6 +401,13 @@ export const getThreadConversationHistory = internalQuery({
       .filter((q) => q.neq(q.field("isStreaming"), true))
       .order("asc")
       .collect();
+  },
+});
+
+export const get = internalQuery({
+  args: { threadId: v.id("threads") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.threadId);
   },
 });
 

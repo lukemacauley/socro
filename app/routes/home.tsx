@@ -1,17 +1,17 @@
-import { SignInButton } from "@clerk/react-router";
-import { Unauthenticated, useConvexAuth } from "convex/react";
+import { SignInButton, useAuth } from "@clerk/react-router";
+import { Unauthenticated } from "convex/react";
 import type { Route } from "./+types/home";
 import { Button } from "~/components/ui/button";
 import { useEffect } from "react";
 
-export default function Profile({ loaderData }: Route.ComponentProps) {
-  const { isAuthenticated } = useConvexAuth();
+export default function Profile({ loaderData: _ }: Route.ComponentProps) {
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isSignedIn) {
       window.location.href = "/threads";
     }
-  }, [isAuthenticated]);
+  }, [isSignedIn]);
 
   return (
     <Unauthenticated>

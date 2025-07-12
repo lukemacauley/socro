@@ -78,7 +78,7 @@ export const getBySubscriptionId = internalQuery({
       .withIndex("by_subscription_id", (q) =>
         q.eq("externalSubscriptionId", args.subscriptionId)
       )
-      .first();
+      .unique();
   },
 });
 

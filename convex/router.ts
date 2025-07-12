@@ -11,15 +11,15 @@ http.route({
   path: "/webhook/microsoft",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    console.log("[WEBHOOK HTTP] Received webhook request");
+    console.log("[WEBHOOK HTTP] ============ WEBHOOK RECEIVED ============");
     console.log("[WEBHOOK HTTP] Request URL:", request.url);
     console.log("[WEBHOOK HTTP] Request method:", request.method);
 
     try {
-      // Verify webhook validation token if present
       const validationToken = new URL(request.url).searchParams.get(
         "validationToken"
       );
+
       if (validationToken) {
         console.log(
           "[WEBHOOK HTTP] Validation request received, token:",
@@ -32,10 +32,6 @@ http.route({
       }
 
       const body: ChangeNotificationCollection = await request.json();
-      console.log(
-        "[WEBHOOK HTTP] Webhook body:",
-        JSON.stringify(body, null, 2)
-      );
 
       // Process webhook notifications
       if (body.value && Array.isArray(body.value)) {
@@ -44,21 +40,21 @@ http.route({
         );
 
         for (const notification of body.value) {
-          console.log(`[WEBHOOK HTTP] Notification:`, {
-            changeType: notification.changeType,
-            resource: notification.resource,
-            subscriptionId: notification.subscriptionId,
-            hasResourceData: !!notification.resourceData,
-          });
+          console.log(`[WEBHOOK HTTP] Notification:`, notification);
 
           if (notification.changeType === "created") {
             console.log("[WEBHOOK HTTP] Processing new email notification");
-            // Process new email
-            await ctx.runMutation(internal.webhooks.processEmailNotification, {
-              subscriptionId: notification.subscriptionId || "",
-              resource: notification.resource || "",
-              isSentEmail: notification.clientState === "sent",
-            });
+
+            const emailId = notification.resource?.split("/").pop() || "";
+
+            await ctx.scheduler.runAfter(
+              0,
+              internal.webhooks.fetchAndProcessEmail,
+              {
+                emailId,
+                subscriptionId: notification.subscriptionId || "",
+              }
+            );
           } else {
             console.log(
               `[WEBHOOK HTTP] Ignoring notification with changeType: ${notification.changeType}`

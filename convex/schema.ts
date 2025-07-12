@@ -5,6 +5,7 @@ import {
   emailParticipant,
   messageType,
   attachmentValidator,
+  nullOrUndefinedString,
 } from "./lib/validators";
 
 const applicationTables = {
@@ -24,7 +25,7 @@ const applicationTables = {
 
   threads: defineTable({
     threadType: v.union(v.literal("chat"), v.literal("email")),
-    externalThreadId: v.string(), // Microsoft Graph conversation ID
+    externalThreadId: v.optional(v.string()), // Microsoft Graph conversation ID
     externalSubscriptionId: v.optional(v.string()),
     userId: v.id("users"),
     subject: v.string(),
@@ -44,10 +45,10 @@ const applicationTables = {
   messages: defineTable({
     threadId: v.id("threads"),
     userId: v.id("users"),
-    content: v.string(),
+    content: nullOrUndefinedString,
     role: v.union(v.literal("user"), v.literal("ai"), v.literal("system")),
     messageType: messageType,
-    attachments: v.optional(v.array(attachmentValidator)),
+    attachments: v.optional(v.union(v.array(attachmentValidator), v.null())),
     isStreaming: v.optional(v.boolean()),
     streamingComplete: v.optional(v.boolean()),
     threadType: v.optional(v.union(v.literal("chat"), v.literal("email"))),
@@ -81,59 +82,4 @@ const applicationTables = {
 
 export default defineSchema({
   ...applicationTables,
-});
-
-// ====== //
-// FOR MICROSOFT EMAILS
-// ====== //
-
-// Helper schemas for nested types
-const recipientSchema = v.object({
-  emailAddress: v.optional(
-    v.object({
-      name: v.optional(v.string()),
-      address: v.optional(v.string()),
-    })
-  ),
-});
-
-const itemBodySchema = v.object({
-  contentType: v.optional(v.string()), // "text" or "html"
-  content: v.optional(v.string()),
-});
-
-export const attachmentSchema = v.object({
-  id: v.string(),
-  name: v.optional(v.string()),
-  contentType: v.optional(v.string()),
-  size: v.optional(v.number()),
-  isInline: v.optional(v.boolean()),
-  lastModifiedDateTime: v.optional(v.string()),
-  contentId: v.optional(v.string()),
-  contentLocation: v.optional(v.string()),
-  contentBytes: v.optional(v.string()), // Base64 encoded
-});
-
-// Main Message schema (includes OutlookItem properties)
-export const outlookEmailSchema = v.object({
-  id: v.optional(v.string()),
-  categories: v.optional(v.array(v.string())),
-  // Message specific properties
-  bccRecipients: v.optional(v.array(recipientSchema)),
-  body: v.optional(itemBodySchema),
-  bodyPreview: v.optional(v.string()),
-  ccRecipients: v.optional(v.array(recipientSchema)),
-  conversationId: v.optional(v.string()),
-  conversationIndex: v.optional(v.string()),
-  from: v.optional(recipientSchema),
-  hasAttachments: v.optional(v.boolean()),
-  internetMessageId: v.optional(v.string()),
-  receivedDateTime: v.optional(v.string()),
-  sender: v.optional(recipientSchema),
-  sentDateTime: v.optional(v.string()),
-  subject: v.optional(v.string()),
-  toRecipients: v.optional(v.array(recipientSchema)),
-  uniqueBody: v.optional(itemBodySchema),
-  // Navigation properties
-  attachments: v.optional(v.array(attachmentSchema)),
 });
