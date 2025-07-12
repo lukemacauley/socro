@@ -2,7 +2,6 @@ import { internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal, api } from "./_generated/api";
 import Reducto, { toFile } from "reductoai";
-import { decode } from "he";
 import { createClerkClient } from "@clerk/backend";
 import type {
   Attachment,
@@ -366,35 +365,6 @@ async function fetchEmailFromMicrosoft(accessToken: string, emailId: string) {
     );
     return null;
   }
-}
-
-function extractEmailContent(email: Message): string {
-  let emailContent = "";
-
-  // First, try Microsoft's uniqueBody if available
-  if (email.uniqueBody?.content) {
-    const uniqueBodyType =
-      email.uniqueBody.contentType?.toLowerCase() || "text";
-    const uniqueContent = email.uniqueBody.content;
-
-    if (uniqueBodyType === "html") {
-      emailContent = decode(uniqueContent);
-    } else {
-      emailContent = decode(uniqueContent).replace(/\n/g, "<br>");
-    }
-  } else if (email.body?.content) {
-    // Fall back to full body
-    const bodyContentType = email.body.contentType?.toLowerCase() || "text";
-    const bodyContent = email.body.content;
-
-    if (bodyContentType === "html") {
-      emailContent = decode(bodyContent);
-    } else {
-      emailContent = decode(bodyContent).replace(/\n/g, "<br>");
-    }
-  }
-
-  return emailContent;
 }
 
 // export const processAttachmentWithReducto = internalAction({
