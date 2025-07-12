@@ -1,14 +1,13 @@
 import { v } from "convex/values";
 import {
   query,
-  mutation,
   internalQuery,
   internalMutation,
   internalAction,
+  action,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { verifyThreadOwnership } from "./lib/utils";
-import type { Id } from "./_generated/dataModel";
 
 export const getMessages = query({
   args: { threadId: v.id("threads") },
@@ -47,52 +46,62 @@ export const getMessages = query({
   },
 });
 
-export const sendMessage = mutation({
+export const sendMessage = action({
   args: {
     content: v.string(),
     threadId: v.id("threads"),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{
-    userMessageId: Id<"messages">;
-    responseMessageId: Id<"messages">;
-  }> => {
+  handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    await verifyThreadOwnership(ctx, args.threadId, userId);
 
-    // Insert user message
+    const { responseMessageId } = await ctx.runMutation(
+      internal.messages.insertWithResponsePlaceholder,
+      {
+        threadId: args.threadId,
+        content: args.content,
+        userId,
+      }
+    );
+
+    await ctx.runAction(internal.messages.generateStreamingResponse, {
+      threadId: args.threadId,
+      responseMessageId,
+    });
+  },
+});
+
+// Helper mutation to insert user message
+export const insertWithResponsePlaceholder = internalMutation({
+  args: {
+    content: v.string(),
+    threadId: v.id("threads"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    await verifyThreadOwnership(ctx, args.threadId, args.userId);
+
     const userMessageId = await ctx.db.insert("messages", {
       content: args.content,
       role: "user",
-      userId,
+      userId: args.userId,
       threadId: args.threadId,
       messageType: "user_message",
     });
 
-    // Create placeholder assistant message
     const responseMessageId = await ctx.db.insert("messages", {
       content: "",
       role: "ai",
-      userId,
+      userId: args.userId,
       threadId: args.threadId,
       isStreaming: true,
       streamingComplete: false,
       messageType: "ai_response",
     });
 
-    // Schedule AI response generation
-    await ctx.scheduler.runAfter(
-      0,
-      internal.messages.generateStreamingResponse,
-      {
-        threadId: args.threadId,
-        responseMessageId,
-      }
-    );
-
-    return { userMessageId, responseMessageId };
+    return {
+      userMessageId,
+      responseMessageId,
+    };
   },
 });
 
@@ -112,7 +121,7 @@ export const generateStreamingResponse = internalAction({
     });
 
     try {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const apiKey = process.env.CONVEX_ANTHROPIC_API_KEY;
       if (!apiKey) {
         throw new Error("ANTHROPIC_API_KEY environment variable is not set");
       }
@@ -178,35 +187,48 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
       // Build the conversation with proper Anthropic format
       const anthropicMessages = [];
 
-      // Add conversation history if exists
-      if (messages && messages.length === 0) {
-        anthropicMessages.push({
-          role: "user",
-          content: "No previous messages in this thread.",
-        });
-        return;
+      // First, add all previous messages as context (excluding the most recent)
+      if (messages && messages.length > 1) {
+        const previousMessages = messages
+          .slice(0, -1)
+          .filter((msg) => msg.content?.trim() !== "")
+          .map((msg) => ({
+            role: msg.role === "user" ? "user" : "assistant",
+            content: msg.content || "",
+          }));
+        anthropicMessages.push(...previousMessages);
       }
 
-      const formattedMessages = messages
-        .filter((msg) => msg.content?.trim() !== "")
-        .map((msg) => ({
-          role: msg.role === "user" ? "user" : "assistant",
-          content: msg.content || "",
-        }));
+      // Get the most recent message that needs a response
+      const mostRecentMessage =
+        messages && messages.length > 0 ? messages[messages.length - 1] : null;
 
-      anthropicMessages.push(...formattedMessages);
+      // Format the request for response to the most recent message
+      if (mostRecentMessage) {
+        anthropicMessages.push({
+          role: "user",
+          content: `Based on the conversation history above, please draft a professional legal response to this most recent email:
 
-      // If this is the first message in the thread, add context
-      anthropicMessages.push({
-        role: "user",
-        content: `Please analyze this email and draft an appropriate legal response:
-
+---
+From: ${
+            thread?.fromParticipants.name ||
+            thread?.fromParticipants.email ||
+            "[Sender]"
+          }
 Subject: ${thread?.subject || "[No Subject]"}
+Date: ${new Date(mostRecentMessage._creationTime).toLocaleString() || "[Date]"}
 
-Email Content: ${anthropicMessages[0].content}
+Email Content:
+${mostRecentMessage.content}
+---
 
-Please draft a professional legal response addressing all points raised.`,
-      });
+Please draft a professional legal response that:
+1. Directly addresses all points in the above email
+2. Considers the full conversation history for context
+3. Maintains consistency with any previous responses in this thread
+4. Follows all legal communication best practices`,
+        });
+      }
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -216,15 +238,18 @@ Please draft a professional legal response addressing all points raised.`,
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022", // Using stable model name
-          max_tokens: 8192, // Reasonable limit for email responses
-          temperature: 0.3, // Lower temperature for more consistent legal writing
+          model: "claude-opus-4-20250514",
+          max_tokens: 30000,
+          temperature: 0.2, // Lower temperature for more consistent legal writing
           system: systemPrompt,
           messages: anthropicMessages,
           stream: true,
         }),
       });
+
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.log("Anthropic API error:", errorBody);
         throw new Error(
           `Anthropic API error: ${response.status} ${response.statusText}`
         );
@@ -289,6 +314,7 @@ Please draft a professional legal response addressing all points raised.`,
           fullContent || "I apologize, but I couldn't generate a response.",
       });
     } catch (error) {
+      console.log({ error });
       console.error("Streaming error:", error);
       await ctx.runMutation(internal.messages.completeStreaming, {
         messageId: args.responseMessageId,

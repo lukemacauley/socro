@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, type FormEventHandler } from "react";
 import { useSidebar } from "~/components/ui/sidebar";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import type { Id } from "convex/_generated/dataModel";
 import {
@@ -18,7 +18,7 @@ export const MessageInput = memo(function MessageInput({
 }: {
   threadId: Id<"threads">;
 }) {
-  const sendMessage = useMutation(api.messages.sendMessage);
+  const sendMessage = useAction(api.messages.sendMessage);
 
   const { state } = useSidebar();
 

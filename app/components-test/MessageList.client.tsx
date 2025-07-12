@@ -90,10 +90,8 @@ function MessageItem({
       {isAi ? (
         <AIResponse>{displayContent}</AIResponse>
       ) : isEmail ? (
-        <AIMessageContent>
-          {message.content ? (
-            <div dangerouslySetInnerHTML={{ __html: message.content }} />
-          ) : null}
+        <AIMessageContent className="whitespace-pre-wrap">
+          {message.content}
           {/* {message.attachments && message.threadId && (
             <AttachmentList
               attachments={message.attachments}

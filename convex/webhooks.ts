@@ -64,7 +64,7 @@ export const fetchAndProcessEmail = internalAction({
           : Date.now(),
         status: "new",
         externalSubscriptionId: args.subscriptionId,
-        content: email.uniqueBody?.content,
+        content: email.bodyPreview,
         hasAttachments: email.hasAttachments,
         attachments: email.attachments?.map((a) => ({
           id: a.id,
