@@ -1,5 +1,11 @@
 import { v } from "convex/values";
-import { query, internalQuery, internalMutation } from "./_generated/server";
+import {
+  query,
+  internalQuery,
+  internalMutation,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import {
   nullOrUndefinedBoolean,
@@ -130,6 +136,7 @@ export const processIncomingEmail = internalMutation({
           v.object({
             id: nullOrUndefinedString,
             name: nullOrUndefinedString,
+            contentBytes: nullOrUndefinedString,
             contentType: nullOrUndefinedString,
             size: nullOrUndefinedNumber,
           })
@@ -137,6 +144,7 @@ export const processIncomingEmail = internalMutation({
         v.null()
       )
     ),
+    accessToken: v.string(),
   },
   handler: async (
     ctx,
@@ -203,6 +211,20 @@ export const processIncomingEmail = internalMutation({
       role: "system",
     });
 
+    if (emailMessageId && args.hasAttachments) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.attachments.processEmailAttachments,
+        {
+          emailId: args.externalThreadId,
+          messageId: emailMessageId,
+          userId,
+          attachments: args.attachments,
+          accessToken: args.accessToken,
+        }
+      );
+    }
+
     const responseMessageId = await ctx.db.insert("messages", {
       content: "",
       role: "ai",
@@ -223,3 +245,15 @@ export const get = internalQuery({
     return await ctx.db.get(args.threadId);
   },
 });
+
+export async function verifyThreadOwnership(
+  ctx: QueryCtx | MutationCtx,
+  threadId: Id<"threads">,
+  userId: Id<"users">
+) {
+  const thread = await ctx.db.get(threadId);
+  if (!thread || thread.userId !== userId) {
+    throw new Error(`Thread not found: ${threadId}`);
+  }
+  return thread;
+}

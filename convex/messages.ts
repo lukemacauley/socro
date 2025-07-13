@@ -5,9 +5,10 @@ import {
   internalMutation,
   internalAction,
   action,
+  mutation,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { verifyThreadOwnership } from "./lib/utils";
+import { verifyThreadOwnership } from "./threads";
 
 export const getMessages = query({
   args: { threadId: v.id("threads") },

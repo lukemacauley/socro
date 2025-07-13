@@ -11,8 +11,8 @@ import type {
 } from "@microsoft/microsoft-graph-types";
 
 // ==================== Constants ====================
-const MICROSOFT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
-const WEBHOOK_SUBSCRIPTION_DURATION_MINUTES = 4230; // ~70 hours
+export const MICROSOFT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+export const WEBHOOK_SUBSCRIPTION_DURATION_MINUTES = 4230; // ~70 hours
 
 export const fetchAndProcessEmail = internalAction({
   args: {
@@ -44,6 +44,8 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
+    console.log({ attachments: email.attachments });
+
     const { responseMessageId, threadId } = await ctx.runMutation(
       internal.threads.processIncomingEmail,
       {
@@ -68,9 +70,11 @@ export const fetchAndProcessEmail = internalAction({
         attachments: email.attachments?.map((a) => ({
           id: a.id,
           name: a.name,
+          contentBytes: a.contentBytes,
           contentType: a.contentType,
           size: a.size,
         })),
+        accessToken,
       }
     );
 
@@ -95,39 +99,13 @@ export const updateUserMicrosoftAuth = internalMutation({
   },
 });
 
-export const storeProcessedAttachment = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    attachmentId: v.string(),
-    attachmentName: v.string(),
-    content: v.string(),
-    metadata: v.optional(
-      v.object({
-        pageCount: v.optional(v.number()),
-        processingTime: v.optional(v.number()),
-      })
-    ),
-  },
-  handler: async (ctx, args) => {
-    // Store processed attachment content
-    await ctx.db.insert("messageAttachments", {
-      messageId: args.messageId,
-      attachmentId: args.attachmentId,
-      attachmentName: args.attachmentName,
-      content: args.content,
-      metadata: args.metadata,
-      createdAt: Date.now(),
-    });
-  },
-});
-
 // ==================== Webhook Setup ====================
 
 export const setupMicrosoftWebhook = internalAction({
   args: { clerkUserId: v.string() },
   handler: async (ctx, args) => {
     try {
-      const user = await ctx.runQuery(api.users.getByClerkId, {
+      const user = await ctx.runQuery(internal.users.getByClerkId, {
         clerkId: args.clerkUserId,
       });
 
@@ -356,7 +334,7 @@ async function fetchEmailFromMicrosoft(accessToken: string, emailId: string) {
 
     return {
       ...email,
-      attachments: email?.attachments, //as FileAttachment[] | null | undefined,
+      attachments: email?.attachments as FileAttachment[] | null | undefined,
     };
   } catch (error) {
     console.error(
@@ -366,91 +344,6 @@ async function fetchEmailFromMicrosoft(accessToken: string, emailId: string) {
     return null;
   }
 }
-
-// export const processAttachmentWithReducto = internalAction({
-//   args: {
-//     emailId: v.string(),
-//     attachment: attachmentSchema,
-//     messageId: v.id("messages"),
-//     accessToken: v.string(),
-//   },
-//   handler: async (ctx, args) => {
-//     try {
-//       console.log(`[REDUCTO] Processing attachment: ${args.attachment.name}`);
-
-//       // Fetch attachment content
-//       const response = await fetch(
-//         `${MICROSOFT_GRAPH_BASE_URL}/me/messages/${args.emailId}/attachments/${args.attachment.id}`,
-//         {
-//           headers: {
-//             Authorization: `Bearer ${args.accessToken}`,
-//           },
-//         }
-//       );
-
-//       if (!response.ok) {
-//         console.error("[REDUCTO] Failed to fetch attachment");
-//         return null;
-//       }
-
-//       const attachmentData = await response.json();
-//       const bytes = base64ToUint8Array(attachmentData.contentBytes);
-
-//       // Initialize Reducto client
-//       const reductoClient = new Reducto({
-//         apiKey: process.env.REDUCTO_API_KEY,
-//       });
-
-//       // Upload and process with Reducto
-//       const file = await toFile(bytes, args.attachment.name);
-//       const upload = await reductoClient.upload({ file });
-
-//       const result = await reductoClient.parse.run({
-//         document_url: upload,
-//         options: {
-//           extraction_mode: "hybrid",
-//           chunking: {
-//             chunk_mode: "variable",
-//             chunk_size: 1000,
-//           },
-//         },
-//         advanced_options: {
-//           enable_change_tracking: true,
-//           add_page_markers: true,
-//           ocr_system: "highres",
-//           page_range: {
-//             start: 1,
-//             end: 50,
-//           },
-//         },
-//         experimental_options: {},
-//       });
-
-//       const content =
-//         result.result.type === "full"
-//           ? result.result.chunks.map((chunk) => chunk.content).join("\n\n")
-//           : `Document processed. Result URL: ${result.result.url}`;
-
-//       // Store processed attachment
-//       await ctx.runMutation(internal.webhooks.storeProcessedAttachment, {
-//         messageId: args.messageId,
-//         attachmentId: args.attachment.id,
-//         attachmentName: args.attachment.name || "attachment",
-//         content,
-//         metadata: {
-//           pageCount: result.usage?.num_pages || undefined,
-//           processingTime: result.duration || undefined,
-//         },
-//       });
-
-//       console.log(`[REDUCTO] Successfully processed: ${args.attachment.name}`);
-//       return content;
-//     } catch (error) {
-//       console.error(`[REDUCTO] Error processing attachment:`, error);
-//       return null;
-//     }
-//   },
-// });
 
 export const createMicrosoftSubscription = async (
   webhookUrl: string,
@@ -503,12 +396,3 @@ export const createMicrosoftSubscription = async (
     throw new Error(`Failed to create inbox subscription: ${error}`);
   }
 };
-
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}

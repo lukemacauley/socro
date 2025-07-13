@@ -1,37 +1,15 @@
-import {
-  internalMutation,
-  internalQuery,
-  query,
-  type QueryCtx,
-} from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { type UserJSON } from "@clerk/backend";
 import { v, type Validator } from "convex/values";
+import { internal } from "./_generated/api";
 
-export const current = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      return null;
-    }
-    return await userByExternalId(ctx, identity.subject);
-  },
-});
-
-export const getByClerkId = query({
+export const getByClerkId = internalQuery({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
       .withIndex("by_external_id", (q) => q.eq("externalId", args.clerkId))
       .first();
-  },
-});
-
-export const getById = internalQuery({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.userId);
   },
 });
 
@@ -46,7 +24,10 @@ export const upsertFromClerk = internalMutation({
       createdAt: Date.now(),
     };
 
-    const user = await userByExternalId(ctx, data.id);
+    const user = await ctx.runQuery(internal.users.getByClerkId, {
+      clerkId: data.id,
+    });
+
     if (user === null) {
       await ctx.db.insert("users", userAttributes);
     } else {
@@ -57,8 +38,10 @@ export const upsertFromClerk = internalMutation({
 
 export const deleteFromClerk = internalMutation({
   args: { clerkUserId: v.string() },
-  async handler(ctx, { clerkUserId }) {
-    const user = await userByExternalId(ctx, clerkUserId);
+  handler: async (ctx, { clerkUserId }) => {
+    const user = await ctx.runQuery(internal.users.getByClerkId, {
+      clerkId: clerkUserId,
+    });
 
     if (user !== null) {
       await ctx.db.delete(user._id);
@@ -81,10 +64,3 @@ export const getBySubscriptionId = internalQuery({
       .unique();
   },
 });
-
-async function userByExternalId(ctx: QueryCtx, externalId: string) {
-  return await ctx.db
-    .query("users")
-    .withIndex("by_external_id", (q) => q.eq("externalId", externalId))
-    .unique();
-}

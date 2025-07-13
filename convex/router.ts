@@ -11,20 +11,12 @@ http.route({
   path: "/webhook/microsoft",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    console.log("[WEBHOOK HTTP] ============ WEBHOOK RECEIVED ============");
-    console.log("[WEBHOOK HTTP] Request URL:", request.url);
-    console.log("[WEBHOOK HTTP] Request method:", request.method);
-
     try {
       const validationToken = new URL(request.url).searchParams.get(
         "validationToken"
       );
 
       if (validationToken) {
-        console.log(
-          "[WEBHOOK HTTP] Validation request received, token:",
-          validationToken
-        );
         return new Response(validationToken, {
           status: 200,
           headers: { "Content-Type": "text/plain" },
@@ -33,18 +25,9 @@ http.route({
 
       const body: ChangeNotificationCollection = await request.json();
 
-      // Process webhook notifications
       if (body.value && Array.isArray(body.value)) {
-        console.log(
-          `[WEBHOOK HTTP] Processing ${body.value.length} notifications`
-        );
-
         for (const notification of body.value) {
-          console.log(`[WEBHOOK HTTP] Notification:`, notification);
-
           if (notification.changeType === "created") {
-            console.log("[WEBHOOK HTTP] Processing new email notification");
-
             const emailId = notification.resource?.split("/").pop() || "";
 
             await ctx.scheduler.runAfter(
@@ -55,16 +38,9 @@ http.route({
                 subscriptionId: notification.subscriptionId || "",
               }
             );
-          } else {
-            console.log(
-              `[WEBHOOK HTTP] Ignoring notification with changeType: ${notification.changeType}`
-            );
           }
         }
-      } else {
-        console.log("[WEBHOOK HTTP] No notifications in webhook body");
       }
-
       return new Response("OK", { status: 200 });
     } catch (error) {
       console.error("[WEBHOOK HTTP] Error processing webhook:", error);
@@ -89,19 +65,11 @@ http.route({
           data: event.data,
         });
 
-        console.log({ data: event.data });
-
-        // Check if user has Microsoft OAuth and set up webhook
-        console.log("[CLERK WEBHOOK] Checking for Microsoft OAuth...");
         const hasMicrosoftOAuth = event.data.external_accounts?.some(
           (account) => account.provider === "oauth_microsoft"
         );
 
         if (hasMicrosoftOAuth) {
-          console.log(
-            "[CLERK WEBHOOK] User has Microsoft OAuth, setting up email webhook..."
-          );
-          // Schedule the Microsoft webhook setup as a separate action
           await ctx.scheduler.runAfter(
             0,
             internal.webhooks.setupMicrosoftWebhook,

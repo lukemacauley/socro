@@ -65,19 +65,31 @@ const applicationTables = {
 
   messageAttachments: defineTable({
     messageId: v.id("messages"),
-    attachmentId: v.string(),
-    attachmentName: v.string(),
-    content: v.string(),
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    externalAttachmentId: v.string(),
+    name: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    uploadStatus: v.union(
+      v.literal("pending"),
+      v.literal("uploading"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    parsedContent: v.union(v.string(), v.null()), // For parsed content from Reducto
     metadata: v.optional(
       v.object({
         pageCount: v.optional(v.number()),
         processingTime: v.optional(v.number()),
       })
     ),
-    createdAt: v.number(),
   })
     .index("by_message_id", ["messageId"])
-    .index("by_attachment_id", ["attachmentId"]),
+    .index("by_user_id", ["userId"])
+    .index("by_storage_id", ["storageId"])
+    .index("by_upload_status", ["uploadStatus"])
+    .index("by_external_attachment_id", ["externalAttachmentId"]),
 };
 
 export default defineSchema({

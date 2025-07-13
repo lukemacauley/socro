@@ -25,6 +25,7 @@ export const messageType = v.union(
 export const attachmentValidator = v.object({
   id: nullOrUndefinedString,
   name: nullOrUndefinedString,
+  contentBytes: nullOrUndefinedString,
   contentType: nullOrUndefinedString,
   size: nullOrUndefinedNumber,
 });
