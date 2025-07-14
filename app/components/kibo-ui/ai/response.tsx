@@ -127,7 +127,7 @@ const components: Options["components"] = {
       return (
         <div
           className={cn(
-            "relative group my-8 py-8 border-y border-sidebar-border",
+            "relative group mt-8 pt-8 border-t-4 border-double border-sidebar-border",
             className
           )}
         >
@@ -143,9 +143,7 @@ const components: Options["components"] = {
             </CodeBlockContext.Provider>
           </div>
           <div className="pr-12 prose max-w-none">
-            <div className="whitespace-pre-wrap font-sans text-foreground">
-              {data[0].code}
-            </div>
+            <ReactMarkdown>{data[0].code}</ReactMarkdown>
           </div>
         </div>
       );
@@ -201,7 +199,7 @@ export const AIResponse = memo(
     return (
       <div
         className={cn(
-          "size-full prose max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          "size-full prose prose-p:text-muted-foreground max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
           className
         )}
         {...props}

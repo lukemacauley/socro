@@ -62,6 +62,7 @@ export const getMessages = query({
 export const sendMessage = action({
   args: {
     content: v.string(),
+    uploadId: v.optional(v.string()),
     threadId: v.id("threads"),
   },
   handler: async (
@@ -78,6 +79,7 @@ export const sendMessage = action({
       {
         threadId: args.threadId,
         content: args.content,
+        uploadId: args.uploadId,
         userId,
       }
     );
@@ -98,6 +100,7 @@ export const sendMessage = action({
 export const insertWithResponsePlaceholder = internalMutation({
   args: {
     content: v.string(),
+    uploadId: v.optional(v.string()),
     threadId: v.id("threads"),
     userId: v.id("users"),
   },

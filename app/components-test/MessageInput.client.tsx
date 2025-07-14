@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
@@ -11,7 +11,7 @@ import {
   AIInputToolbar,
   AIInputTools,
 } from "~/components/kibo-ui/ai/input";
-import { Paperclip } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import {
   Dropzone,
   DropzoneContent,
@@ -19,15 +19,20 @@ import {
 } from "~/components/kibo-ui/dropzone";
 import { useDropzone } from "react-dropzone";
 import { createId } from "legid";
+import { Button } from "~/components/ui/button";
 
 export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
   const sendMessage = useAction(api.messages.sendMessage);
   const uploadFiles = useAction(api.attachments.uploadUserFiles);
 
   const { state } = useSidebar();
+  const { getRootProps, isDragActive } = useDropzone();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [prompt, setPrompt] = useState("");
   const [files, setFiles] = useState<File[] | undefined>(undefined);
+  const [uploadId, setUploadId] = useState<string | undefined>(undefined);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -42,7 +47,11 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
       await sendMessage({
         threadId,
         content,
+        uploadId,
       });
+
+      setFiles(undefined);
+      setUploadId(undefined);
     },
     [prompt, threadId, sendMessage]
   );
@@ -55,7 +64,8 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
 
       const fileArray = Array.isArray(_files) ? _files : [_files];
 
-      // Use Promise.all to wait for all async operations to complete
+      setFiles((prev) => [...(prev || []), ...fileArray]);
+
       const files = await Promise.all(
         fileArray.map(async (file) => ({
           name: file.name,
@@ -66,6 +76,7 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
       );
 
       const uploadId = await createId();
+      setUploadId(uploadId);
 
       await uploadFiles({
         files,
@@ -74,16 +85,6 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
     },
     [threadId, sendMessage, uploadFiles]
   );
-
-  const handleDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      setFiles(acceptedFiles);
-      handleUploadFiles(acceptedFiles);
-    },
-    [handleUploadFiles, setFiles]
-  );
-
-  const { getRootProps, isDragActive, isDragAccept } = useDropzone();
 
   return (
     <div
@@ -95,19 +96,66 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
     >
       <div className="max-w-[808px] w-full mx-auto">
         {isDragActive ? (
-          <Dropzone onDrop={handleDrop} onError={console.error} src={files}>
+          <Dropzone
+            onDrop={handleUploadFiles}
+            onError={console.error}
+            src={files}
+          >
             <DropzoneEmptyState />
             <DropzoneContent />
           </Dropzone>
         ) : (
           <AIInput onSubmit={handleSubmit}>
+            {files && files.length > 0 && (
+              <div className="flex items-center justify-start gap-4 p-2 overflow-auto scrollbar-hide">
+                {files?.map((file, index) => (
+                  <Button
+                    key={`${file.name}-${index}`}
+                    variant="outline"
+                    size="sm"
+                    className="justify-start"
+                    tooltip={file.name}
+                    onClick={() => {
+                      setFiles((prev) =>
+                        prev ? prev.filter((f) => f !== file) : []
+                      );
+                    }}
+                  >
+                    <div className="bg-primary text-primary-foreground rounded px-1.5">
+                      {file.type.split("/")[1].toUpperCase()}
+                    </div>
+                    <div className="w-28 truncate line-clamp-1">
+                      {file.name}
+                    </div>
+                    <X className="size-4" />
+                  </Button>
+                ))}
+              </div>
+            )}
             <AIInputTextarea
-              onChange={(e) => setPrompt(e.target.value)}
               value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
             />
             <AIInputToolbar>
               <AIInputTools>
-                <AIInputButton variant="outline">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) {
+                      handleUploadFiles(files);
+                    }
+                  }}
+                />
+                <AIInputButton
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  type="button"
+                  tooltip="Upload files"
+                >
                   <Paperclip size={16} />
                 </AIInputButton>
               </AIInputTools>

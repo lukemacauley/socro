@@ -9,10 +9,10 @@ export type AIMessageProps = HTMLAttributes<HTMLDivElement> & {
 export const AIMessage = ({ className, from, ...props }: AIMessageProps) => (
   <div
     className={cn(
-      "group flex w-full items-end justify-end gap-2 py-4",
+      "flex flex-col w-full items-end justify-end gap-2 py-8",
       from === "user"
         ? "is-user [&>div]:max-w-[80%]"
-        : "is-assistant flex-row-reverse justify-end",
+        : "is-assistant justify-start items-start",
       className
     )}
     {...props}

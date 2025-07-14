@@ -53,7 +53,7 @@ function Button({
   if (tooltip) {
     return (
       <Tooltip>
-        <TooltipTrigger>
+        <TooltipTrigger asChild>
           <Comp
             data-slot="button"
             className={cn(buttonVariants({ variant, size, className }))}

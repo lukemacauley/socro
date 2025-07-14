@@ -582,14 +582,13 @@ export const CodeBlockItem = ({
   return (
     <div
       className={cn(
-        // codeBlockClassName,
-        // lineHighlightClassNames,
-        // lineDiffClassNames,
-        // lineFocusedClassNames,
-        // wordHighlightClassNames,
-        // darkModeClassNames,
-        // lineNumbers && lineNumberClassNames,
-        "font-sans",
+        codeBlockClassName,
+        lineHighlightClassNames,
+        lineDiffClassNames,
+        lineFocusedClassNames,
+        wordHighlightClassNames,
+        darkModeClassNames,
+        lineNumbers && lineNumberClassNames,
         className
       )}
       {...props}
