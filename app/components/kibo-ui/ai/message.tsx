@@ -10,8 +10,9 @@ export const AIMessage = ({ className, from, ...props }: AIMessageProps) => (
   <div
     className={cn(
       "group flex w-full items-end justify-end gap-2 py-4",
-      from === "user" ? "is-user" : "is-assistant flex-row-reverse justify-end",
-      // "[&>div]:max-w-[80%]",
+      from === "user"
+        ? "is-user [&>div]:max-w-[80%]"
+        : "is-assistant flex-row-reverse justify-end",
       className
     )}
     {...props}
@@ -27,7 +28,7 @@ export const AIMessageContent = ({
 }: AIMessageContentProps) => (
   <div
     className={cn(
-      "flex flex-col gap-2 rounded-lg px-4 py-3 text-sm",
+      "flex flex-col gap-2 rounded-lg px-4 py-3",
       "bg-muted text-foreground",
       // "group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground",
       className
