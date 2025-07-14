@@ -85,7 +85,11 @@ function AttachmentItem({ att }: { att: Attachment }) {
           </p>
         </div>
       </div>
-      <Button size="icon" onClick={handleDownloadAttachment}>
+      <Button
+        size="icon"
+        onClick={handleDownloadAttachment}
+        tooltip="Download attachment"
+      >
         <Download />
       </Button>
     </div>

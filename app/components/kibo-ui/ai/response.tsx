@@ -127,7 +127,7 @@ const components: Options["components"] = {
       return (
         <div
           className={cn(
-            "relative group my-8 py-4 border-y border-sidebar-border",
+            "relative group my-8 py-8 border-y border-sidebar-border",
             className
           )}
         >

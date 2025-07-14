@@ -521,6 +521,7 @@ export const CodeBlockCopyButton = ({
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"
+      tooltip="Copy email"
       {...props}
     >
       {children ?? <Icon className="text-muted-foreground" size={14} />}

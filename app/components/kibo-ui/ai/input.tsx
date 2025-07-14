@@ -233,6 +233,7 @@ export const AIInputSubmit = ({
       type="submit"
       variant={variant}
       {...props}
+      tooltip="Send message"
     >
       {children ?? Icon}
     </Button>
