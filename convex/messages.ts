@@ -47,7 +47,7 @@ export const getMessages = query({
             attachments,
           };
         }
-        
+
         return {
           ...message,
           attachments,
@@ -218,19 +218,21 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
           .filter((msg) => msg.content?.trim() !== "")
           .map((msg) => {
             let content = msg.content || "";
-            
+
             // Add attachment information if present
             if (msg.attachments && msg.attachments.length > 0) {
               content += "\n\n[Attachments:";
               msg.attachments.forEach((att) => {
-                content += `\n- ${att.name} (${att.contentType}, ${(att.size / 1024).toFixed(2)} KB)`;
+                content += `\n- ${att.name} (${att.contentType}, ${(
+                  att.size / 1024
+                ).toFixed(2)} KB)`;
                 if (att.parsedContent) {
                   content += `\n  Content:\n${att.parsedContent}`;
                 }
               });
               content += "]";
             }
-            
+
             return {
               role: msg.role === "user" ? "user" : "assistant",
               content,
@@ -262,10 +264,15 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
             ${mostRecentMessage.content}`;
 
         // Add attachment information for the most recent message
-        if (mostRecentMessage.attachments && mostRecentMessage.attachments.length > 0) {
+        if (
+          mostRecentMessage.attachments &&
+          mostRecentMessage.attachments.length > 0
+        ) {
           emailContent += "\n\nAttachments in this email:";
           mostRecentMessage.attachments.forEach((att) => {
-            emailContent += `\n- ${att.name} (${att.contentType}, ${(att.size / 1024).toFixed(2)} KB)`;
+            emailContent += `\n- ${att.name} (${att.contentType}, ${(
+              att.size / 1024
+            ).toFixed(2)} KB)`;
             if (att.parsedContent) {
               emailContent += `\n  Full Content:\n${att.parsedContent}`;
             }
@@ -416,7 +423,7 @@ export const getThreadHistory = internalQuery({
           .query("messageAttachments")
           .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
           .collect();
-        
+
         return {
           ...message,
           attachments,

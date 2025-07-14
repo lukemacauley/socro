@@ -42,11 +42,18 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
-    const attachments = email.attachments?.filter(isProcessedFileAttachment);
+    const attachments = email.attachments
+      ?.filter(isProcessedFileAttachment)
+      ?.map((a) => ({
+        id: a.id,
+        name: a.name,
+        contentBytes: a.contentBytes,
+        contentType: a.contentType,
+        size: a.size,
+      }));
 
-    const { responseMessageId, threadId } = await ctx.runMutation(
-      internal.threads.processIncomingEmail,
-      {
+    const { responseMessageId, emailMessageId, threadId } =
+      await ctx.runMutation(internal.threads.processIncomingEmail, {
         subject: email.subject || "New Email",
         fromParticipants: {
           email: email.from?.emailAddress?.address,
@@ -66,16 +73,19 @@ export const fetchAndProcessEmail = internalAction({
         content: email.body?.content,
         contentPreview: email.bodyPreview,
         hasAttachments: email.hasAttachments,
-        attachments: attachments?.map((a) => ({
-          id: a.id,
-          name: a.name,
-          contentBytes: a.contentBytes,
-          contentType: a.contentType,
-          size: a.size,
-        })),
+        attachments,
         accessToken,
-      }
-    );
+      });
+
+    if (emailMessageId && email.hasAttachments && email.conversationId) {
+      await ctx.runAction(internal.attachments.processEmailAttachments, {
+        emailId: email.conversationId,
+        messageId: emailMessageId,
+        userId: user._id,
+        attachments,
+        accessToken,
+      });
+    }
 
     await ctx.runAction(internal.messages.generateStreamingResponse, {
       threadId,

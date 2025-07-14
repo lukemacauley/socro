@@ -136,11 +136,9 @@ const components: Options["components"] = {
               value={{ value: language, onValueChange: undefined, data }}
             >
               <CodeBlockCopyButton
-                onCopy={() => console.log("Copied email to clipboard")}
-                onError={() =>
-                  console.error("Failed to copy email to clipboard")
-                }
                 className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                onCopy={console.log}
+                onError={console.error}
               />
             </CodeBlockContext.Provider>
           </div>

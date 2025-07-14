@@ -179,8 +179,8 @@ export const processIncomingEmail = internalMutation({
     // Create or update email thread
     let thread = await ctx.db
       .query("threads")
-      .withIndex("by_external_subscription_id", (q) =>
-        q.eq("externalSubscriptionId", args.externalSubscriptionId)
+      .withIndex("by_external_id", (q) =>
+        q.eq("externalThreadId", args.externalThreadId)
       )
       .unique();
 
@@ -219,20 +219,6 @@ export const processIncomingEmail = internalMutation({
       threadType: "email",
       role: "system",
     });
-
-    if (emailMessageId && args.hasAttachments) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.attachments.processEmailAttachments,
-        {
-          emailId: args.externalThreadId,
-          messageId: emailMessageId,
-          userId,
-          attachments: args.attachments,
-          accessToken: args.accessToken,
-        }
-      );
-    }
 
     const responseMessageId = await ctx.db.insert("messages", {
       content: "",
