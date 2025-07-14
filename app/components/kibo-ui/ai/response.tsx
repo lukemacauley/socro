@@ -14,6 +14,7 @@ import {
   CodeBlockSelectItem,
   CodeBlockSelectTrigger,
   CodeBlockSelectValue,
+  CodeBlockContext,
 } from "../code-block";
 import type { HTMLAttributes } from "react";
 import { memo } from "react";
@@ -97,7 +98,7 @@ const components: Options["components"] = {
     </h6>
   ),
   pre: ({ node, className, children }) => {
-    let language = "javascript";
+    let language = "email";
 
     if (typeof node?.properties?.className === "string") {
       language = node.properties.className.replace("language-", "");
@@ -120,6 +121,37 @@ const components: Options["components"] = {
         code: (children.props as { children: string }).children,
       },
     ];
+
+    // Special styling for email code blocks
+    if (language === "email") {
+      return (
+        <div
+          className={cn(
+            "relative group my-8 py-4 border-y border-sidebar-border",
+            className
+          )}
+        >
+          <div className="absolute right-0 top-2">
+            <CodeBlockContext.Provider
+              value={{ value: language, onValueChange: undefined, data }}
+            >
+              <CodeBlockCopyButton
+                onCopy={() => console.log("Copied email to clipboard")}
+                onError={() =>
+                  console.error("Failed to copy email to clipboard")
+                }
+                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              />
+            </CodeBlockContext.Provider>
+          </div>
+          <div className="pr-12 prose max-w-none">
+            <div className="whitespace-pre-wrap font-sans text-foreground">
+              {data[0].code}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <CodeBlock
@@ -171,7 +203,7 @@ export const AIResponse = memo(
     return (
       <div
         className={cn(
-          "size-full prose prose-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          "size-full prose max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
           className
         )}
         {...props}

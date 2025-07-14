@@ -286,6 +286,16 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
             4. Maintains consistency with previous responses in this thread
             5. Follows legal communication best practices where appropriate
 
+            IMPORTANT: Format your response as follows:
+            - First, provide any analysis or context about the email (if needed)
+            - Then, place the actual email response inside a code block using triple backticks:
+            
+            \`\`\`email
+            [Your email response here]
+            \`\`\`
+            
+            The code block should contain ONLY the email text that the user would copy and send, without any meta-commentary.
+
             Note: If this appears to be a quick internal exchange, keep the response concise and conversational rather than overly formal.`;
 
         anthropicMessages.push({
