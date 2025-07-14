@@ -3,14 +3,23 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
-  mutation,
   query,
+  action,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
-import { attachmentValidator } from "./lib/validators";
 import { MICROSOFT_GRAPH_BASE_URL } from "./webhooks";
 import Reducto, { toFile } from "reductoai";
+import { attachmentValidator } from "./lib/validators";
+
+// Types for attachment handling
+interface EmailAttachmentData {
+  id?: string | null;
+  name?: string | null;
+  contentBytes?: string | null; // Base64 encoded
+  contentType?: string | null;
+  size?: number | null;
+}
 
 interface ProcessedAttachment {
   storageId: Id<"_storage">;
@@ -24,6 +33,11 @@ interface ProcessedAttachment {
 export const getMessageAttachments = query({
   args: { messageId: v.id("messages") },
   handler: async (ctx, args) => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
     const attachments = await ctx.db
       .query("messageAttachments")
       .withIndex("by_message_id", (q) => q.eq("messageId", args.messageId))
@@ -48,93 +62,228 @@ export const getMessageAttachments = query({
 export const getAttachmentUrl = query({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
     return await ctx.storage.getUrl(args.storageId);
   },
 });
 
-// Process multiple attachments for an email message
-export const processEmailAttachments = internalAction({
+// NEW: Frontend file upload action
+export const uploadUserFiles = action({
   args: {
-    emailId: v.optional(v.string()),
-    messageId: v.id("messages"),
-    userId: v.id("users"),
-    accessToken: v.string(),
-    attachments: v.optional(v.union(v.array(attachmentValidator), v.null())),
+    uploadId: v.string(),
+    files: v.array(
+      v.object({
+        data: v.bytes(),
+        name: v.string(),
+        type: v.string(),
+        size: v.number(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const processedAttachments: ProcessedAttachment[] = [];
+
+    try {
+      console.log(
+        `[ATTACHMENTS] Processing ${args.files.length} user-uploaded files`
+      );
+
+      for (const file of args.files) {
+        try {
+          // Store file in Convex storage
+          const blob = new Blob([file.data], { type: file.type });
+          const storageId = await ctx.storage.store(blob);
+
+          // Create attachment record
+          const attachmentId = await ctx.runMutation(
+            internal.attachments.createAttachmentRecord,
+            {
+              uploadId: args.uploadId,
+              userId,
+              storageId,
+              externalAttachmentId: `user_upload_${Date.now()}_${Math.random()}`,
+              name: file.name,
+              contentType: file.type,
+              size: file.size,
+              uploadStatus: "completed",
+              parsedContent: null, // No parsing for user uploads initially
+            }
+          );
+
+          processedAttachments.push({
+            storageId,
+            attachmentId,
+            name: file.name,
+            size: file.size,
+            contentType: file.type,
+          });
+        } catch (error) {
+          console.error(
+            `[ATTACHMENTS] Failed to upload file ${file.name}:`,
+            error
+          );
+        }
+      }
+
+      return processedAttachments;
+    } catch (error) {
+      console.error(`[ATTACHMENTS] Failed to process user uploads:`, error);
+      throw error;
+    }
+  },
+});
+
+// Helper function to validate and clean email attachment data
+function validateEmailAttachment(att: EmailAttachmentData): {
+  id: string;
+  name: string;
+  contentBytes: string;
+  contentType: string;
+  size: number;
+} | null {
+  // Check if all required fields are present and valid
+  if (
+    !att ||
+    !att.contentBytes ||
+    !att.contentType ||
+    att.size === null ||
+    att.size === undefined ||
+    att.size <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    id: att.id || `attachment_${Date.now()}_${Math.random()}`,
+    name: att.name || `Attachment ${Date.now()}`,
+    contentBytes: att.contentBytes,
+    contentType: att.contentType,
+    size: att.size,
+  };
+}
+
+// UPDATED: Email attachment processor with proper type handling
+export const processEmailAttachments = internalAction({
+  args: {
+    messageId: v.id("messages"),
+    userId: v.id("users"),
+    attachments: v.optional(v.union(v.array(attachmentValidator), v.null())),
+    emailId: v.optional(v.string()),
+    accessToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<ProcessedAttachment[]> => {
     const startTime = Date.now();
     const processedAttachments: ProcessedAttachment[] = [];
 
     if (!args.attachments || args.attachments.length === 0) {
       console.log("[ATTACHMENTS] No attachments to process");
-      return;
+      return processedAttachments;
     }
 
-    console.log(
-      `[ATTACHMENTS] Processing ${args.attachments.length} attachments for message ${args.messageId}`
-    );
-
-    // Process each attachment
-    for (const att of args.attachments) {
-      if (!att || !att.contentBytes || !att.contentType) {
-        console.warn("[ATTACHMENTS] Skipping invalid attachment:", att);
-        continue;
-      }
-
-      try {
-        // Decode base64 content
-        const binaryData = Buffer.from(att.contentBytes, "base64");
-        // Create blob for storage
-        const blob = new Blob([binaryData], { type: att.contentType });
-        // Store in Convex storage
-        const storageId = await ctx.storage.store(blob);
-
-        const name = att.name || `Attachment ${Date.now()}`;
-
-        const reductoContent = await processAttachmentWithReducto(
-          args.emailId,
-          att.id || "",
-          att.contentBytes,
-          name,
-          args.accessToken
-        );
-
-        // Create attachment record
-        const attachmentId = await ctx.runMutation(
-          internal.attachments.createAttachmentRecord,
-          {
-            messageId: args.messageId,
-            userId: args.userId,
-            storageId,
-            externalAttachmentId: att.id || "",
-            name,
-            parsedContent: reductoContent,
-            contentType: att.contentType || "application/pdf",
-            size: att.size || 0,
-            uploadStatus: "completed",
-          }
-        );
-
-        processedAttachments.push({
-          storageId,
-          attachmentId,
-          name,
-          size: att.size || 0,
-          contentType: att.contentType,
-        });
-      } catch (error) {
-        console.error(
-          `[ATTACHMENTS] Failed to process attachment ${att.name}:`,
-          error
-        );
-      }
-
-      const duration = Date.now() - startTime;
+    try {
       console.log(
-        `[ATTACHMENTS] Processed ${processedAttachments.length}/${args.attachments.length} attachments in ${duration}ms`
+        `[ATTACHMENTS] Processing ${args.attachments.length} email attachments for message ${args.messageId}`
       );
 
+      // Process each attachment
+      for (const rawAttachment of args.attachments) {
+        // Validate and clean the attachment data
+        const attachment = validateEmailAttachment(rawAttachment);
+
+        if (!attachment) {
+          console.warn(
+            "[ATTACHMENTS] Skipping invalid attachment:",
+            rawAttachment
+          );
+          continue;
+        }
+
+        try {
+          const binaryData = base64ToUint8Array(attachment.contentBytes);
+
+          // Create blob for storage
+          const blob = new Blob([binaryData], { type: attachment.contentType });
+
+          // Store in Convex storage
+          const storageId = await ctx.storage.store(blob);
+
+          // Process with Reducto if we have access token and email ID
+          let parsedContent = null;
+          if (args.accessToken && args.emailId) {
+            try {
+              parsedContent = await processAttachmentWithReducto(
+                args.emailId,
+                attachment.id,
+                attachment.contentBytes,
+                attachment.name,
+                args.accessToken
+              );
+            } catch (error) {
+              console.warn(
+                `[ATTACHMENTS] Reducto processing failed for ${attachment.name}:`,
+                error
+              );
+              // Continue without parsed content
+            }
+          }
+
+          // Create attachment record
+          const attachmentId = await ctx.runMutation(
+            internal.attachments.createAttachmentRecord,
+            {
+              messageId: args.messageId,
+              userId: args.userId,
+              storageId,
+              externalAttachmentId: attachment.id,
+              name: attachment.name,
+              contentType: attachment.contentType,
+              size: attachment.size,
+              uploadStatus: "completed",
+              parsedContent,
+              metadata: {
+                source: "email",
+                contentParsed: !!parsedContent,
+                downloadedAt: Date.now(),
+              },
+            }
+          );
+
+          processedAttachments.push({
+            storageId,
+            attachmentId,
+            name: attachment.name,
+            size: attachment.size,
+            contentType: attachment.contentType,
+          });
+        } catch (error) {
+          console.error(
+            `[ATTACHMENTS] Failed to process attachment ${attachment.name}:`,
+            error
+          );
+        }
+
+        const duration = Date.now() - startTime;
+        console.log(
+          `[ATTACHMENTS] Processed ${processedAttachments.length}/${args.attachments.length} email attachments in ${duration}ms`
+        );
+      }
       return processedAttachments;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(
+        `[ATTACHMENTS] Failed to process email attachments for message ${args.messageId}:`,
+        error
+      );
+
+      throw error;
     }
   },
 });
@@ -142,7 +291,8 @@ export const processEmailAttachments = internalAction({
 // Create attachment record in database
 export const createAttachmentRecord = internalMutation({
   args: {
-    messageId: v.id("messages"),
+    messageId: v.optional(v.id("messages")),
+    uploadId: v.optional(v.string()),
     userId: v.id("users"),
     storageId: v.id("_storage"),
     externalAttachmentId: v.string(),
@@ -155,19 +305,25 @@ export const createAttachmentRecord = internalMutation({
       v.literal("completed"),
       v.literal("failed")
     ),
-    parsedContent: v.union(v.string(), v.null()),
+    parsedContent: v.optional(v.union(v.string(), v.null())),
     metadata: v.optional(
       v.object({
         pageCount: v.optional(v.number()),
         processingTime: v.optional(v.number()),
         originalUrl: v.optional(v.string()),
         downloadedAt: v.optional(v.number()),
+        source: v.optional(
+          v.union(v.literal("email"), v.literal("user_upload"))
+        ),
+        contentParsed: v.optional(v.boolean()),
+        parsingError: v.optional(v.string()),
       })
     ),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messageAttachments", {
       messageId: args.messageId,
+      uploadId: args.uploadId,
       userId: args.userId,
       storageId: args.storageId,
       externalAttachmentId: args.externalAttachmentId,
@@ -273,33 +429,9 @@ export const deleteAttachmentRecord = internalMutation({
   },
 });
 
-export const generateUploadUrl = mutation({
-  handler: async (ctx) => {
-    return await ctx.storage.generateUploadUrl();
-  },
-});
-
-// export const sendFile = mutation({
-//   args: {
-//     messageId: v.id("messages"),
-//     storageId: v.id("_storage"),
-//     author: v.string(),
-//     fileType: v.string(),
-//   },
-//   handler: async (ctx, args) => {
-//     const userId = await ctx.runQuery(api.auth.loggedInUserId);
-//     await ctx.db.insert("messageAttachments", {
-//       storageId: args.storageId,
-//       userId: userId,
-//       contentType: args.fileType,
-//       uploadStatus: "pending",
-//       size,
-//     });
-//   },
-// });
-
-export async function processAttachmentWithReducto(
-  emailId: string | undefined,
+// Placeholder for Reducto processing - implement based on your needs
+async function processAttachmentWithReducto(
+  emailId: string,
   attachmentId: string,
   attachmentBytes: string | undefined | null,
   attachmentName: string,

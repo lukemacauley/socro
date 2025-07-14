@@ -5,10 +5,10 @@ import {
   internalMutation,
   internalAction,
   action,
-  mutation,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { verifyThreadOwnership } from "./threads";
+import { type Id } from "./_generated/dataModel";
 
 export const getMessages = query({
   args: { threadId: v.id("threads") },
@@ -52,10 +52,16 @@ export const sendMessage = action({
     content: v.string(),
     threadId: v.id("threads"),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    userMessageId: Id<"messages">;
+    responseMessageId: Id<"messages">;
+  }> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
 
-    const { responseMessageId } = await ctx.runMutation(
+    const { userMessageId, responseMessageId } = await ctx.runMutation(
       internal.messages.insertWithResponsePlaceholder,
       {
         threadId: args.threadId,
@@ -68,6 +74,11 @@ export const sendMessage = action({
       threadId: args.threadId,
       responseMessageId,
     });
+
+    return {
+      userMessageId,
+      responseMessageId,
+    };
   },
 });
 

@@ -64,7 +64,8 @@ const applicationTables = {
   }).index("by_message", ["messageId", "chunkIndex"]),
 
   messageAttachments: defineTable({
-    messageId: v.id("messages"),
+    messageId: v.optional(v.id("messages")),
+    uploadId: v.optional(v.string()), // For frontend uploads"
     userId: v.id("users"),
     storageId: v.id("_storage"),
     externalAttachmentId: v.string(),
@@ -77,11 +78,18 @@ const applicationTables = {
       v.literal("completed"),
       v.literal("failed")
     ),
-    parsedContent: v.union(v.string(), v.null()), // For parsed content from Reducto
+    parsedContent: nullOrUndefinedString, // For parsed content from Reducto
     metadata: v.optional(
       v.object({
         pageCount: v.optional(v.number()),
         processingTime: v.optional(v.number()),
+        originalUrl: v.optional(v.string()),
+        downloadedAt: v.optional(v.number()),
+        source: v.optional(
+          v.union(v.literal("email"), v.literal("user_upload"))
+        ),
+        contentParsed: v.optional(v.boolean()),
+        parsingError: v.optional(v.string()),
       })
     ),
   })

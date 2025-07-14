@@ -203,7 +203,6 @@ export const processIncomingEmail = internalMutation({
     // Create message for the received email
     const emailMessageId = await ctx.db.insert("messages", {
       content: args.content,
-      attachments: args.attachments,
       userId,
       threadId,
       messageType: isSentEmail ? "sent_email" : "received_email",
