@@ -10,12 +10,12 @@ type Attachment =
 
 export const AttachmentList = memo(function AttachmentList({
   attachments,
-  onDownload,
 }: {
   attachments: Attachment[];
-  onDownload: (attachmentId: string, fileName: string) => void;
 }) {
-  if (!attachments || attachments.length === 0) return null;
+  if (!attachments || attachments.length === 0) {
+    return null;
+  }
 
   return (
     <div className="w-full mt-3 border-t pt-3">
