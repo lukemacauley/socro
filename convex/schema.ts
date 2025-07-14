@@ -29,6 +29,7 @@ const applicationTables = {
     externalSubscriptionId: v.optional(v.string()),
     userId: v.id("users"),
     subject: v.string(),
+    contentPreview: nullOrUndefinedString,
     fromParticipants: emailParticipant,
     toParticipants: v.array(emailParticipant),
     lastActivityAt: v.number(),

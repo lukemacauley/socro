@@ -1,5 +1,4 @@
 import { useCallback, memo, useMemo } from "react";
-import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
 import {
@@ -42,14 +41,12 @@ function MessageItem({
     message.messageType === "received_email" ||
     message.messageType === "sent_email";
 
-  // const downloadAttachment = useAction(api.webhooks.downloadAttachment);
-
   const handleDownloadAttachment = useCallback(
-    async (emailId: string, attachmentId: string, fileName: string) => {
+    async (attachmentId: string, fileName: string) => {
       try {
         toast.info("Downloading attachment...");
 
-        const result = message.attachments?.find((a) => a.id === attachmentId);
+        const result = message.attachments?.find((a) => a._id === attachmentId);
 
         if (result?.contentType) {
           const byteCharacters = atob(result.contentType); // NEEDS FIX: SHOULD BE RESULT.CONTENT
@@ -92,18 +89,14 @@ function MessageItem({
       ) : isEmail ? (
         <AIMessageContent className="whitespace-pre-wrap">
           {message.content}
-          {/* {message.attachments && message.threadId && (
-            <AttachmentList
-              attachments={message.attachments}
-              onDownload={(attachmentId, fileName) =>
-                handleDownloadAttachment(
-                  message.threadId,
-                  attachmentId,
-                  fileName
-                )
-              }
-            />
-          )} */}
+          {message.attachments &&
+            message.attachments.length > 0 &&
+            message.threadId && (
+              <AttachmentList
+                attachments={message.attachments}
+                onDownload={handleDownloadAttachment}
+              />
+            )}
         </AIMessageContent>
       ) : (
         <AIMessageContent>{message.content}</AIMessageContent>

@@ -1,14 +1,12 @@
 import { internalMutation, internalAction } from "./_generated/server";
 import { v } from "convex/values";
-import { internal, api } from "./_generated/api";
-import Reducto, { toFile } from "reductoai";
+import { internal } from "./_generated/api";
 import { createClerkClient } from "@clerk/backend";
-import type {
-  Attachment,
-  FileAttachment,
-  Message,
-  Subscription,
-} from "@microsoft/microsoft-graph-types";
+import type { Subscription } from "@microsoft/microsoft-graph-types";
+import {
+  fetchEmailFromMicrosoft,
+  isProcessedFileAttachment,
+} from "./lib/email";
 
 // ==================== Constants ====================
 export const MICROSOFT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
@@ -44,7 +42,7 @@ export const fetchAndProcessEmail = internalAction({
       return;
     }
 
-    console.log({ attachments: email.attachments });
+    const attachments = email.attachments?.filter(isProcessedFileAttachment);
 
     const { responseMessageId, threadId } = await ctx.runMutation(
       internal.threads.processIncomingEmail,
@@ -59,15 +57,16 @@ export const fetchAndProcessEmail = internalAction({
             email: r.emailAddress?.address,
             name: r.emailAddress?.name,
           })) || [],
-        externalThreadId: email.id,
+        externalThreadId: email.conversationId ?? "",
         lastActivityAt: email.receivedDateTime
           ? new Date(email.receivedDateTime).getTime()
           : Date.now(),
         status: "new",
         externalSubscriptionId: args.subscriptionId,
-        content: email.bodyPreview,
+        content: email.body?.content,
+        contentPreview: email.bodyPreview,
         hasAttachments: email.hasAttachments,
-        attachments: email.attachments?.map((a) => ({
+        attachments: attachments?.map((a) => ({
           id: a.id,
           name: a.name,
           contentBytes: a.contentBytes,
@@ -243,107 +242,6 @@ export const getMicrosoftAccessToken = async (
     throw new Error(`Failed to get Microsoft access token: ${error}`);
   }
 };
-
-async function fetchEmailFromMicrosoft(accessToken: string, emailId: string) {
-  try {
-    console.log("[WEBHOOK] Fetching email from Microsoft Graph API...");
-    const response = await fetch(
-      `${MICROSOFT_GRAPH_BASE_URL}/me/messages/${emailId}?$expand=attachments`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[WEBHOOK] Microsoft Graph API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-      });
-      return null;
-    }
-
-    const email: Message = await response.json();
-
-    console.log("[WEBHOOK] Successfully fetched email:", {
-      id: email.id,
-      subject: email.subject,
-      from: email.from?.emailAddress?.address,
-      attachmentCount: email.attachments?.length || 0,
-    });
-
-    // Process attachments and ensure all have content
-    if (email.attachments && email.attachments.length > 0) {
-      const processedAttachments: FileAttachment[] = [];
-
-      for (const attachment of email.attachments) {
-        if (
-          (attachment as any)["@odata.type"] ===
-          "#microsoft.graph.fileAttachment"
-        ) {
-          const fileAttachment = attachment as FileAttachment;
-
-          if (!fileAttachment.contentBytes) {
-            // Large file - need to fetch separately
-            console.log(
-              `[WEBHOOK] Fetching large attachment: ${fileAttachment.name}`
-            );
-
-            const attachmentResponse = await fetch(
-              `${MICROSOFT_GRAPH_BASE_URL}/me/messages/${emailId}/attachments/${attachment.id}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                },
-              }
-            );
-
-            if (!attachmentResponse.ok) {
-              console.error(
-                `[WEBHOOK] Failed to fetch attachment ${attachment.id}`
-              );
-              continue;
-            }
-
-            const fullAttachment: FileAttachment =
-              await attachmentResponse.json();
-            fileAttachment.contentBytes = fullAttachment.contentBytes;
-          }
-
-          processedAttachments.push(fileAttachment);
-        } else if (
-          (attachment as any)["@odata.type"] ===
-          "#microsoft.graph.itemAttachment"
-        ) {
-          // Handle item attachments (e.g., attached emails, calendar items)
-          console.log(`[WEBHOOK] Item attachment found: ${attachment.name}`);
-          processedAttachments.push(attachment);
-        }
-      }
-
-      // Replace attachments with fully loaded versions
-      email.attachments = processedAttachments;
-      console.log(
-        `[WEBHOOK] Processed ${processedAttachments.length} attachments`
-      );
-    }
-
-    return {
-      ...email,
-      attachments: email?.attachments as FileAttachment[] | null | undefined,
-    };
-  } catch (error) {
-    console.error(
-      "[WEBHOOK] Error fetching email from Microsoft Graph:",
-      error
-    );
-    return null;
-  }
-}
 
 export const createMicrosoftSubscription = async (
   webhookUrl: string,

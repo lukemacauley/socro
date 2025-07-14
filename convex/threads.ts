@@ -83,9 +83,15 @@ export const getThread = query({
       .order("asc")
       .collect();
 
-    // Get streaming chunks for assistant messages
-    const messagesWithChunks = await Promise.all(
+    // Get streaming chunks and attachments for messages
+    const messagesWithDetails = await Promise.all(
       messages.map(async (message) => {
+        // Get attachments for this message
+        const attachments = await ctx.db
+          .query("messageAttachments")
+          .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
+          .collect();
+
         if (message.role === "ai" && message.isStreaming) {
           const chunks = await ctx.db
             .query("streamingChunks")
@@ -98,15 +104,19 @@ export const getThread = query({
             ...message,
             content: streamedContent || message.content,
             chunks: chunks.length,
+            attachments,
           };
         }
-        return message;
+        return {
+          ...message,
+          attachments,
+        };
       })
     );
 
     return {
       thread,
-      messages: messagesWithChunks,
+      messages: messagesWithDetails,
     };
   },
 });
@@ -129,6 +139,7 @@ export const processIncomingEmail = internalMutation({
     status: threadStatus,
     externalSubscriptionId: v.string(),
     content: nullOrUndefinedString,
+    contentPreview: nullOrUndefinedString,
     hasAttachments: nullOrUndefinedBoolean,
     attachments: v.optional(
       v.union(
@@ -185,6 +196,7 @@ export const processIncomingEmail = internalMutation({
         lastActivityAt: args.lastActivityAt,
         status: args.status,
         threadType: "email",
+        contentPreview: args.contentPreview,
         externalSubscriptionId: args.externalSubscriptionId,
         userId,
       });
@@ -197,8 +209,6 @@ export const processIncomingEmail = internalMutation({
     }
 
     const isSentEmail = args.fromParticipants.email === user.email;
-
-    console.log({ content: args.content });
 
     // Create message for the received email
     const emailMessageId = await ctx.db.insert("messages", {

@@ -22,9 +22,16 @@ export const getMessages = query({
       .order("asc")
       .collect();
 
-    // Get streaming chunks for assistant messages
-    const messagesWithChunks = await Promise.all(
+    // Get streaming chunks and attachments for messages
+    const messagesWithDetails = await Promise.all(
       messages.map(async (message) => {
+        // Get attachments for this message
+        const attachments = await ctx.db
+          .query("messageAttachments")
+          .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
+          .collect();
+
+        // Get streaming chunks if it's an AI message
         if (message.role === "ai" && message.isStreaming) {
           const chunks = await ctx.db
             .query("streamingChunks")
@@ -37,13 +44,18 @@ export const getMessages = query({
             ...message,
             content: streamedContent || message.content,
             chunks: chunks.length,
+            attachments,
           };
         }
-        return message;
+        
+        return {
+          ...message,
+          attachments,
+        };
       })
     );
 
-    return messagesWithChunks;
+    return messagesWithDetails;
   },
 });
 
@@ -204,10 +216,26 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
         const previousMessages = messages
           .slice(0, -1)
           .filter((msg) => msg.content?.trim() !== "")
-          .map((msg) => ({
-            role: msg.role === "user" ? "user" : "assistant",
-            content: msg.content || "",
-          }));
+          .map((msg) => {
+            let content = msg.content || "";
+            
+            // Add attachment information if present
+            if (msg.attachments && msg.attachments.length > 0) {
+              content += "\n\n[Attachments:";
+              msg.attachments.forEach((att) => {
+                content += `\n- ${att.name} (${att.contentType}, ${(att.size / 1024).toFixed(2)} KB)`;
+                if (att.parsedContent) {
+                  content += `\n  Content:\n${att.parsedContent}`;
+                }
+              });
+              content += "]";
+            }
+            
+            return {
+              role: msg.role === "user" ? "user" : "assistant",
+              content,
+            };
+          });
         anthropicMessages.push(...previousMessages);
       }
 
@@ -217,9 +245,7 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
 
       // Format the request for response to the most recent message
       if (mostRecentMessage) {
-        anthropicMessages.push({
-          role: "user",
-          content: `Based on the conversation history above, please draft an appropriate response to this most recent email:
+        let emailContent = `Based on the conversation history above, please draft an appropriate response to this most recent email:
             ---
             From: ${
               thread?.fromParticipants.name ||
@@ -233,7 +259,20 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
             }
 
             Email Content:
-            ${mostRecentMessage.content}
+            ${mostRecentMessage.content}`;
+
+        // Add attachment information for the most recent message
+        if (mostRecentMessage.attachments && mostRecentMessage.attachments.length > 0) {
+          emailContent += "\n\nAttachments in this email:";
+          mostRecentMessage.attachments.forEach((att) => {
+            emailContent += `\n- ${att.name} (${att.contentType}, ${(att.size / 1024).toFixed(2)} KB)`;
+            if (att.parsedContent) {
+              emailContent += `\n  Full Content:\n${att.parsedContent}`;
+            }
+          });
+        }
+
+        emailContent += `
             ---
 
             Please draft a response that:
@@ -247,7 +286,11 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
             4. Maintains consistency with previous responses in this thread
             5. Follows legal communication best practices where appropriate
 
-            Note: If this appears to be a quick internal exchange, keep the response concise and conversational rather than overly formal.`,
+            Note: If this appears to be a quick internal exchange, keep the response concise and conversational rather than overly formal.`;
+
+        anthropicMessages.push({
+          role: "user",
+          content: emailContent,
         });
       }
 
@@ -349,12 +392,29 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
 export const getThreadHistory = internalQuery({
   args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const messages = await ctx.db
       .query("messages")
       .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
       .filter((q) => q.neq(q.field("isStreaming"), true))
       .order("asc")
       .collect();
+
+    // Get attachments for each message
+    const messagesWithAttachments = await Promise.all(
+      messages.map(async (message) => {
+        const attachments = await ctx.db
+          .query("messageAttachments")
+          .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
+          .collect();
+        
+        return {
+          ...message,
+          attachments,
+        };
+      })
+    );
+
+    return messagesWithAttachments;
   },
 });
 
