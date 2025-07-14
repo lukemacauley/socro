@@ -80,8 +80,8 @@ function AttachmentItem({ att }: { att: Attachment }) {
         <div>
           <p className="text-sm font-medium">{att.name}</p>
           <p className="text-xs text-muted-foreground">
-            {att.contentType} •{" "}
-            {att.size ? `${att.size / 1024}.toFixed(1) KB` : null}
+            {att.contentType}
+            {att.size ? `• ${(att.size / 1024).toFixed(1)} KB` : null}
           </p>
         </div>
       </div>
