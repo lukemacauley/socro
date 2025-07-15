@@ -1,53 +1,29 @@
 import { memo } from "react";
-import { Paperclip, Download } from "lucide-react";
-import { Button } from "~/components/ui/button";
+import { api } from "convex/_generated/api";
+import AttachmentButton from "./AttachmentButton";
 
-interface Attachment {
-  id: string;
-  name: string;
-  contentType: string;
-  size: number;
-}
+type Attachment =
+  (typeof api.messages.getMessages._returnType)[number]["attachments"][number];
 
 export const AttachmentList = memo(function AttachmentList({
   attachments,
-  onDownload,
 }: {
   attachments: Attachment[];
-  onDownload: (attachmentId: string, fileName: string) => void;
 }) {
-  if (!attachments || attachments.length === 0) return null;
+  if (!attachments || attachments.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="w-full mt-3 border-t pt-3">
-      <p className="text-sm font-medium mb-2">
-        Attachments ({attachments.length})
-      </p>
-      <div className="space-y-2">
-        {attachments.map((attachment) => (
-          <div
-            key={attachment.id}
-            className="flex items-center justify-between p-2 rounded-lg"
-          >
-            <div className="flex items-center space-x-2">
-              <Paperclip className="size-5" />
-              <div>
-                <p className="text-sm font-medium">{attachment.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {attachment.contentType} •{" "}
-                  {(attachment.size / 1024).toFixed(1)} KB
-                </p>
-              </div>
-            </div>
-            <Button
-              size="icon"
-              onClick={() => onDownload(attachment.id, attachment.name)}
-            >
-              <Download />
-            </Button>
-          </div>
-        ))}
-      </div>
+    <div className="flex items-center justify-start gap-4 py-2 overflow-auto scrollbar-hide mt-4">
+      {attachments?.map((att) => (
+        <AttachmentButton
+          key={att._id}
+          name={att.name}
+          storageId={att.storageId}
+          type={att.contentType.split("/")[1]}
+        />
+      ))}
     </div>
   );
 });

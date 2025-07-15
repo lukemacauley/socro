@@ -301,7 +301,7 @@ type CodeBlockContextType = {
   data: CodeBlockData[];
 };
 
-const CodeBlockContext = createContext<CodeBlockContextType>({
+export const CodeBlockContext = createContext<CodeBlockContextType>({
   value: undefined,
   onValueChange: undefined,
   data: [],
@@ -346,7 +346,7 @@ export const CodeBlockHeader = ({
 }: CodeBlockHeaderProps) => (
   <div
     className={cn(
-      "flex flex-row items-center border-b bg-secondary p-1",
+      "flex flex-row items-center justify-end border-b bg-background p-1",
       className
     )}
     {...props}
@@ -407,7 +407,7 @@ export const CodeBlockFilename = ({
 
   return (
     <div
-      className="flex items-center gap-2 bg-secondary px-4 py-1.5 text-muted-foreground text-xs"
+      className="flex items-center gap-2 bg-background px-4 py-1.5 text-muted-foreground text-xs"
       {...props}
     >
       {Icon && <Icon className="h-4 w-4 shrink-0" />}
@@ -521,6 +521,7 @@ export const CodeBlockCopyButton = ({
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"
+      tooltip="Copy email"
       {...props}
     >
       {children ?? <Icon className="text-muted-foreground" size={14} />}

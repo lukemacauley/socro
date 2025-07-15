@@ -1,3 +1,6 @@
+import { useQuery } from "convex-helpers/react/cache";
+import { api } from "convex/_generated/api";
+import type { Id } from "convex/_generated/dataModel";
 import { Outlet, useLocation, Link } from "react-router";
 import { Fragment } from "react/jsx-runtime";
 import { AppSidebar } from "~/components/app-sidebar";
@@ -20,12 +23,13 @@ export default function Layout() {
   const location = useLocation();
   const pathSegments = location.pathname.split("/").filter(Boolean);
 
-  // Build breadcrumb items based on current path
   const breadcrumbItems: {
     label: string;
     href: string;
     isLast: boolean;
   }[] = [];
+
+  let isId = false;
 
   // // Always show Home as first item
   // breadcrumbItems.push({
@@ -42,12 +46,13 @@ export default function Layout() {
 
     // Format the label
     let label = segment;
-    if (segment === "emails") {
-      label = "Emails";
+    if (segment === "threads") {
+      label = "Threads";
     } else if (segment === "new") {
       label = "New";
     } else {
-      label = "Conversation";
+      label = "";
+      isId = true;
     }
 
     breadcrumbItems.push({
@@ -57,11 +62,18 @@ export default function Layout() {
     });
   });
 
+  const threadId = pathSegments.pop();
+
+  const threadName = useQuery(
+    api.threads.getThreadName,
+    isId && threadId ? { id: threadId as Id<"threads"> } : "skip"
+  );
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
+        <header className="sticky w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -74,7 +86,9 @@ export default function Layout() {
                   <Fragment key={index}>
                     <BreadcrumbItem>
                       {item.isLast ? (
-                        <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                        <BreadcrumbPage>
+                          {threadName || item.label}
+                        </BreadcrumbPage>
                       ) : (
                         <BreadcrumbLink asChild>
                           <Link to={item.href}>{item.label}</Link>

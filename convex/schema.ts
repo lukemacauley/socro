@@ -1,9 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
-  conversationStatus,
+  threadStatus,
+  emailParticipant,
   messageType,
   attachmentValidator,
+  nullOrUndefinedString,
 } from "./lib/validators";
 
 const applicationTables = {
@@ -14,48 +16,47 @@ const applicationTables = {
     imageUrl: v.optional(v.string()),
     createdAt: v.number(),
     lastActiveAt: v.optional(v.number()),
+    externalSubscriptionId: v.optional(v.string()),
+    responseTemplate: v.optional(v.string()),
   })
     .index("by_external_id", ["externalId"])
+    .index("by_subscription_id", ["externalSubscriptionId"])
     .index("by_email", ["email"]),
 
-  conversations: defineTable({
-    threadId: v.string(), // Microsoft Graph conversation ID - unique thread identifier
+  threads: defineTable({
+    threadType: v.union(v.literal("chat"), v.literal("email")),
+    externalThreadId: v.optional(v.string()), // Microsoft Graph conversation ID
+    externalSubscriptionId: v.optional(v.string()),
     userId: v.id("users"),
     subject: v.string(),
-    status: conversationStatus,
-    // Thread metadata
-    participants: v.array(
-      v.object({
-        email: v.string(),
-        name: v.optional(v.string()),
-      })
-    ),
-    createdAt: v.number(),
-    lastActivity: v.number(),
-    agentThreadId: v.optional(v.string()), // ID for agent-specific threads
+    contentPreview: nullOrUndefinedString,
+    fromParticipants: emailParticipant,
+    toParticipants: v.array(emailParticipant),
+    lastActivityAt: v.number(),
+    status: v.optional(threadStatus),
+    processed: v.optional(v.boolean()),
   })
-    .index("by_user", ["userId"])
+    .index("by_user_id", ["userId"])
     .index("by_status", ["status"])
-    .index("by_thread", ["threadId", "userId"]),
+    .index("by_external_id", ["externalThreadId"])
+    .index("by_external_subscription_id", ["externalSubscriptionId"])
+    .index("by_type", ["threadType"])
+    .index("by_processed", ["processed"]),
+
   messages: defineTable({
-    conversationId: v.id("conversations"),
+    threadId: v.id("threads"),
     userId: v.id("users"),
-    content: v.string(),
-    role: v.union(v.literal("user"), v.literal("assistant")),
-    type: messageType,
-    sender: v.optional(v.string()), // email sender or "ai" or user ID
-    timestamp: v.number(),
-    emailId: v.optional(v.string()), // Microsoft Graph message ID if applicable
-    attachments: v.optional(v.array(attachmentValidator)),
-    streamId: v.optional(v.string()), // ID for persistent streaming
-    isStreaming: v.optional(v.boolean()), // Whether this message is part of a streaming response
-    streamingComplete: v.optional(v.boolean()), // Whether the streaming response is complete
+    content: nullOrUndefinedString,
+    role: v.union(v.literal("user"), v.literal("ai"), v.literal("system")),
+    messageType: messageType,
+    attachments: v.optional(v.union(v.array(attachmentValidator), v.null())),
+    isStreaming: v.optional(v.boolean()),
+    streamingComplete: v.optional(v.boolean()),
+    threadType: v.optional(v.union(v.literal("chat"), v.literal("email"))),
   })
-    .index("by_conversation", ["conversationId"])
-    .index("by_timestamp", ["timestamp"])
-    .index("by_email_id", ["emailId"])
-    .index("by_streamId", ["streamId"])
-    .index("by_user", ["userId"]),
+    .index("by_thread_id", ["threadId"])
+    .index("by_type", ["threadType"])
+    .index("by_user_id", ["userId"]),
 
   streamingChunks: defineTable({
     messageId: v.id("messages"),
@@ -63,28 +64,41 @@ const applicationTables = {
     chunkIndex: v.number(),
   }).index("by_message", ["messageId", "chunkIndex"]),
 
-  userSettings: defineTable({
+  messageAttachments: defineTable({
+    messageId: v.optional(v.id("messages")),
+    uploadId: v.optional(v.string()), // For frontend uploads"
     userId: v.id("users"),
-    webhookSubscriptionId: v.optional(v.string()),
-    autoResponseEnabled: v.boolean(),
-    responseTemplate: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
-
-  processedAttachments: defineTable({
-    conversationId: v.id("conversations"),
-    attachmentId: v.string(),
-    attachmentName: v.string(),
-    content: v.string(),
+    storageId: v.id("_storage"),
+    externalAttachmentId: v.string(),
+    name: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    uploadStatus: v.union(
+      v.literal("pending"),
+      v.literal("uploading"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    parsedContent: nullOrUndefinedString, // For parsed content from Reducto
     metadata: v.optional(
       v.object({
         pageCount: v.optional(v.number()),
         processingTime: v.optional(v.number()),
+        originalUrl: v.optional(v.string()),
+        downloadedAt: v.optional(v.number()),
+        source: v.optional(
+          v.union(v.literal("email"), v.literal("user_upload"))
+        ),
+        contentParsed: v.optional(v.boolean()),
+        parsingError: v.optional(v.string()),
       })
     ),
-    processedAt: v.number(),
   })
-    .index("by_conversation", ["conversationId"])
-    .index("by_attachment_id", ["attachmentId"]),
+    .index("by_message_id", ["messageId"])
+    .index("by_user_id", ["userId"])
+    .index("by_storage_id", ["storageId"])
+    .index("by_upload_status", ["uploadStatus"])
+    .index("by_external_attachment_id", ["externalAttachmentId"]),
 };
 
 export default defineSchema({

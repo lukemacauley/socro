@@ -14,12 +14,14 @@ import {
   CodeBlockSelectItem,
   CodeBlockSelectTrigger,
   CodeBlockSelectValue,
+  CodeBlockContext,
 } from "../code-block";
 import type { HTMLAttributes } from "react";
 import { memo } from "react";
 import ReactMarkdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "~/lib/utils";
+import { Badge } from "../../ui/badge";
 
 export type AIResponseProps = HTMLAttributes<HTMLDivElement> & {
   options?: Options;
@@ -97,7 +99,7 @@ const components: Options["components"] = {
     </h6>
   ),
   pre: ({ node, className, children }) => {
-    let language = "javascript";
+    let language = "email";
 
     if (typeof node?.properties?.className === "string") {
       language = node.properties.className.replace("language-", "");
@@ -120,6 +122,38 @@ const components: Options["components"] = {
         code: (children.props as { children: string }).children,
       },
     ];
+
+    // Special styling for email code blocks
+    if (language === "email") {
+      return (
+        <div
+          className={cn(
+            "relative group",
+            // "mt-8 pt-8 border-t-4 border-double border-sidebar-border",
+            className
+          )}
+        >
+          <div className="flex items-center gap-4">
+            <div className="h-[1px] w-full flex-1 bg-muted" />
+            <Badge variant="muted">Email response below</Badge>
+          </div>
+          <div className="absolute right-0 top-8">
+            <CodeBlockContext.Provider
+              value={{ value: language, onValueChange: undefined, data }}
+            >
+              <CodeBlockCopyButton
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onCopy={console.log}
+                onError={console.error}
+              />
+            </CodeBlockContext.Provider>
+          </div>
+          <div className="pr-12 mt-4 prose max-w-none">
+            <ReactMarkdown>{data[0].code}</ReactMarkdown>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <CodeBlock
@@ -171,7 +205,7 @@ export const AIResponse = memo(
     return (
       <div
         className={cn(
-          "size-full prose prose-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          "size-full prose prose-p:text-primary prose-li:text-primary prose-strong:text-primary prose-headings:text-primary max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
           className
         )}
         {...props}

@@ -38,9 +38,9 @@ export const NAVIGATION: {
 }[] = [
   { title: "Assistant", icon: MessageSquare, url: "/assistant" },
   {
-    title: "Emails",
+    title: "Threads",
     icon: MessagesSquare,
-    url: "/emails",
+    url: "/threads",
     // isActive: true,
     // items: [
     //   { title: "All", url: "/emails" },
@@ -63,8 +63,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <Link to="/" className="px-2">
-          <h1 className="font-bold text-xl tracking-wide leading-relaxed text-primary uppercase transition-all">
-            {state === "collapsed" ? "C" : "CONGAS"}
+          <h1 className="font-medium text-xl tracking-tight leading-relaxed text-primary">
+            {state === "collapsed" ? "C" : "Congas"}
           </h1>
         </Link>
       </SidebarHeader>
