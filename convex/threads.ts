@@ -15,50 +15,30 @@ import {
 } from "./lib/validators";
 import type { DataModel, Id } from "./_generated/dataModel";
 
-type ThreadWithLatestMessage = DataModel["threads"]["document"] & {
-  latestMessage?: DataModel["messages"]["document"] | null;
-};
+type Thread = DataModel["threads"]["document"];
 
 export const getThreads = query({
   args: {
     threadType: v.optional(v.union(v.literal("chat"), v.literal("email"))),
   },
-  handler: async (ctx, args): Promise<Array<ThreadWithLatestMessage>> => {
+  handler: async (ctx, args): Promise<Thread[]> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
     if (!userId) {
       throw new Error("Not authenticated");
     }
 
-    const threads = args.threadType
+    return args.threadType
       ? await ctx.db
           .query("threads")
-          .withIndex("by_type", (q) => q.eq("threadType", args.threadType!))
-          .filter((q) => q.eq(q.field("userId"), userId))
+          .withIndex("by_user_id", (q) => q.eq("userId", userId))
+          .filter((q) => q.eq(q.field("threadType"), args.threadType))
           .order("desc")
           .collect()
       : await ctx.db
           .query("threads")
-          .filter((q) => q.eq(q.field("userId"), userId))
+          .withIndex("by_user_id", (q) => q.eq("userId", userId))
           .order("desc")
           .collect();
-
-    // Get message counts and latest message for each thread
-    const threadsWithDetails = await Promise.all(
-      threads.map(async (thread) => {
-        const message = await ctx.db
-          .query("messages")
-          .withIndex("by_thread_id", (q) => q.eq("threadId", thread._id))
-          .order("desc")
-          .first();
-
-        return {
-          ...thread,
-          latestMessage: message,
-        };
-      })
-    );
-
-    return threadsWithDetails;
   },
 });
 

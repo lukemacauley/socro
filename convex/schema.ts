@@ -36,7 +36,7 @@ const applicationTables = {
     status: v.optional(threadStatus),
     processed: v.optional(v.boolean()),
   })
-    .index("by_user_ud", ["userId"])
+    .index("by_user_id", ["userId"])
     .index("by_status", ["status"])
     .index("by_external_id", ["externalThreadId"])
     .index("by_external_subscription_id", ["externalSubscriptionId"])

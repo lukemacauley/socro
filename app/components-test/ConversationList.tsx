@@ -1,13 +1,12 @@
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
-import ReactMarkdown from "react-markdown";
 import { Link } from "react-router";
 
 export function ConversationList() {
   const threads = useQuery(api.threads.getThreads, {});
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full mt-10 flex flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-1 p-4">
           {threads?.map((t) => (
@@ -24,11 +23,11 @@ export function ConversationList() {
                   {t.subject}
                 </div>
                 <div className="text-sm text-muted-foreground line-clamp-1">
-                  <ReactMarkdown>{t.latestMessage?.content}</ReactMarkdown>
+                  {t.contentPreview}
                 </div>
               </div>
               <div className="flex-shrink-0 text-sm text-muted-foreground">
-                {new Date(t.lastActivityAt).toLocaleDateString()}
+                {new Date(t.lastActivityAt).toLocaleString()}
               </div>
             </Link>
           ))}

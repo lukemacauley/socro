@@ -486,6 +486,8 @@ async function processAttachmentWithReducto(
       document_url: upload,
     });
 
+    console.log({ result });
+
     const content =
       result.result.type === "full"
         ? result.result.chunks.map((chunk) => chunk.content).join("\n\n")
