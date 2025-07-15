@@ -99,6 +99,72 @@ const applicationTables = {
     .index("by_storage_id", ["storageId"])
     .index("by_upload_status", ["uploadStatus"])
     .index("by_external_attachment_id", ["externalAttachmentId"]),
+
+  userWritingStyles: defineTable({
+    userId: v.id("users"),
+    analysisDate: v.number(),
+    emailsAnalyzed: v.number(),
+    
+    // Tone and formality
+    formalityLevel: v.union(
+      v.literal("very_formal"),
+      v.literal("formal"),
+      v.literal("semi_formal"),
+      v.literal("casual"),
+      v.literal("very_casual")
+    ),
+    
+    // Common greetings and closings
+    greetings: v.array(v.string()), // e.g., ["Hi", "Hello", "Dear", "Hey"]
+    closings: v.array(v.string()), // e.g., ["Best regards", "Thanks", "Cheers", "Sincerely"]
+    
+    // Sentence patterns
+    averageSentenceLength: v.number(),
+    usesContractions: v.boolean(), // e.g., "I'll" vs "I will"
+    sentenceStarters: v.array(v.string()), // Common ways they start sentences
+    
+    // Vocabulary and phrases
+    commonPhrases: v.array(v.string()), // Frequently used phrases
+    signaturePhrases: v.array(v.string()), // Unique phrases that identify their style
+    professionalTerms: v.array(v.string()), // Industry-specific terms they use
+    
+    // Email structure preferences
+    usesNumberedLists: v.boolean(),
+    usesBulletPoints: v.boolean(),
+    paragraphStyle: v.union(v.literal("short"), v.literal("medium"), v.literal("long")),
+    
+    // Communication patterns
+    directness: v.union(v.literal("very_direct"), v.literal("direct"), v.literal("balanced"), v.literal("indirect")),
+    emotionalTone: v.union(v.literal("warm"), v.literal("neutral"), v.literal("professional"), v.literal("formal")),
+    
+    // Example emails for reference
+    exampleEmails: v.array(
+      v.object({
+        recipient: v.string(), // To understand context-based style changes
+        content: v.string(),
+        context: v.optional(v.string()), // e.g., "client", "colleague", "team"
+      })
+    ),
+    
+    // Style variations by recipient type
+    styleByRecipient: v.optional(
+      v.object({
+        clients: v.optional(v.object({
+          formalityLevel: v.string(),
+          commonPhrases: v.array(v.string()),
+        })),
+        colleagues: v.optional(v.object({
+          formalityLevel: v.string(),
+          commonPhrases: v.array(v.string()),
+        })),
+        internal: v.optional(v.object({
+          formalityLevel: v.string(),
+          commonPhrases: v.array(v.string()),
+        })),
+      })
+    ),
+  })
+    .index("by_user_id", ["userId"]),
 };
 
 export default defineSchema({

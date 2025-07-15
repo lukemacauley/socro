@@ -168,6 +168,11 @@ export const setupMicrosoftWebhook = internalAction({
         user._id,
         subscription.id
       );
+
+      await ctx.runAction(internal.userStyles.analyse, {
+        userId: user._id,
+        accessToken,
+      });
     } catch (error) {
       console.error(
         "[WEBHOOK SETUP] Error setting up Microsoft webhook:",

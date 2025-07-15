@@ -40,33 +40,9 @@ interface FetchEmailOptions {
   attachmentTypes?: string[]; // filter by MIME types
 }
 
-class MicrosoftGraphError extends Error {
-  constructor(
-    message: string,
-    public status?: number,
-    public statusText?: string,
-    public details?: any
-  ) {
-    super(message);
-    this.name = "MicrosoftGraphError";
-  }
-}
-
 // Extend the base types to include the OData type discriminator
 interface AttachmentWithODataType extends Attachment {
   "@odata.type"?: string;
-}
-
-interface FileAttachmentWithODataType extends FileAttachment {
-  "@odata.type": "#microsoft.graph.fileAttachment";
-}
-
-interface ItemAttachmentWithODataType extends ItemAttachment {
-  "@odata.type": "#microsoft.graph.itemAttachment";
-}
-
-interface ReferenceAttachmentWithODataType extends ReferenceAttachment {
-  "@odata.type": "#microsoft.graph.referenceAttachment";
 }
 
 // Type guard functions using proper type checking
@@ -159,11 +135,8 @@ export async function fetchEmailFromMicrosoft(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new MicrosoftGraphError(
-        `Microsoft Graph API error: ${response.status}`,
-        response.status,
-        response.statusText,
-        errorText
+      throw new Error(
+        `Microsoft Graph API error: ${response.status}: ${errorText}`
       );
     }
 
@@ -344,4 +317,60 @@ function processItemAttachment(attachment: ItemAttachment): ItemAttachment {
   // You might want to fetch the actual item here if needed
   // For now, return the attachment with its metadata
   return attachment;
+}
+
+/**
+ * Fetches sent emails from Microsoft Graph API
+ * @param accessToken - Microsoft Graph access token
+ * @param limit - Number of emails to fetch (default: 50)
+ * @param daysBack - How many days back to fetch (default: 30)
+ * @returns Array of sent emails
+ */
+export async function fetchSentEmailsFromMicrosoft(
+  accessToken: string,
+  limit: number = 50,
+  daysBack: number = 30
+): Promise<Message[]> {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysBack);
+  const filterDate = startDate.toISOString();
+
+  try {
+    // Fetch sent emails from the sent items folder
+    const response = await fetch(
+      `${MICROSOFT_GRAPH_BASE_URL}/me/mailFolders/sentitems/messages?` +
+        `$filter=sentDateTime ge ${filterDate}&` +
+        `$top=${limit}&` +
+        `$orderby=sentDateTime desc`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          Prefer: 'outlook.body-content-type="text"',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Failed to fetch sent emails:", errorText);
+
+      throw new Error(
+        `Failed to fetch sent emails: ${response.status} : ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+
+    const emails: Message[] = data.value;
+
+    console.log(
+      `[EMAIL] Fetched ${emails.length} sent emails for style analysis`
+    );
+
+    return emails;
+  } catch (error) {
+    console.error("[EMAIL] Error fetching sent emails:", error);
+    throw error;
+  }
 }

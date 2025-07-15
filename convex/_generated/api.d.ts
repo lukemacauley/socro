@@ -16,6 +16,8 @@ import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
 import type * as router from "../router.js";
 import type * as threads from "../threads.js";
+import type * as userStyles from "../userStyles.js";
+import type * as userStylesEnhanced from "../userStylesEnhanced.js";
 import type * as users from "../users.js";
 import type * as webhooks from "../webhooks.js";
 
@@ -42,6 +44,8 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   router: typeof router;
   threads: typeof threads;
+  userStyles: typeof userStyles;
+  userStylesEnhanced: typeof userStylesEnhanced;
   users: typeof users;
   webhooks: typeof webhooks;
 }>;

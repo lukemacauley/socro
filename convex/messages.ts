@@ -147,14 +147,18 @@ export const generateStreamingResponse = internalAction({
       threadId: args.threadId,
     });
 
+    const userStyle = await ctx.runQuery(internal.userStyles.get, {
+      userId: thread?.userId || messages[0].userId,
+    });
+
     try {
       const apiKey = process.env.CONVEX_ANTHROPIC_API_KEY;
       if (!apiKey) {
         throw new Error("ANTHROPIC_API_KEY environment variable is not set");
       }
 
-      // Comprehensive system prompt for legal AI assistant
-      const systemPrompt = `You are an expert legal AI assistant designed to help lawyers draft professional email responses. Your role is to analyze incoming emails and create thoughtful, legally sound responses while maintaining the highest standards of legal practice.
+      // Build system prompt with user's writing style if available
+      let systemPrompt = `You are an expert legal AI assistant designed to help lawyers draft professional email responses. Your role is to analyze incoming emails and create thoughtful, legally sound responses while maintaining the highest standards of legal practice.
 
 # Core Capabilities and Responsibilities:
 
@@ -210,6 +214,66 @@ export const generateStreamingResponse = internalAction({
 - Highlight sections requiring particular attorney review with **[ATTORNEY REVIEW NEEDED]**
 
 Remember: You are a tool to enhance legal practice efficiency, not replace attorney judgment. Always encourage appropriate human review of substantive legal matters.`;
+
+      if (userStyle) {
+        systemPrompt += `\n\n# User's Personal Writing Style\n\nIMPORTANT: The following analysis is based on the user's actual sent emails. You should adapt your responses to match their personal writing style while maintaining legal professionalism:\n\n`;
+
+        systemPrompt += `## Style Profile:\n`;
+        systemPrompt += `- Formality Level: ${userStyle.formalityLevel}\n`;
+        systemPrompt += `- Typical Greetings: ${userStyle.greetings.join(
+          ", "
+        )}\n`;
+        systemPrompt += `- Typical Closings: ${userStyle.closings.join(
+          ", "
+        )}\n`;
+        systemPrompt += `- Average Sentence Length: ${Math.round(
+          userStyle.averageSentenceLength
+        )} words\n`;
+        systemPrompt += `- Uses Contractions: ${
+          userStyle.usesContractions ? "Yes" : "No"
+        }\n`;
+        systemPrompt += `- Paragraph Style: ${userStyle.paragraphStyle}\n`;
+        systemPrompt += `- Communication Style: ${userStyle.directness}, ${userStyle.emotionalTone}\n`;
+
+        if (userStyle.commonPhrases.length > 0) {
+          systemPrompt += `\n## Common Phrases to Use:\n`;
+          userStyle.commonPhrases.slice(0, 10).forEach((phrase) => {
+            systemPrompt += `- "${phrase}"\n`;
+          });
+        }
+
+        if (userStyle.sentenceStarters.length > 0) {
+          systemPrompt += `\n## Typical Sentence Starters:\n`;
+          userStyle.sentenceStarters.slice(0, 5).forEach((starter) => {
+            systemPrompt += `- "${starter}"\n`;
+          });
+        }
+
+        if (userStyle.exampleEmails.length > 0) {
+          systemPrompt += `\n## Example Emails from User (for tone reference):\n`;
+          userStyle.exampleEmails.slice(0, 2).forEach((example, idx) => {
+            systemPrompt += `\n### Example ${idx + 1} (${
+              example.context || "general"
+            }):\n`;
+            systemPrompt += `${example.content.slice(0, 300)}...\n`;
+          });
+        }
+
+        systemPrompt += `\n## Writing Guidelines:\n`;
+        systemPrompt += `- Match the user's formality level (${userStyle.formalityLevel})\n`;
+        systemPrompt += `- Use their preferred greetings and closings\n`;
+        systemPrompt += `- Maintain their sentence structure and length patterns\n`;
+        systemPrompt += `- ${
+          userStyle.usesContractions
+            ? "Use contractions naturally"
+            : "Avoid contractions for formality"
+        }\n`;
+        systemPrompt += `- Write in ${userStyle.paragraphStyle} paragraphs\n`;
+        systemPrompt += `- Be ${userStyle.directness} in communication\n`;
+        systemPrompt += `- Maintain a ${userStyle.emotionalTone} tone\n\n`;
+
+        systemPrompt += `Remember: While matching the user's style, always maintain appropriate legal professionalism and accuracy.`;
+      }
 
       // Build the conversation with proper Anthropic format
       const anthropicMessages = [];
