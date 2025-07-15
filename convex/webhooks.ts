@@ -223,7 +223,7 @@ export const getMicrosoftAccessToken = async (
   clerkUserId: string
 ): Promise<string> => {
   const clerk = createClerkClient({
-    secretKey: process.env.CLERK_SECRET_KEY!,
+    secretKey: process.env.CLERK_SECRET_KEY,
   });
 
   try {

@@ -6,7 +6,6 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-import { rootAuthLoader } from "@clerk/react-router/ssr.server";
 import type { Route } from "./+types/root";
 import "./app.css";
 import { ClerkProvider, useAuth } from "@clerk/react-router";
@@ -14,10 +13,7 @@ import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import { Toaster } from "./components/ui/sonner";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
-
-export async function loader(args: Route.LoaderArgs) {
-  return rootAuthLoader(args);
-}
+import { env } from "env";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -51,7 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+const convex = new ConvexReactClient(env.VITE_CONVEX_URL as string);
 
 export default function App({ loaderData }: Route.ComponentProps) {
   return (
@@ -59,6 +55,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
       loaderData={loaderData}
       signUpFallbackRedirectUrl="/"
       signInFallbackRedirectUrl="/"
+      publishableKey={env.VITE_CLERK_PUBLISHABLE_KEY}
     >
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <ConvexQueryCacheProvider>
@@ -80,7 +77,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       error.status === 404
         ? "The requested page could not be found."
         : error.statusText || details;
-  } else if (import.meta.env.DEV && error && error instanceof Error) {
+  } else if (process.env.DEV && error && error instanceof Error) {
     details = error.message;
     stack = error.stack;
   }
