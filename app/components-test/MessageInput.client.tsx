@@ -19,7 +19,7 @@ import {
 } from "~/components/kibo-ui/dropzone";
 import { useDropzone } from "react-dropzone";
 import { createId } from "legid";
-import { Button } from "~/components/ui/button";
+import AttachmentButton from "./AttachmentButton";
 
 export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
   const sendMessage = useAction(api.messages.sendMessage);
@@ -109,26 +109,17 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
             {files && files.length > 0 && (
               <div className="flex items-center justify-start gap-4 p-2 overflow-auto scrollbar-hide">
                 {files?.map((file, index) => (
-                  <Button
+                  <AttachmentButton
+                    name={file.name}
+                    type={file.type.split("/")[1].toUpperCase()}
                     key={`${file.name}-${index}`}
-                    variant="outline"
-                    size="sm"
-                    className="justify-start"
-                    tooltip={file.name}
                     onClick={() => {
                       setFiles((prev) =>
                         prev ? prev.filter((f) => f !== file) : []
                       );
                     }}
-                  >
-                    <div className="bg-primary text-primary-foreground rounded px-1.5">
-                      {file.type.split("/")[1].toUpperCase()}
-                    </div>
-                    <div className="w-28 truncate line-clamp-1">
-                      {file.name}
-                    </div>
-                    <X className="size-4" />
-                  </Button>
+                    icon={X}
+                  />
                 ))}
               </div>
             )}
