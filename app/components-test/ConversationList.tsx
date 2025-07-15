@@ -6,7 +6,7 @@ export function ConversationList() {
   const threads = useQuery(api.threads.getThreads, {});
 
   return (
-    <div className="h-full mt-10 flex flex-col">
+    <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-1 p-4">
           {threads?.map((t) => (

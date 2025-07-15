@@ -142,7 +142,7 @@ const components: Options["components"] = {
               value={{ value: language, onValueChange: undefined, data }}
             >
               <CodeBlockCopyButton
-                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
                 onCopy={console.log}
                 onError={console.error}
               />

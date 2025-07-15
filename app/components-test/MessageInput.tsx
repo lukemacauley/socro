@@ -111,7 +111,7 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
                 {files?.map((file, index) => (
                   <AttachmentButton
                     name={file.name}
-                    type={file.type.split("/")[1].toUpperCase()}
+                    type={file.type.split("/")[1]}
                     key={`${file.name}-${index}`}
                     onClick={() => {
                       setFiles((prev) =>

@@ -15,7 +15,7 @@ export const AttachmentList = memo(function AttachmentList({
   }
 
   return (
-    <div className="flex items-center justify-start gap-4 py-2 overflow-auto scrollbar-hide">
+    <div className="flex items-center justify-start gap-4 py-2 overflow-auto scrollbar-hide mt-4">
       {attachments?.map((att) => (
         <AttachmentButton
           key={att._id}

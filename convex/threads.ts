@@ -42,6 +42,30 @@ export const getThreads = query({
   },
 });
 
+export const getThreadName = query({
+  args: { id: v.id("threads") },
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.id);
+
+    const toParticipants = thread?.toParticipants
+      .map((p) => p.name || p.email)
+      .filter(Boolean);
+
+    const fromParticipants = thread?.fromParticipants
+      ? thread.fromParticipants.name || thread.fromParticipants.email
+      : null;
+
+    const participants = [
+      ...(fromParticipants ? [fromParticipants] : []),
+      ...(toParticipants || []),
+    ].join(", ");
+
+    const threadTitle = thread?.subject || "Untitled Thread";
+
+    return participants ? `${threadTitle} - ${participants}` : threadTitle;
+  },
+});
+
 export const getThread = query({
   args: { id: v.id("threads") },
   handler: async (ctx, args) => {
