@@ -19,12 +19,14 @@ export const MessageList = memo(function MessageList({
   const messages = useQuery(api.messages.getMessages, { threadId }) || [];
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="flex-1 flex flex-col min-h-0 pt-12">
       <AIConversation className="bg-primary-foreground">
         <AIConversationContent>
-          {messages.map((m) => (
-            <MessageItem message={m} key={m._id} />
-          ))}
+          <div className="max-w-3xl mx-auto">
+            {messages.map((m) => (
+              <MessageItem message={m} key={m._id} />
+            ))}
+          </div>
         </AIConversationContent>
         <AIConversationScrollButton />
       </AIConversation>
