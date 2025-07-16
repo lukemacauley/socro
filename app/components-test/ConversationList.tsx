@@ -16,7 +16,7 @@ export function ConversationList() {
           >
             <div className="min-w-0 flex-1 flex-col sm:flex-row flex sm:items-center sm:gap-4">
               <div className="w-full sm:w-80 flex-shrink-0 flex items-center gap-2 justify-between">
-                <div className="text-sm sm:text-sm text-card-foreground font-semibold">
+                <div className="text-sm sm:text-sm text-card-foreground font-medium">
                   {t.fromParticipants.name || t.fromParticipants.email}
                 </div>
                 <div className="text-xs sm:hidden text-muted-foreground">

@@ -341,15 +341,15 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
       let fullContent = "";
       let chunkIndex = 0;
 
-      // Use the AI SDK to stream the response
       const { textStream, response } = streamText({
         model: groq("moonshotai/kimi-k2-instruct"),
         messages: aiMessages,
         temperature: 0.2,
         maxRetries: 3,
+        onError: ({ error }) =>
+          console.error(error instanceof Error ? error.message : "Not working"),
       });
 
-      // Process the stream
       for await (const textPart of textStream) {
         fullContent += textPart;
 
@@ -363,19 +363,19 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
         chunkIndex++;
       }
 
-      // Wait for the response to complete
-      await response;
+      try {
+        await response;
+      } catch (err) {
+        console.error("Final response error:", err);
+      }
 
-      // Mark streaming as complete
       await ctx.runMutation(internal.messages.completeStreaming, {
         messageId: args.responseMessageId,
         finalContent:
           fullContent || "I apologize, but I couldn't generate a response.",
       });
     } catch (error) {
-      console.log({ error });
-      console.error("Streaming error:", error);
-
+      console.error("Error initializing Groq client:", error);
       await ctx.runMutation(internal.messages.completeStreaming, {
         messageId: args.responseMessageId,
         finalContent:
