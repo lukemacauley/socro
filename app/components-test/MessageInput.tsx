@@ -126,6 +126,7 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
             <AIInputTextarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
+              autoFocus
             />
             <AIInputToolbar>
               <AIInputTools>
