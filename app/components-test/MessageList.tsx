@@ -48,8 +48,8 @@ function MessageItem({
       {isAi ? (
         <AIResponse>{displayContent}</AIResponse>
       ) : (
-        <AIMessageContent className="whitespace-pre-wrap">
-          {message.content}
+        <AIMessageContent>
+          <div className="whitespace-pre-wrap">{message.content}</div>
           <AttachmentList attachments={message.attachments} />
         </AIMessageContent>
       )}

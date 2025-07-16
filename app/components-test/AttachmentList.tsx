@@ -16,7 +16,7 @@ export const AttachmentList = memo(function AttachmentList({
   }
 
   return (
-    <div className="flex items-center justify-start gap-2 py-2 overflow-auto scrollbar-hide mt-4">
+    <div className="flex items-center justify-start gap-2 pt-3 overflow-auto scrollbar-hide mt-3 border-t border-border">
       <Paperclip className="text-muted-foreground size-4" />
       {attachments?.map((att) => (
         <AttachmentButton
