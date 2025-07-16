@@ -64,3 +64,13 @@ export const getBySubscriptionId = internalQuery({
       .unique();
   },
 });
+
+export const getAllWithSubscriptions = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("users")
+      .filter((q) => q.neq(q.field("externalSubscriptionId"), undefined))
+      .collect();
+  },
+});

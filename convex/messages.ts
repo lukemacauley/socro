@@ -9,8 +9,8 @@ import {
 import { api, internal } from "./_generated/api";
 import { verifyThreadOwnership } from "./threads";
 import { type Id } from "./_generated/dataModel";
-import { Groq } from "groq-sdk";
-import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
+import { streamText } from "ai";
+import { createGroq } from "@ai-sdk/groq";
 
 export const getMessages = query({
   args: { threadId: v.id("threads") },
@@ -155,6 +155,11 @@ export const generateStreamingResponse = internalAction({
         throw new Error("GROQ_API_KEY environment variable is not set");
       }
 
+      // Initialize Groq client with the API key
+      const groq = createGroq({
+        apiKey: apiKey.trim(),
+      });
+
       // Comprehensive system prompt for legal AI assistant
       const systemPrompt = `You are an expert legal AI assistant designed to help lawyers draft professional email responses. Your role is to analyze incoming emails and create thoughtful, legally sound responses while maintaining the highest standards of legal practice.
 
@@ -213,8 +218,11 @@ export const generateStreamingResponse = internalAction({
 
 Remember: You are a tool to enhance legal practice efficiency, not replace attorney judgment. Always encourage appropriate human review of substantive legal matters.`;
 
-      // Build the conversation with proper Anthropic format
-      const anthropicMessages: ChatCompletionMessageParam[] = [
+      // Build the conversation with proper format for AI SDK
+      const aiMessages: Array<{
+        role: "system" | "user" | "assistant";
+        content: string;
+      }> = [
         {
           role: "system",
           content: systemPrompt,
@@ -244,11 +252,14 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
             }
 
             return {
-              role: msg.role === "user" ? "user" : "assistant",
+              role:
+                msg.role === "user"
+                  ? ("user" as const)
+                  : ("assistant" as const),
               content,
-            } satisfies ChatCompletionMessageParam;
+            };
           });
-        anthropicMessages.push(...previousMessages);
+        aiMessages.push(...previousMessages);
       }
 
       // Get the most recent message that needs a response
@@ -315,160 +326,39 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
 
             Note: If this appears to be a quick internal exchange, keep the response concise and conversational rather than overly formal.`;
 
-        anthropicMessages.push({
+        aiMessages.push({
           role: "user",
           content: emailContent,
         });
       }
 
-      const groq = new Groq({ apiKey });
+      let fullContent = "";
+      let chunkIndex = 0;
 
-      const chatCompletion = await groq.chat.completions.create({
-        messages: anthropicMessages,
-        model: "moonshotai/kimi-k2-instruct",
+      // Use the AI SDK to stream the response
+      const { textStream, response } = streamText({
+        model: groq("moonshotai/kimi-k2-instruct"),
+        messages: aiMessages,
         temperature: 0.2,
-        stream: true,
+        maxRetries: 3,
       });
 
-      let chunkIndex = 0;
-      let fullContent = "";
+      // Process the stream
+      for await (const textPart of textStream) {
+        fullContent += textPart;
 
-      for await (const chunk of chatCompletion) {
-        if (chunk.choices[0]?.delta?.content) {
-          const content = chunk.choices[0].delta.content;
+        // Store chunk in database
+        await ctx.runMutation(internal.messages.addStreamingChunk, {
+          messageId: args.responseMessageId,
+          chunk: textPart,
+          chunkIndex,
+        });
 
-          fullContent += content;
-
-          // Store chunk in database
-          await ctx.runMutation(internal.messages.addStreamingChunk, {
-            messageId: args.responseMessageId,
-            chunk: content,
-            chunkIndex,
-          });
-
-          chunkIndex++;
-        }
+        chunkIndex++;
       }
 
-      // try {
-      //   while (true) {
-      //     const { done, value } = await reader.read();
-      //     if (done) break;
-
-      //     const chunk = decoder.decode(value);
-      //     const lines = chunk.split("\n");
-
-      //     for (const line of lines) {
-      //       if (line.startsWith("data: ")) {
-      //         const data = line.slice(6);
-      //         if (data === "[DONE]") continue;
-
-      //         try {
-      //           const parsed = JSON.parse(data);
-
-      //           if (
-      //             parsed.type === "content_block_delta" &&
-      //             parsed.delta?.text
-      //           ) {
-      //             const content = parsed.delta.text;
-      //             fullContent += content;
-
-      //             // Store chunk in database
-      //             await ctx.runMutation(internal.messages.addStreamingChunk, {
-      //               messageId: args.responseMessageId,
-      //               chunk: content,
-      //               chunkIndex,
-      //             });
-
-      //             chunkIndex++;
-      //           }
-      //         } catch (parseError) {
-      //           // Skip invalid JSON lines
-      //           continue;
-      //         }
-      //       }
-      //     }
-      //   }
-      // } finally {
-      //   reader.releaseLock();
-      // }
-
-      // const response = await fetch("https://api.anthropic.com/v1/messages", {
-      //   method: "POST",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     "x-api-key": apiKey,
-      //     "anthropic-version": "2023-06-01",
-      //   },
-      //   body: JSON.stringify({
-      //     model: "claude-opus-4-20250514",
-      //     max_tokens: 30000,
-      //     temperature: 0.2, // Lower temperature for more consistent legal writing
-      //     system: systemPrompt,
-      //     messages: anthropicMessages,
-      //     stream: true,
-      //   }),
-      // });
-
-      // if (!response.ok) {
-      //   const errorBody = await response.text();
-      //   console.log("Anthropic API error:", errorBody);
-      //   throw new Error(
-      //     `Anthropic API error: ${response.status} ${response.statusText}`
-      //   );
-      // }
-
-      // const reader = response.body?.getReader();
-      // if (!reader) {
-      //   throw new Error("No response body reader available");
-      // }
-
-      // const decoder = new TextDecoder();
-      // let chunkIndex = 0;
-      // let fullContent = "";
-
-      // try {
-      //   while (true) {
-      //     const { done, value } = await reader.read();
-      //     if (done) break;
-
-      //     const chunk = decoder.decode(value);
-      //     const lines = chunk.split("\n");
-
-      //     for (const line of lines) {
-      //       if (line.startsWith("data: ")) {
-      //         const data = line.slice(6);
-      //         if (data === "[DONE]") continue;
-
-      //         try {
-      //           const parsed = JSON.parse(data);
-
-      //           if (
-      //             parsed.type === "content_block_delta" &&
-      //             parsed.delta?.text
-      //           ) {
-      //             const content = parsed.delta.text;
-      //             fullContent += content;
-
-      //             // Store chunk in database
-      //             await ctx.runMutation(internal.messages.addStreamingChunk, {
-      //               messageId: args.responseMessageId,
-      //               chunk: content,
-      //               chunkIndex,
-      //             });
-
-      //             chunkIndex++;
-      //           }
-      //         } catch (parseError) {
-      //           // Skip invalid JSON lines
-      //           continue;
-      //         }
-      //       }
-      //     }
-      //   }
-      // } finally {
-      //   reader.releaseLock();
-      // }
+      // Wait for the response to complete
+      await response;
 
       // Mark streaming as complete
       await ctx.runMutation(internal.messages.completeStreaming, {
@@ -479,10 +369,11 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
     } catch (error) {
       console.log({ error });
       console.error("Streaming error:", error);
+
       await ctx.runMutation(internal.messages.completeStreaming, {
         messageId: args.responseMessageId,
         finalContent:
-          "Sorry, I encountered an error while generating the response. Please make sure the ANTHROPIC_API_KEY environment variable is set.",
+          "Sorry, I encountered an error while generating the response. Please try again in a moment.",
       });
     }
   },

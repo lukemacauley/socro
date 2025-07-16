@@ -10,6 +10,7 @@
 
 import type * as attachments from "../attachments.js";
 import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib_email from "../lib/email.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -36,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   attachments: typeof attachments;
   auth: typeof auth;
+  crons: typeof crons;
   http: typeof http;
   "lib/email": typeof lib_email;
   "lib/validators": typeof lib_validators;

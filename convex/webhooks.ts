@@ -304,3 +304,125 @@ export const createMicrosoftSubscription = async (
     throw new Error(`Failed to create inbox subscription: ${error}`);
   }
 };
+
+// ==================== Subscription Refresh ====================
+
+export const refreshAllMicrosoftSubscriptions = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    console.log("[CRON] Starting Microsoft subscription refresh...");
+
+    // Get all users with Microsoft subscriptions
+    const users = await ctx.runQuery(internal.users.getAllWithSubscriptions);
+
+    if (!users || users.length === 0) {
+      console.log("[CRON] No users with Microsoft subscriptions found");
+      return;
+    }
+
+    const webhookUrl = `${process.env.CONVEX_SITE_URL}/webhook/microsoft`;
+    let refreshedCount = 0;
+    let createdCount = 0;
+    let errorCount = 0;
+
+    for (const user of users) {
+      try {
+        console.log(`[CRON] Processing subscription for user: ${user._id}`);
+
+        // Get fresh access token from Clerk - this is the key part!
+        // Even if the subscription hasn't expired, we get a fresh token
+        const accessToken = await getMicrosoftAccessToken(user.externalId);
+
+        if (user.externalSubscriptionId) {
+          // Try to renew the existing subscription
+          const renewed = await renewSubscription(
+            user.externalSubscriptionId,
+            accessToken
+          );
+
+          if (renewed) {
+            refreshedCount++;
+            console.log(
+              `[CRON] Successfully renewed subscription for user: ${user._id}`
+            );
+          } else {
+            // If renewal fails (e.g., subscription not found), create a new one
+            console.log(
+              `[CRON] Subscription renewal failed for user: ${user._id}, creating new subscription`
+            );
+
+            const newSubscription = await createMicrosoftSubscription(
+              webhookUrl,
+              accessToken
+            );
+
+            if (newSubscription?.id) {
+              await ctx.runMutation(internal.webhooks.updateUserMicrosoftAuth, {
+                userId: user._id,
+                subscriptionId: newSubscription.id,
+              });
+              createdCount++;
+              console.log(
+                `[CRON] Successfully created new subscription for user: ${user._id}`
+              );
+            } else {
+              throw new Error("Failed to create new subscription");
+            }
+          }
+        }
+      } catch (error) {
+        errorCount++;
+        console.error(
+          `[CRON] Error processing subscription for user ${user._id}:`,
+          error
+        );
+      }
+    }
+
+    console.log(
+      `[CRON] Subscription refresh complete. Renewed: ${refreshedCount}, Created: ${createdCount}, Errors: ${errorCount}`
+    );
+  },
+});
+
+async function renewSubscription(
+  subscriptionId: string,
+  accessToken: string
+): Promise<boolean> {
+  try {
+    const expirationDateTime = new Date(
+      Date.now() + WEBHOOK_SUBSCRIPTION_DURATION_MINUTES * 60 * 1000
+    ).toISOString();
+
+    const response = await fetch(
+      `${MICROSOFT_GRAPH_BASE_URL}/subscriptions/${subscriptionId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          expirationDateTime,
+        }),
+      }
+    );
+
+    if (response.ok) {
+      console.log(
+        `[CRON] Successfully renewed subscription: ${subscriptionId}`
+      );
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error(
+        `[CRON] Failed to renew subscription: ${response.status}`,
+        errorText
+      );
+      return false;
+    }
+  } catch (error) {
+    console.error("[CRON] Error renewing subscription:", error);
+    return false;
+  }
+}
