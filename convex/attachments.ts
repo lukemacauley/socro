@@ -473,20 +473,17 @@ async function processAttachmentWithReducto(
 
     const fileInput = base64ToUint8Array(bytes);
 
-    // Initialize Reducto client
     const reductoClient = new Reducto({
       apiKey: process.env.REDUCTO_API_KEY,
     });
 
-    // Upload and process with Reducto
     const file = await toFile(fileInput, attachmentName);
     const upload = await reductoClient.upload({ file });
-
     const result = await reductoClient.parse.run({
       document_url: upload,
+      options: { ocr_mode: "standard", extraction_mode: "hybrid" },
+      advanced_options: { keep_line_breaks: true, ocr_system: "highres" },
     });
-
-    console.log({ result });
 
     const content =
       result.result.type === "full"
@@ -494,6 +491,7 @@ async function processAttachmentWithReducto(
         : `Document processed. Result URL: ${result.result.url}`;
 
     console.log(`[REDUCTO] Successfully processed: ${attachmentName}`);
+
     return content;
   } catch (error) {
     console.error(`[REDUCTO] Error processing attachment:`, error);
