@@ -1,22 +1,16 @@
 import { type MutationCtx, query, type QueryCtx } from "./_generated/server";
 
-export const loggedInUser = query({
-  handler: async (ctx) => {
-    return await getCurrentUser(ctx);
-  },
-});
-
 export const loggedInUserId = query({
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
-    return user._id;
+    return user ? user._id : null;
   },
 });
 
 async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (identity === null) {
-    throw new Error("Not authenticated");
+    return null;
   }
 
   const user = await ctx.db
@@ -25,7 +19,7 @@ async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
     .first();
 
   if (!user) {
-    throw new Error("User not found");
+    return null;
   }
 
   return user;

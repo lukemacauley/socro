@@ -35,7 +35,7 @@ export const getMessageAttachments = query({
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
     if (!userId) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     const attachments = await ctx.db

@@ -24,7 +24,7 @@ export const getThreads = query({
   handler: async (ctx, args): Promise<Thread[]> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
     if (!userId) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     return args.threadType
@@ -71,7 +71,7 @@ export const getThread = query({
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
     if (!userId) {
-      throw new Error("Not authenticated");
+      return null;
     }
     // Get thread info
     const thread = await ctx.db.get(args.id);

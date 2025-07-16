@@ -16,6 +16,9 @@ export const getMessages = query({
   args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      return [];
+    }
     await verifyThreadOwnership(ctx, args.threadId, userId);
 
     const messages = await ctx.db
@@ -75,6 +78,9 @@ export const sendMessage = action({
     responseMessageId: Id<"messages">;
   }> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
 
     const { userMessageId, responseMessageId } = await ctx.runMutation(
       internal.messages.insertWithResponsePlaceholder,
