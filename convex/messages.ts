@@ -9,6 +9,8 @@ import {
 import { api, internal } from "./_generated/api";
 import { verifyThreadOwnership } from "./threads";
 import { type Id } from "./_generated/dataModel";
+import { Groq } from "groq-sdk";
+import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
 
 export const getMessages = query({
   args: { threadId: v.id("threads") },
@@ -148,9 +150,9 @@ export const generateStreamingResponse = internalAction({
     });
 
     try {
-      const apiKey = process.env.CONVEX_ANTHROPIC_API_KEY;
+      const apiKey = process.env.CONVEX_GROQ_API_KEY;
       if (!apiKey) {
-        throw new Error("ANTHROPIC_API_KEY environment variable is not set");
+        throw new Error("GROQ_API_KEY environment variable is not set");
       }
 
       // Comprehensive system prompt for legal AI assistant
@@ -212,7 +214,12 @@ export const generateStreamingResponse = internalAction({
 Remember: You are a tool to enhance legal practice efficiency, not replace attorney judgment. Always encourage appropriate human review of substantive legal matters.`;
 
       // Build the conversation with proper Anthropic format
-      const anthropicMessages = [];
+      const anthropicMessages: ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+      ];
 
       // First, add all previous messages as context (excluding the most recent)
       if (messages && messages.length > 1) {
@@ -239,7 +246,7 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
             return {
               role: msg.role === "user" ? "user" : "assistant",
               content,
-            };
+            } satisfies ChatCompletionMessageParam;
           });
         anthropicMessages.push(...previousMessages);
       }
@@ -314,82 +321,154 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
         });
       }
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-opus-4-20250514",
-          max_tokens: 30000,
-          temperature: 0.2, // Lower temperature for more consistent legal writing
-          system: systemPrompt,
-          messages: anthropicMessages,
-          stream: true,
-        }),
+      const groq = new Groq({ apiKey });
+
+      const chatCompletion = await groq.chat.completions.create({
+        messages: anthropicMessages,
+        model: "moonshotai/kimi-k2-instruct",
+        temperature: 0.2,
+        stream: true,
       });
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.log("Anthropic API error:", errorBody);
-        throw new Error(
-          `Anthropic API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No response body reader available");
-      }
-
-      const decoder = new TextDecoder();
       let chunkIndex = 0;
       let fullContent = "";
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      for await (const chunk of chatCompletion) {
+        if (chunk.choices[0]?.delta?.content) {
+          const content = chunk.choices[0].delta.content;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
+          fullContent += content;
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
+          // Store chunk in database
+          await ctx.runMutation(internal.messages.addStreamingChunk, {
+            messageId: args.responseMessageId,
+            chunk: content,
+            chunkIndex,
+          });
 
-              try {
-                const parsed = JSON.parse(data);
-
-                if (
-                  parsed.type === "content_block_delta" &&
-                  parsed.delta?.text
-                ) {
-                  const content = parsed.delta.text;
-                  fullContent += content;
-
-                  // Store chunk in database
-                  await ctx.runMutation(internal.messages.addStreamingChunk, {
-                    messageId: args.responseMessageId,
-                    chunk: content,
-                    chunkIndex,
-                  });
-
-                  chunkIndex++;
-                }
-              } catch (parseError) {
-                // Skip invalid JSON lines
-                continue;
-              }
-            }
-          }
+          chunkIndex++;
         }
-      } finally {
-        reader.releaseLock();
       }
+
+      // try {
+      //   while (true) {
+      //     const { done, value } = await reader.read();
+      //     if (done) break;
+
+      //     const chunk = decoder.decode(value);
+      //     const lines = chunk.split("\n");
+
+      //     for (const line of lines) {
+      //       if (line.startsWith("data: ")) {
+      //         const data = line.slice(6);
+      //         if (data === "[DONE]") continue;
+
+      //         try {
+      //           const parsed = JSON.parse(data);
+
+      //           if (
+      //             parsed.type === "content_block_delta" &&
+      //             parsed.delta?.text
+      //           ) {
+      //             const content = parsed.delta.text;
+      //             fullContent += content;
+
+      //             // Store chunk in database
+      //             await ctx.runMutation(internal.messages.addStreamingChunk, {
+      //               messageId: args.responseMessageId,
+      //               chunk: content,
+      //               chunkIndex,
+      //             });
+
+      //             chunkIndex++;
+      //           }
+      //         } catch (parseError) {
+      //           // Skip invalid JSON lines
+      //           continue;
+      //         }
+      //       }
+      //     }
+      //   }
+      // } finally {
+      //   reader.releaseLock();
+      // }
+
+      // const response = await fetch("https://api.anthropic.com/v1/messages", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //     "x-api-key": apiKey,
+      //     "anthropic-version": "2023-06-01",
+      //   },
+      //   body: JSON.stringify({
+      //     model: "claude-opus-4-20250514",
+      //     max_tokens: 30000,
+      //     temperature: 0.2, // Lower temperature for more consistent legal writing
+      //     system: systemPrompt,
+      //     messages: anthropicMessages,
+      //     stream: true,
+      //   }),
+      // });
+
+      // if (!response.ok) {
+      //   const errorBody = await response.text();
+      //   console.log("Anthropic API error:", errorBody);
+      //   throw new Error(
+      //     `Anthropic API error: ${response.status} ${response.statusText}`
+      //   );
+      // }
+
+      // const reader = response.body?.getReader();
+      // if (!reader) {
+      //   throw new Error("No response body reader available");
+      // }
+
+      // const decoder = new TextDecoder();
+      // let chunkIndex = 0;
+      // let fullContent = "";
+
+      // try {
+      //   while (true) {
+      //     const { done, value } = await reader.read();
+      //     if (done) break;
+
+      //     const chunk = decoder.decode(value);
+      //     const lines = chunk.split("\n");
+
+      //     for (const line of lines) {
+      //       if (line.startsWith("data: ")) {
+      //         const data = line.slice(6);
+      //         if (data === "[DONE]") continue;
+
+      //         try {
+      //           const parsed = JSON.parse(data);
+
+      //           if (
+      //             parsed.type === "content_block_delta" &&
+      //             parsed.delta?.text
+      //           ) {
+      //             const content = parsed.delta.text;
+      //             fullContent += content;
+
+      //             // Store chunk in database
+      //             await ctx.runMutation(internal.messages.addStreamingChunk, {
+      //               messageId: args.responseMessageId,
+      //               chunk: content,
+      //               chunkIndex,
+      //             });
+
+      //             chunkIndex++;
+      //           }
+      //         } catch (parseError) {
+      //           // Skip invalid JSON lines
+      //           continue;
+      //         }
+      //       }
+      //     }
+      //   }
+      // } finally {
+      //   reader.releaseLock();
+      // }
 
       // Mark streaming as complete
       await ctx.runMutation(internal.messages.completeStreaming, {
