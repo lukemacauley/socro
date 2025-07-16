@@ -89,7 +89,7 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
   return (
     <div
       {...getRootProps()}
-      className="sticky left-0 right-0 bottom-4"
+      className="sticky px-4 left-0 right-0 bottom-4"
       style={{
         left: state === "collapsed" ? "3rem" : "18rem",
       }}

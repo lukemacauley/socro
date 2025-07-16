@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { cn } from "~/lib/utils";
+import { marked } from "marked";
 
 export type { BundledLanguage } from "shiki";
 
@@ -330,20 +331,29 @@ export const CodeBlockCopyButton = ({
   const code = data.find((item) => item.language === value)?.code;
 
   const copyToClipboard = () => {
-    if (
-      typeof window === "undefined" ||
-      !navigator.clipboard.writeText ||
-      !code
-    ) {
+    if (typeof window === "undefined" || !navigator.clipboard.write || !code) {
       return;
     }
 
-    navigator.clipboard.writeText(code).then(() => {
-      setIsCopied(true);
-      onCopy?.();
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = marked(code, { async: false });
 
-      setTimeout(() => setIsCopied(false), timeout);
-    }, onError);
+    const htmlBlob = new Blob([tempDiv.innerHTML], { type: "text/html" });
+    const textBlob = new Blob([tempDiv.innerText], { type: "text/plain" });
+
+    navigator.clipboard
+      .write([
+        new ClipboardItem({
+          "text/html": htmlBlob,
+          "text/plain": textBlob,
+        }),
+      ])
+      .then(() => {
+        setIsCopied(true);
+        onCopy?.();
+
+        setTimeout(() => setIsCopied(false), timeout);
+      }, onError);
   };
 
   if (asChild) {
