@@ -7,9 +7,6 @@ import {
   MessagesSquare,
 } from "lucide-react";
 import { NavMain } from "~/components/nav-main";
-import { NavProjects } from "~/components/nav-projects";
-// import { NavUser } from "~/components/nav-user";
-import { TeamSwitcher } from "~/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +22,7 @@ import {
   UserButton,
 } from "@clerk/react-router";
 import { Link } from "react-router";
+import { cn } from "~/lib/utils";
 
 export const NAVIGATION: {
   title: string;
@@ -62,9 +60,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <Link to="/" className="px-2">
-          <h1 className="font-medium text-xl tracking-tight leading-relaxed text-primary">
-            {state === "collapsed" ? "C" : "Congas"}
+        <Link to="/">
+          <h1
+            className={cn(
+              "font-medium text-xl tracking-tight leading-relaxed text-primary",
+              state === "collapsed" ? "text-center" : "text-left px-2"
+            )}
+          >
+            {state === "collapsed" ? "CG" : "Con Gas"}
           </h1>
         </Link>
       </SidebarHeader>

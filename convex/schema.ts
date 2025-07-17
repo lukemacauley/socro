@@ -25,13 +25,14 @@ const applicationTables = {
 
   threads: defineTable({
     threadType: v.union(v.literal("chat"), v.literal("email")),
+    threadId: v.optional(v.string()), // Client-generated ID for instant navigation
     externalThreadId: v.optional(v.string()), // Microsoft Graph conversation ID
     externalSubscriptionId: v.optional(v.string()),
     userId: v.id("users"),
-    subject: v.string(),
+    subject: v.optional(v.string()),
     contentPreview: nullOrUndefinedString,
-    fromParticipants: emailParticipant,
-    toParticipants: v.array(emailParticipant),
+    fromParticipants: v.optional(emailParticipant),
+    toParticipants: v.optional(v.array(emailParticipant)),
     lastActivityAt: v.number(),
     status: v.optional(threadStatus),
     processed: v.optional(v.boolean()),
@@ -39,6 +40,7 @@ const applicationTables = {
     .index("by_user_id", ["userId"])
     .index("by_status", ["status"])
     .index("by_external_id", ["externalThreadId"])
+    .index("by_client_id", ["threadId"])
     .index("by_external_subscription_id", ["externalSubscriptionId"])
     .index("by_type", ["threadType"])
     .index("by_processed", ["processed"]),

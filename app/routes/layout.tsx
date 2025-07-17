@@ -59,7 +59,7 @@ export default function Layout() {
 
   const threadName = useQuery(
     api.threads.getThreadName,
-    isId && threadId ? { id: threadId as Id<"threads"> } : "skip"
+    isId && threadId ? { id: threadId } : "skip"
   );
 
   return (

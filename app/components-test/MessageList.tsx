@@ -9,21 +9,27 @@ import { AIMessage, AIMessageContent } from "~/components/kibo-ui/ai/message";
 import { AIResponse } from "~/components/kibo-ui/ai/response";
 import { AttachmentList } from "./AttachmentList";
 import { useQuery } from "convex-helpers/react/cache";
-import type { Id } from "convex/_generated/dataModel";
 
 export const MessageList = memo(function MessageList({
   threadId,
 }: {
-  threadId: Id<"threads">;
+  threadId?: string;
 }) {
-  const messages = useQuery(api.messages.getMessages, { threadId }) || [];
+  const thread = useQuery(
+    api.threads.getThreadByClientId,
+    threadId ? { threadId } : "skip"
+  );
+
+  if (!thread?.thread._id) {
+    return <div className="flex-1 flex flex-col min-h-0 pt-12" />;
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 pt-12">
       <AIConversation className="bg-primary-foreground">
         <AIConversationContent>
           <div className="max-w-3xl mx-auto">
-            {messages.map((m) => (
+            {thread.messages.map((m) => (
               <MessageItem message={m} key={m._id} />
             ))}
           </div>

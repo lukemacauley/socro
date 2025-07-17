@@ -5,6 +5,7 @@ import {
   internalMutation,
   type MutationCtx,
   type QueryCtx,
+  mutation,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import {
@@ -14,8 +15,28 @@ import {
   threadStatus,
 } from "./lib/validators";
 import type { DataModel, Id } from "./_generated/dataModel";
+import { v4 as createId } from "uuid";
 
 type Thread = DataModel["threads"]["document"];
+
+export const createThread = mutation({
+  args: {
+    threadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    await ctx.db.insert("threads", {
+      threadId: args.threadId,
+      lastActivityAt: Date.now(),
+      threadType: "chat",
+      userId,
+    });
+  },
+});
 
 export const getThreads = query({
   args: {
@@ -43,12 +64,15 @@ export const getThreads = query({
 });
 
 export const getThreadName = query({
-  args: { id: v.id("threads") },
+  args: { id: v.string() },
   handler: async (ctx, args) => {
-    const thread = await ctx.db.get(args.id);
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_client_id", (q) => q.eq("threadId", args.id))
+      .unique();
 
     const toParticipants = thread?.toParticipants
-      .map((p) => p.name || p.email)
+      ?.map((p) => p.name || p.email)
       .filter(Boolean);
 
     const fromParticipants = thread?.fromParticipants
@@ -84,6 +108,81 @@ export const getThread = query({
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_thread_id", (q) => q.eq("threadId", args.id))
+      .order("asc")
+      .collect();
+
+    // Get streaming chunks and attachments for messages
+    const messagesWithDetails = await Promise.all(
+      messages.map(async (message) => {
+        // Get attachments for this message
+        const attachments = await ctx.db
+          .query("messageAttachments")
+          .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
+          .collect();
+
+        if (message.role === "ai" && message.isStreaming) {
+          const chunks = await ctx.db
+            .query("streamingChunks")
+            .withIndex("by_message", (q) => q.eq("messageId", message._id))
+            .order("asc")
+            .collect();
+
+          const streamedContent = chunks.map((chunk) => chunk.chunk).join("");
+          return {
+            ...message,
+            content: streamedContent || message.content,
+            chunks: chunks.length,
+            attachments,
+          };
+        }
+        return {
+          ...message,
+          attachments,
+        };
+      })
+    );
+
+    return {
+      thread,
+      messages: messagesWithDetails,
+    };
+  },
+});
+
+export const getThreadByClientId = query({
+  args: { threadId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_external_id", (q) => q.eq("externalId", identity.subject))
+      .unique();
+
+    if (!user) {
+      return null;
+    }
+
+    const userId = user._id;
+
+    // Get thread by client ID
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_client_id", (q) => q.eq("threadId", args.threadId))
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .unique();
+
+    if (!thread) {
+      return null;
+    }
+
+    // Get all messages in the thread
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_thread_id", (q) => q.eq("threadId", thread._id))
       .order("asc")
       .collect();
 
@@ -192,8 +291,11 @@ export const processIncomingEmail = internalMutation({
 
     if (!threadId) {
       // Create new email thread
+      const clientThreadId = createId();
+
       const newThreadId = await ctx.db.insert("threads", {
         subject: args.subject,
+        threadId: clientThreadId,
         fromParticipants: args.fromParticipants,
         toParticipants: args.toParticipants,
         externalThreadId: args.externalThreadId,

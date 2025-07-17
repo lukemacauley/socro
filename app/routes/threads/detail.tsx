@@ -1,9 +1,6 @@
 import { ConversationView } from "~/components-test/ConversationView";
 import type { Route } from "./+types/detail";
-import type { Id } from "convex/_generated/dataModel";
 
 export default function Page({ params }: Route.ComponentProps) {
-  const id = params.id as Id<"threads">;
-
-  return <ConversationView threadId={id} />;
+  return <ConversationView threadId={params.id} />;
 }

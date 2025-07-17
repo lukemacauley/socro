@@ -104,6 +104,53 @@ export const sendMessage = action({
   },
 });
 
+export const createThreadAndSendMessage = action({
+  args: {
+    content: v.string(),
+    uploadId: v.optional(v.string()),
+    threadId: v.string(),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    threadId: Id<"threads">;
+    userMessageId: Id<"messages">;
+    responseMessageId: Id<"messages">;
+  }> => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const threadId = await ctx.runMutation(internal.messages.createChatThread, {
+      userId,
+      threadId: args.threadId,
+    });
+
+    const { userMessageId, responseMessageId } = await ctx.runMutation(
+      internal.messages.insertWithResponsePlaceholder,
+      {
+        threadId,
+        content: args.content,
+        uploadId: args.uploadId,
+        userId,
+      }
+    );
+
+    await ctx.runAction(internal.messages.generateStreamingResponse, {
+      threadId,
+      responseMessageId,
+    });
+
+    return {
+      threadId,
+      userMessageId,
+      responseMessageId,
+    };
+  },
+});
+
 // Helper mutation to insert user message
 export const insertWithResponsePlaceholder = internalMutation({
   args: {
@@ -277,8 +324,8 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
         let emailContent = `Based on the conversation history above, please draft an appropriate response to this most recent email:
             ---
             From: ${
-              thread?.fromParticipants.name ||
-              thread?.fromParticipants.email ||
+              thread?.fromParticipants?.name ||
+              thread?.fromParticipants?.email ||
               "[Sender]"
             }
             Subject: ${thread?.subject || "[No Subject]"}
@@ -440,5 +487,24 @@ export const completeStreaming = internalMutation({
       isStreaming: false,
       streamingComplete: true,
     });
+  },
+});
+
+export const createChatThread = internalMutation({
+  args: {
+    userId: v.id("users"),
+    threadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const threadId = await ctx.db.insert("threads", {
+      subject: "New Chat",
+      threadId: args.threadId,
+      lastActivityAt: Date.now(),
+      status: "new",
+      threadType: "chat",
+      userId: args.userId,
+    });
+
+    return threadId;
   },
 });

@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useSidebar } from "~/components/ui/sidebar";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
 import {
   AIInput,
   AIInputButton,
@@ -18,12 +17,27 @@ import {
   DropzoneEmptyState,
 } from "~/components/kibo-ui/dropzone";
 import { useDropzone } from "react-dropzone";
-import { createId } from "legid";
+import { v4 as createId } from "uuid";
 import AttachmentButton from "./AttachmentButton";
 
-export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
+export const MessageInput = ({
+  threadId,
+  onSendFirstMessage,
+}: {
+  threadId?: string;
+  onSendFirstMessage?: (content: string, uploadId?: string) => void;
+}) => {
   const sendMessage = useAction(api.messages.sendMessage);
+  const createThreadAndSendMessage = useAction(
+    api.messages.createThreadAndSendMessage
+  );
   const uploadFiles = useAction(api.attachments.uploadUserFiles);
+
+  // Get thread data if we have a threadId
+  const threadData = useQuery(
+    api.threads.getThreadByClientId,
+    threadId ? { threadId } : "skip"
+  );
 
   const { state } = useSidebar();
   const { getRootProps, isDragActive } = useDropzone();
@@ -44,16 +58,40 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
       const content = prompt;
       setPrompt("");
 
-      await sendMessage({
-        threadId,
-        content,
-        uploadId,
-      });
+      // If this is for creating a new thread in /new route
+      if (onSendFirstMessage) {
+        onSendFirstMessage(content, uploadId);
+        return;
+      }
+
+      // If we have a threadId, check if thread exists
+      if (threadId) {
+        if (threadData?.thread) {
+          await sendMessage({
+            threadId: threadData.thread._id,
+            content,
+            uploadId,
+          });
+        } else {
+          await createThreadAndSendMessage({
+            content,
+            uploadId,
+            threadId,
+          });
+        }
+      }
 
       setFiles(undefined);
       setUploadId(undefined);
     },
-    [prompt, threadId, sendMessage]
+    [
+      prompt,
+      threadId,
+      sendMessage,
+      createThreadAndSendMessage,
+      onSendFirstMessage,
+      threadData,
+    ]
   );
 
   const handleUploadFiles = useCallback(
@@ -75,7 +113,7 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
         }))
       );
 
-      const uploadId = await createId();
+      const uploadId = createId();
       setUploadId(uploadId);
 
       await uploadFiles({
@@ -83,7 +121,7 @@ export const MessageInput = ({ threadId }: { threadId: Id<"threads"> }) => {
         uploadId,
       });
     },
-    [threadId, sendMessage, uploadFiles]
+    [uploadFiles]
   );
 
   return (
