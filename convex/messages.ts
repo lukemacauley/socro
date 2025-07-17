@@ -9,8 +9,21 @@ import {
 import { api, internal } from "./_generated/api";
 import { verifyThreadOwnership } from "./threads";
 import { type Id } from "./_generated/dataModel";
-import { streamText } from "ai";
+import { streamText, generateText } from "ai";
 import { createGroq } from "@ai-sdk/groq";
+
+// Helper function to generate content preview
+function generateContentPreview(content: string): string {
+  // Remove extra whitespace and newlines
+  const cleaned = content.trim().replace(/\s+/g, ' ');
+  
+  // Take up to 100 characters for preview
+  if (cleaned.length > 100) {
+    return cleaned.substring(0, 97) + '...';
+  }
+  
+  return cleaned;
+}
 
 export const getMessages = query({
   args: { threadId: v.id("threads") },
@@ -137,6 +150,12 @@ export const createThreadAndSendMessage = action({
         userId,
       }
     );
+
+    // Generate title for the new chat thread
+    await ctx.scheduler.runAfter(0, internal.messages.generateThreadTitle, {
+      threadId,
+      content: args.content,
+    });
 
     await ctx.runAction(internal.messages.generateStreamingResponse, {
       threadId,
@@ -506,5 +525,72 @@ export const createChatThread = internalMutation({
     });
 
     return threadId;
+  },
+});
+
+// Internal action to generate AI title for thread
+export const generateThreadTitle = internalAction({
+  args: {
+    threadId: v.id("threads"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      const apiKey = process.env.CONVEX_GROQ_API_KEY;
+      if (!apiKey) {
+        console.error("GROQ_API_KEY not set, skipping title generation");
+        return;
+      }
+
+      const groq = createGroq({
+        apiKey: apiKey.trim(),
+      });
+
+      const { text } = await generateText({
+        model: groq("llama-3.3-70b-versatile"),
+        prompt: `Generate a short, descriptive title (max 5 words) for a conversation that starts with this message: "${args.content}". 
+        
+        Requirements:
+        - Maximum 5 words
+        - Be specific and descriptive
+        - No quotes or punctuation
+        - Just return the title, nothing else`,
+        temperature: 0.3,
+        maxTokens: 20,
+      });
+
+      const title = text.trim().replace(/['"]/g, '');
+      const preview = generateContentPreview(args.content);
+
+      // Update the thread with the generated title and preview
+      await ctx.runMutation(internal.messages.updateThreadTitleAndPreview, {
+        threadId: args.threadId,
+        subject: title || "New Chat",
+        contentPreview: preview,
+      });
+    } catch (error) {
+      console.error("Failed to generate title:", error);
+      // Still update with content preview even if title generation fails
+      await ctx.runMutation(internal.messages.updateThreadTitleAndPreview, {
+        threadId: args.threadId,
+        subject: "New Chat",
+        contentPreview: generateContentPreview(args.content),
+      });
+    }
+  },
+});
+
+// Internal mutation to update thread title and preview
+export const updateThreadTitleAndPreview = internalMutation({
+  args: {
+    threadId: v.id("threads"),
+    subject: v.string(),
+    contentPreview: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.threadId, {
+      subject: args.subject,
+      contentPreview: args.contentPreview,
+    });
   },
 });
