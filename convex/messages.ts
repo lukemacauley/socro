@@ -15,13 +15,13 @@ import { createGroq } from "@ai-sdk/groq";
 // Helper function to generate content preview
 function generateContentPreview(content: string): string {
   // Remove extra whitespace and newlines
-  const cleaned = content.trim().replace(/\s+/g, ' ');
-  
+  const cleaned = content.trim().replace(/\s+/g, " ");
+
   // Take up to 100 characters for preview
   if (cleaned.length > 100) {
-    return cleaned.substring(0, 97) + '...';
+    return cleaned.substring(0, 97) + "...";
   }
-  
+
   return cleaned;
 }
 
@@ -519,7 +519,6 @@ export const createChatThread = internalMutation({
       subject: "New Chat",
       threadId: args.threadId,
       lastActivityAt: Date.now(),
-      status: "new",
       threadType: "chat",
       userId: args.userId,
     });
@@ -559,7 +558,7 @@ export const generateThreadTitle = internalAction({
         maxTokens: 20,
       });
 
-      const title = text.trim().replace(/['"]/g, '');
+      const title = text.trim().replace(/['"]/g, "");
       const preview = generateContentPreview(args.content);
 
       // Update the thread with the generated title and preview

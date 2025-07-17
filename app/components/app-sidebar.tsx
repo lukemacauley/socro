@@ -39,13 +39,13 @@ export const NAVIGATION: {
     title: "Threads",
     icon: MessagesSquare,
     url: "/threads",
-    isActive: true,
-    items: [
-      { title: "All", url: "/threads" },
-      { title: "New", url: "/threads?status=new" },
-      // { title: "In Progress", url: "/threads/?status=in_progress" },
-      { title: "Archived", url: "/threads?status=archived" },
-    ],
+    // isActive: true,
+    // items: [
+    //   { title: "All", url: "/threads" },
+    //   { title: "New", url: "/threads?status=new" },
+    //   // { title: "In Progress", url: "/threads/?status=in_progress" },
+    //   { title: "Archived", url: "/threads?status=archived" },
+    // ],
   },
   {
     title: "Vault",

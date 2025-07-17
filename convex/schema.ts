@@ -35,16 +35,14 @@ const applicationTables = {
     toParticipants: v.optional(v.array(emailParticipant)),
     lastActivityAt: v.number(),
     status: v.optional(threadStatus),
-    processed: v.optional(v.boolean()),
+    opened: v.optional(v.boolean()),
   })
     .index("by_user_id", ["userId"])
     .index("by_status", ["status"])
     .index("by_external_id", ["externalThreadId"])
     .index("by_client_id", ["threadId"])
     .index("by_external_subscription_id", ["externalSubscriptionId"])
-    .index("by_type", ["threadType"])
-    .index("by_processed", ["processed"]),
-
+    .index("by_type", ["threadType"]),
   messages: defineTable({
     threadId: v.id("threads"),
     userId: v.id("users"),

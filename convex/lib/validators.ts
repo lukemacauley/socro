@@ -7,11 +7,7 @@ export const nullOrUndefinedBoolean = v.optional(
 export const nullOrUndefinedNumber = v.optional(v.union(v.number(), v.null()));
 
 // Single source of truth for conversation status
-export const threadStatus = v.union(
-  v.literal("new"),
-  v.literal("pinned"),
-  v.literal("archived")
-);
+export const threadStatus = v.union(v.literal("pinned"), v.literal("archived"));
 
 // Single source of truth for message types
 export const messageType = v.union(

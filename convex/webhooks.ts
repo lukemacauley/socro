@@ -68,7 +68,6 @@ export const fetchAndProcessEmail = internalAction({
         lastActivityAt: email.receivedDateTime
           ? new Date(email.receivedDateTime).getTime()
           : Date.now(),
-        status: "new",
         externalSubscriptionId: args.subscriptionId,
         content: email.body?.content,
         contentPreview: email.bodyPreview,

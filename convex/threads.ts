@@ -6,6 +6,7 @@ import {
   type MutationCtx,
   type QueryCtx,
   mutation,
+  internalAction,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import {
@@ -226,6 +227,13 @@ export const getThreadByClientId = query({
   },
 });
 
+export const setIsOpened = mutation({
+  args: { threadId: v.id("threads") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.threadId, { opened: true });
+  },
+});
+
 export const processIncomingEmail = internalMutation({
   args: {
     subject: v.string(),
@@ -241,7 +249,6 @@ export const processIncomingEmail = internalMutation({
     ),
     externalThreadId: v.optional(v.string()),
     lastActivityAt: v.number(),
-    status: threadStatus,
     externalSubscriptionId: v.string(),
     content: nullOrUndefinedString,
     contentPreview: nullOrUndefinedString,
@@ -302,7 +309,6 @@ export const processIncomingEmail = internalMutation({
         toParticipants: args.toParticipants,
         externalThreadId: args.externalThreadId,
         lastActivityAt: args.lastActivityAt,
-        status: args.status,
         threadType: "email",
         contentPreview: args.contentPreview,
         externalSubscriptionId: args.externalSubscriptionId,
