@@ -9,7 +9,7 @@ export const nullOrUndefinedNumber = v.optional(v.union(v.number(), v.null()));
 // Single source of truth for conversation status
 export const threadStatus = v.union(
   v.literal("new"),
-  v.literal("in_progress"),
+  v.literal("pinned"),
   v.literal("archived")
 );
 

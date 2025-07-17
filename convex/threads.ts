@@ -41,6 +41,7 @@ export const createThread = mutation({
 export const getThreads = query({
   args: {
     threadType: v.optional(v.union(v.literal("chat"), v.literal("email"))),
+    threadStatus: v.optional(v.union(threadStatus, v.null())),
   },
   handler: async (ctx, args): Promise<Thread[]> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
@@ -48,18 +49,19 @@ export const getThreads = query({
       return [];
     }
 
-    return args.threadType
-      ? await ctx.db
-          .query("threads")
-          .withIndex("by_user_id", (q) => q.eq("userId", userId))
-          .filter((q) => q.eq(q.field("threadType"), args.threadType))
-          .order("desc")
-          .collect()
-      : await ctx.db
-          .query("threads")
-          .withIndex("by_user_id", (q) => q.eq("userId", userId))
-          .order("desc")
-          .collect();
+    let query = ctx.db
+      .query("threads")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId));
+
+    if (args.threadType !== undefined && args.threadType !== null) {
+      query = query.filter((q) => q.eq(q.field("threadType"), args.threadType));
+    }
+
+    if (args.threadStatus !== undefined && args.threadStatus !== null) {
+      query = query.filter((q) => q.eq(q.field("status"), args.threadStatus));
+    }
+
+    return await query.order("desc").collect();
   },
 });
 
@@ -340,6 +342,18 @@ export const processIncomingEmail = internalMutation({
   },
 });
 
+export const updateStatus = mutation({
+  args: {
+    threadId: v.id("threads"),
+    status: v.optional(threadStatus),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.threadId, {
+      status: args.status,
+      lastActivityAt: Date.now(),
+    });
+  },
+});
 export const get = internalQuery({
   args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
