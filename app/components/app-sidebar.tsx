@@ -36,7 +36,7 @@ export const NAVIGATION: {
     url: string;
   }[];
 }[] = [
-  { title: "Assistant", icon: MessageSquare, url: "/assistant" },
+  { title: "Chat", icon: MessageSquare, url: "/new" },
   {
     title: "Threads",
     icon: MessagesSquare,

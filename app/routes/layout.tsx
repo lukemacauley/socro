@@ -19,32 +19,25 @@ import {
   SidebarTrigger,
 } from "~/components/ui/sidebar";
 
+type Breadcrumb = {
+  label: string;
+  href: string;
+  isLast: boolean;
+};
+
 export default function Layout() {
   const location = useLocation();
   const pathSegments = location.pathname.split("/").filter(Boolean);
 
-  const breadcrumbItems: {
-    label: string;
-    href: string;
-    isLast: boolean;
-  }[] = [];
+  const breadcrumbItems: Breadcrumb[] = [];
 
   let isId = false;
-
-  // // Always show Home as first item
-  // breadcrumbItems.push({
-  //   label: "Home",
-  //   href: "/",
-  //   isLast: pathSegments.length === 0,
-  // });
-
-  // Build up the path for each segment
   let currentPath = "";
+
   pathSegments.forEach((segment, index) => {
     currentPath += `/${segment}`;
     const isLast = index === pathSegments.length - 1;
 
-    // Format the label
     let label = segment;
     if (segment === "threads") {
       label = "Threads";

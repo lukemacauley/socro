@@ -1,26 +1,15 @@
-import { SignInButton, useAuth } from "@clerk/react-router";
-import { Unauthenticated } from "convex/react";
+import { SignIn } from "@clerk/react-router";
 import type { Route } from "./+types/home";
-import { Button } from "~/components/ui/button";
-import { useEffect } from "react";
 
-export default function Profile({ loaderData: _ }: Route.ComponentProps) {
-  const { isSignedIn } = useAuth();
-
-  useEffect(() => {
-    if (isSignedIn) {
-      window.location.href = "/threads";
-    }
-  }, [isSignedIn]);
-
+export default function Home({}: Route.ComponentProps) {
   return (
-    <Unauthenticated>
-      <SignInButton
-        children={<Button>Sign In</Button>}
-        mode="modal"
+    <div className="flex items-center justify-center h-screen w-full">
+      <SignIn
         oauthFlow="popup"
+        afterSignOutUrl="/"
+        fallbackRedirectUrl="/threads"
         withSignUp
       />
-    </Unauthenticated>
+    </div>
   );
 }
