@@ -71,6 +71,7 @@ export default function Layout() {
       if (threadId) {
         await updateName({ id: threadId, name: newName });
         toast.success("Thread name updated successfully");
+        return;
       }
     } catch (error) {
       toast.error("Failed to update thread name");
@@ -101,7 +102,7 @@ export default function Layout() {
                               value={threadName || "New Thread"}
                               onSave={handleUpdateName}
                               emptyMessage="Thread name cannot be empty"
-                              className="px-0 max-w-none w-96"
+                              className="px-2.5 -ml-2.5 max-w-none w-50"
                             />
                           ) : (
                             threadName || item.label

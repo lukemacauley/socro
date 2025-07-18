@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Input, type InputProps } from "../ui/input";
 import { toast } from "sonner";
 
@@ -21,6 +21,8 @@ export default function GhostInput({
   const [editValue, setEditValue] = useState(value);
   const [isReadOnly, setIsReadOnly] = useState(true);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const handleSave = async () => {
     if (editValue === "") {
       toast.error(emptyMessage);
@@ -32,8 +34,9 @@ export default function GhostInput({
 
     if (editValue !== value) {
       await onSave?.(editValue);
+      setIsReadOnly(true);
+      inputRef.current?.blur();
     }
-    setIsReadOnly(true);
   };
 
   const handleCancel = () => {
@@ -52,6 +55,7 @@ export default function GhostInput({
 
   return (
     <Input
+      ref={inputRef}
       value={isReadOnly ? value : editValue}
       onChange={(e) => setEditValue(e.target.value)}
       onBlur={handleSave}
