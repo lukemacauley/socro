@@ -33,7 +33,7 @@ export function NavMain({
     <SidebarGroup>
       {/* <SidebarGroupLabel>Platform</SidebarGroupLabel> */}
       <SidebarMenu>
-        {items.map((item) =>
+        {items.filter(Boolean).map((item) =>
           item.items && item.items.length > 0 ? (
             <Collapsible
               key={item.title}
@@ -51,7 +51,7 @@ export function NavMain({
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {item.items.map((subItem) => (
+                    {item.items.filter(Boolean).map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
                         <SidebarMenuSubButton asChild>
                           <Link to={subItem.url}>{subItem.title}</Link>

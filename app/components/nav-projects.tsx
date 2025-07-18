@@ -39,7 +39,7 @@ export function NavProjects({
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Projects</SidebarGroupLabel>
       <SidebarMenu>
-        {projects.map((item) => (
+        {projects.filter(Boolean).map((item) => (
           <SidebarMenuItem key={item.name}>
             <SidebarMenuButton asChild>
               <Link to={item.url}>
