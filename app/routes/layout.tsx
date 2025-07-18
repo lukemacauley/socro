@@ -1,6 +1,5 @@
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
-import type { Id } from "convex/_generated/dataModel";
 import { Outlet, useLocation, Link } from "react-router";
 import { Fragment } from "react/jsx-runtime";
 import { AppSidebar } from "~/components/app-sidebar";
