@@ -9,8 +9,8 @@ import {
 import { api, internal } from "./_generated/api";
 import { verifyThreadOwnership } from "./threads";
 import { type Id } from "./_generated/dataModel";
-import { streamText, generateText } from "ai";
-import { createGroq } from "@ai-sdk/groq";
+import { Groq } from "groq-sdk";
+import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
 
 // Helper function to generate content preview
 function generateContentPreview(content: string): string {
@@ -222,15 +222,7 @@ export const generateStreamingResponse = internalAction({
     });
 
     try {
-      const apiKey = process.env.CONVEX_GROQ_API_KEY;
-      if (!apiKey) {
-        throw new Error("GROQ_API_KEY environment variable is not set");
-      }
-
-      // Initialize Groq client with the API key
-      const groq = createGroq({
-        apiKey: apiKey.trim(),
-      });
+      const groq = new Groq();
 
       // Comprehensive system prompt for legal AI assistant
       const systemPrompt = `You are an expert legal AI assistant designed to help lawyers draft professional email responses. Your role is to analyze incoming emails and create thoughtful, legally sound responses while maintaining the highest standards of legal practice.
@@ -291,10 +283,7 @@ export const generateStreamingResponse = internalAction({
 Remember: You are a tool to enhance legal practice efficiency, not replace attorney judgment. Always encourage appropriate human review of substantive legal matters.`;
 
       // Build the conversation with proper format for AI SDK
-      const aiMessages: Array<{
-        role: "system" | "user" | "assistant";
-        content: string;
-      }> = [
+      const aiMessages: ChatCompletionMessageParam[] = [
         {
           role: "system",
           content: systemPrompt,
@@ -405,34 +394,18 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
       }
 
       let fullContent = "";
-      let chunkIndex = 0;
 
-      const { textStream, response } = streamText({
-        model: groq("moonshotai/kimi-k2-instruct"),
+      const response = await groq.chat.completions.create({
         messages: aiMessages,
-        temperature: 0.2,
-        maxRetries: 3,
-        onError: ({ error }) =>
-          console.error(error instanceof Error ? error.message : "Not working"),
+        model: "moonshotai/kimi-k2-instruct",
       });
 
-      for await (const textPart of textStream) {
-        fullContent += textPart;
-
-        // Store chunk in database
-        await ctx.runMutation(internal.messages.addStreamingChunk, {
-          messageId: args.responseMessageId,
-          chunk: textPart,
-          chunkIndex,
-        });
-
-        chunkIndex++;
-      }
-
-      try {
-        await response;
-      } catch (err) {
-        console.error("Final response error:", err);
+      for await (const textPart of response.choices) {
+        const chunk = textPart.message.content;
+        if (!chunk) {
+          continue;
+        }
+        fullContent += chunk;
       }
 
       await ctx.runMutation(internal.messages.completeStreaming, {
@@ -520,6 +493,7 @@ export const createChatThread = internalMutation({
       threadId: args.threadId,
       lastActivityAt: Date.now(),
       threadType: "chat",
+      opened: true,
       userId: args.userId,
     });
 
@@ -535,30 +509,35 @@ export const generateThreadTitle = internalAction({
   },
   handler: async (ctx, args) => {
     try {
-      const apiKey = process.env.CONVEX_GROQ_API_KEY;
-      if (!apiKey) {
-        console.error("GROQ_API_KEY not set, skipping title generation");
-        return;
-      }
+      const groq = new Groq();
 
-      const groq = createGroq({
-        apiKey: apiKey.trim(),
-      });
-
-      const { text } = await generateText({
-        model: groq("llama-3.3-70b-versatile"),
-        prompt: `Generate a short, descriptive title (max 5 words) for a conversation that starts with this message: "${args.content}". 
-        
+      const response = await groq.chat.completions.create({
+        messages: [
+          {
+            role: "user",
+            content: `Generate a short, descriptive title (max 5 words) for a conversation that starts with this message: "${args.content}". 
         Requirements:
         - Maximum 5 words
         - Be specific and descriptive
         - No quotes or punctuation
         - Just return the title, nothing else`,
-        temperature: 0.3,
-        maxTokens: 20,
+          },
+        ],
+        model: "moonshotai/kimi-k2-instruct",
+        stream: false,
       });
 
-      const title = text.trim().replace(/['"]/g, "");
+      let fullContent = "";
+
+      for await (const textPart of response.choices) {
+        const chunk = textPart.message.content;
+        if (!chunk) {
+          continue;
+        }
+        fullContent += chunk;
+      }
+
+      const title = fullContent.trim();
       const preview = generateContentPreview(args.content);
 
       // Update the thread with the generated title and preview

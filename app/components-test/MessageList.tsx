@@ -9,6 +9,7 @@ import { AIMessage, AIMessageContent } from "~/components/kibo-ui/ai/message";
 import { AIResponse } from "~/components/kibo-ui/ai/response";
 import { AttachmentList } from "./AttachmentList";
 import { useQuery } from "convex-helpers/react/cache";
+import { Spinner } from "~/components/kibo-ui/spinner";
 
 export const MessageList = memo(function MessageList({
   threadId,
@@ -51,10 +52,14 @@ function MessageItem({
     return message.content;
   }, [message.content]);
 
+  const isEmpty = !displayContent || displayContent.trim() === "";
+
   return (
     <AIMessage from={isAi ? "assistant" : "user"}>
-      {isAi ? (
-        <AIResponse>{displayContent}</AIResponse>
+      {isEmpty ? (
+        <Spinner variant="bars" />
+      ) : isAi ? (
+        <AIResponse>{message.content}</AIResponse>
       ) : (
         <AIMessageContent>
           <div className="whitespace-pre-wrap">{message.content}</div>

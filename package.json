@@ -10,7 +10,6 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
-    "@ai-sdk/groq": "^1.2.9",
     "@clerk/backend": "^2.4.1",
     "@clerk/react-router": "^1.7.0",
     "@radix-ui/react-avatar": "^1.1.10",
@@ -28,12 +27,12 @@
     "@react-router/serve": "^7.6.3",
     "@shikijs/transformers": "^3.7.0",
     "@t3-oss/env-core": "^0.13.8",
-    "ai": "^4.3.19",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.25.2",
     "convex-helpers": "^0.1.99",
     "dayjs": "^1.11.13",
+    "groq-sdk": "^0.27.0",
     "isbot": "^5.1.27",
     "lucide-react": "^0.525.0",
     "marked": "^16.0.0",

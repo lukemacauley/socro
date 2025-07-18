@@ -9,7 +9,6 @@ import RelativeTime from "~/components/relative-time";
 
 type Thread = (typeof api.threads.getThreads._returnType)[number];
 type ThreadStatus = Thread["status"];
-
 type DateSection =
   | "today"
   | "yesterday"
@@ -36,7 +35,7 @@ export function ConversationList({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4">
+      <div className="py-3">
         {groupedThreads &&
           sectionOrder.map((section) => {
             const sectionThreads = groupedThreads[section];
@@ -47,10 +46,12 @@ export function ConversationList({
             return (
               <div key={section} className="space-y-1">
                 <div className="flex items-center gap-4">
-                  <h3 className="text-sm">{getSectionTitle(section)}</h3>
-                  <div className="h-px w-full flex-none bg-sidebar-border" />
+                  <h3 className="text-xs text-muted-foreground">
+                    {getSectionTitle(section)}
+                  </h3>
+                  <div className="h-px flex-auto bg-sidebar-border" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 pt-1 pb-6">
                   {sectionThreads.map((t) => (
                     <ThreadItem t={t} key={t._id} />
                   ))}
@@ -85,28 +86,35 @@ const ThreadItem = ({ t }: { t: Thread }) => {
   ];
 
   return (
-    <div className="relative group rounded-md hover:bg-sidebar px-3 py-2 bg-card-background">
+    <div className="relative group rounded-md px-3 py-2 hover:bg-accent hover:text-accent-foreground">
       <Link
         to={"/threads/" + t.threadId}
         onClick={() => setIsOpened({ threadId: t._id })}
-        className="flex flex-col sm:flex-row sm:items-center w-full sm:justify-between sm:gap-4 "
+        className="flex flex-col sm:flex-row sm:items-center w-full sm:justify-between sm:gap-3"
       >
-        <div className="min-w-0 flex-1 flex-col sm:flex-row flex sm:items-center sm:gap-4">
-          <div className="w-full sm:w-80 flex-shrink-0 flex items-center gap-2 justify-between">
+        <div
+          className={cn(
+            "size-1.5 absolute left-0",
+            t.opened ? "invisible" : "relative flex"
+          )}
+        >
+          <span className="bg-emerald-500 absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
+          <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+        </div>
+        <div className="min-w-0 flex-1 flex-col sm:flex-row flex sm:items-center sm:gap-3">
+          {/* <div className="w-full sm:w-80 flex-shrink-0 flex items-center gap-2 justify-between">
             <div className="text-sm sm:text-sm text-card-foreground font-medium">
               {t.fromParticipants?.name || t.fromParticipants?.email}
             </div>
             <div className="text-xs sm:hidden text-muted-foreground">
               <RelativeTime date={t.lastActivityAt} />
             </div>
-          </div>
+          </div> */}
           <div
-            className={cn("size-2", t.opened ? "invisible" : "relative flex")}
+            className={cn(
+              "font-medium text-xs sm:text-sm text-card-foreground flex-none truncate"
+            )}
           >
-            <span className="bg-emerald-500 absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </div>
-          <div className="font-medium text-xs sm:text-sm text-card-foreground flex-none truncate">
             {t.subject}
           </div>
           <div className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-1">
@@ -117,12 +125,15 @@ const ThreadItem = ({ t }: { t: Thread }) => {
           <RelativeTime date={t.lastActivityAt} />
         </div>
       </Link>
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2 transition-all duration-200 opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 transition-all duration-200 opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0">
         {statusButtons.map((b) => {
           const isActive = t.status === b.status;
           return (
             <Button
               key={b.status}
+              size="icon-sm"
+              variant="ghost"
+              tooltip={isActive ? b.inactiveTooltip : b.activeTooltip}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -131,9 +142,6 @@ const ThreadItem = ({ t }: { t: Thread }) => {
                   status: isActive ? undefined : b.status,
                 });
               }}
-              size="icon-sm"
-              variant="ghost"
-              tooltip={isActive ? b.inactiveTooltip : b.activeTooltip}
             >
               {isActive ? (
                 <b.inactiveIcon className="size-4" />
@@ -182,8 +190,8 @@ function getSectionTitle(section: DateSection) {
   switch (section) {
     case "pinned":
       return (
-        <span className="flex items-center gap-2">
-          <Pin className="size-4" />
+        <span className="flex items-center pl-1 gap-2">
+          <Pin className="size-3" />
           Pinned
         </span>
       );
