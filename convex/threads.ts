@@ -42,7 +42,7 @@ export const createThread = mutation({
 export const getThreads = query({
   args: {
     threadType: v.optional(v.union(v.literal("chat"), v.literal("email"))),
-    threadStatus: v.optional(v.union(threadStatus, v.null())),
+    threadStatus: v.optional(threadStatus),
   },
   handler: async (ctx, args): Promise<Thread[]> => {
     const userId = await ctx.runQuery(api.auth.loggedInUserId);
@@ -58,8 +58,12 @@ export const getThreads = query({
       query = query.filter((q) => q.eq(q.field("threadType"), args.threadType));
     }
 
-    if (args.threadStatus !== undefined && args.threadStatus !== null) {
-      query = query.filter((q) => q.eq(q.field("status"), args.threadStatus));
+    if (args.threadStatus !== undefined) {
+      if (args.threadStatus === "active") {
+        query = query.filter((q) => q.neq(q.field("status"), "archived"));
+      } else {
+        query = query.filter((q) => q.eq(q.field("status"), args.threadStatus));
+      }
     }
 
     return await query.order("desc").collect();
@@ -356,7 +360,6 @@ export const updateStatus = mutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.threadId, {
       status: args.status,
-      lastActivityAt: Date.now(),
     });
   },
 });

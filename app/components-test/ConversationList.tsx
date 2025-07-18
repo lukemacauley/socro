@@ -17,11 +17,12 @@ type DateSection =
   | "past30days"
   | "pinned";
 
-export function ConversationList() {
-  // const [params] = useSearchParams();
-  // const threadStatus = params.get("status") as ThreadStatus | null;
-
-  const threads = useQuery(api.threads.getThreads, {});
+export function ConversationList({
+  threadStatus,
+}: {
+  threadStatus?: ThreadStatus;
+}) {
+  const threads = useQuery(api.threads.getThreads, { threadStatus });
 
   const groupedThreads = threads ? groupThreadsByDate(threads) : null;
 
@@ -34,7 +35,7 @@ export function ConversationList() {
   ];
 
   return (
-    <div className="h-full flex flex-col pt-12">
+    <div className="h-full flex flex-col">
       <div className="p-4">
         {groupedThreads &&
           sectionOrder.map((section) => {
@@ -116,7 +117,7 @@ const ThreadItem = ({ t }: { t: Thread }) => {
           <RelativeTime date={t.lastActivityAt} />
         </div>
       </Link>
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 transition-all duration-200 opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0">
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2 transition-all duration-200 opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0">
         {statusButtons.map((b) => {
           const isActive = t.status === b.status;
           return (
