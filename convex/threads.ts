@@ -16,7 +16,7 @@ import {
   threadStatus,
 } from "./lib/validators";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { v4 as createId } from "uuid";
+import { v7 as createId } from "uuid";
 
 type Thread = DataModel["threads"]["document"];
 

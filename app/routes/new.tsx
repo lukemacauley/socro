@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { v4 as createId } from "uuid";
+import { v7 as createId } from "uuid";
 import { ConversationView } from "~/components-test/ConversationView";
 import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
