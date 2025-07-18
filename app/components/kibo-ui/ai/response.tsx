@@ -133,9 +133,15 @@ const components: Options["components"] = {
             className
           )}
         >
-          <div className="flex items-center gap-4">
+          {/* <div className="flex items-center gap-4">
             <div className="h-[1px] w-full flex-1 bg-muted" />
             <Badge variant="muted">Email response below</Badge>
+          </div> */}
+          <div className="flex items-center gap-4">
+            <div className="h-px flex-auto bg-sidebar-border" />
+            <div className="text-xs font-normal text-muted-foreground">
+              Email response below
+            </div>
           </div>
           <div className="absolute right-0 top-8">
             <CodeBlockContext.Provider

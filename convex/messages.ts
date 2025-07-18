@@ -104,6 +104,32 @@ export const sendMessage = action({
   },
 });
 
+export const retryMessage = action({
+  args: {
+    messageId: v.id("messages"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Get message and verify ownership in one mutation
+    const message = await ctx.runMutation(internal.messages.resetMessageForRetry, {
+      messageId: args.messageId,
+      userId,
+    });
+
+    // Generate new response
+    await ctx.runAction(internal.messages.generateStreamingResponse, {
+      threadId: message.threadId,
+      responseMessageId: args.messageId,
+    });
+
+    return { messageId: args.messageId };
+  },
+});
+
 export const createThreadAndSendMessage = action({
   args: {
     content: v.string(),
@@ -461,3 +487,43 @@ ${emailContent}
 
 Note: For quick internal exchanges, keep responses concise and conversational.`;
 }
+
+export const resetMessageForRetry = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    // Verify ownership through thread
+    await verifyThreadOwnership(ctx, message.threadId, args.userId);
+
+    // Only allow retry on AI messages
+    if (message.role !== "ai") {
+      throw new Error("Can only retry AI messages");
+    }
+
+    // Clear streaming chunks
+    const chunks = await ctx.db
+      .query("streamingChunks")
+      .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
+      .collect();
+
+    for (const chunk of chunks) {
+      await ctx.db.delete(chunk._id);
+    }
+
+    // Reset message state
+    await ctx.db.patch(args.messageId, {
+      content: "",
+      isStreaming: true,
+      streamingComplete: false,
+    });
+
+    return message;
+  },
+});

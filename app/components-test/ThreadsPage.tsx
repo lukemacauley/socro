@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ConversationList } from "./ConversationList";
 
-export default async function Threads() {
+export default function Threads() {
   return (
     <div className="pt-12">
       <Tabs defaultValue="all" className="p-4">

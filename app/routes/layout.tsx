@@ -1,8 +1,11 @@
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
+import { useMutation } from "convex/react";
 import { Outlet, useLocation, Link } from "react-router";
 import { Fragment } from "react/jsx-runtime";
+import { toast } from "sonner";
 import { AppSidebar } from "~/components/app-sidebar";
+import GhostInput from "~/components/layout/ghost-input";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -61,6 +64,20 @@ export default function Layout() {
     isId && threadId ? { id: threadId } : "skip"
   );
 
+  const updateName = useMutation(api.threads.updateThreadName);
+
+  const handleUpdateName = async (newName: string) => {
+    try {
+      if (threadId) {
+        await updateName({ id: threadId, name: newName });
+        toast.success("Thread name updated successfully");
+      }
+    } catch (error) {
+      toast.error("Failed to update thread name");
+      console.error("Error updating thread name:", error);
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -79,7 +96,16 @@ export default function Layout() {
                     <BreadcrumbItem>
                       {item.isLast ? (
                         <BreadcrumbPage>
-                          {threadName || item.label}
+                          {isId ? (
+                            <GhostInput
+                              value={threadName || "New Thread"}
+                              onSave={handleUpdateName}
+                              emptyMessage="Thread name cannot be empty"
+                              className="px-0 max-w-none w-96"
+                            />
+                          ) : (
+                            threadName || item.label
+                          )}
                         </BreadcrumbPage>
                       ) : (
                         <BreadcrumbLink asChild>

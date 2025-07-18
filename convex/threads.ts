@@ -97,6 +97,24 @@ export const getThreadName = query({
   },
 });
 
+export const updateThreadName = mutation({
+  args: { id: v.string(), name: v.string() },
+  handler: async (ctx, args) => {
+    const thread = await ctx.db
+      .query("threads")
+      .withIndex("by_client_id", (q) => q.eq("threadId", args.id))
+      .unique();
+
+    if (!thread?._id) {
+      throw new Error(`Thread not found: ${args.id}`);
+    }
+
+    await ctx.db.patch(thread._id, {
+      subject: args.name,
+    });
+  },
+});
+
 export const getThread = query({
   args: { id: v.id("threads") },
   handler: async (ctx, args) => {
