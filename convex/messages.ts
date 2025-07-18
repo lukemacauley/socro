@@ -12,19 +12,6 @@ import { type Id } from "./_generated/dataModel";
 import { Groq } from "groq-sdk";
 import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
 
-// Helper function to generate content preview
-function generateContentPreview(content: string): string {
-  // Remove extra whitespace and newlines
-  const cleaned = content.trim().replace(/\s+/g, " ");
-
-  // Take up to 100 characters for preview
-  if (cleaned.length > 100) {
-    return cleaned.substring(0, 97) + "...";
-  }
-
-  return cleaned;
-}
-
 export const getMessages = query({
   args: { threadId: v.id("threads") },
   handler: async (ctx, args) => {
@@ -212,191 +199,22 @@ export const generateStreamingResponse = internalAction({
     responseMessageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
-    // Get conversation history
     const messages = await ctx.runQuery(internal.messages.getThreadHistory, {
       threadId: args.threadId,
     });
 
-    const thread = await ctx.runQuery(internal.threads.get, {
-      threadId: args.threadId,
-    });
+    // const thread = await ctx.runQuery(internal.threads.get, {
+    //   threadId: args.threadId,
+    // });
 
     try {
       const groq = new Groq();
-
-      // Comprehensive system prompt for legal AI assistant
-      const systemPrompt = `You are an expert legal AI assistant designed to help lawyers draft professional email responses. Your role is to analyze incoming emails and create thoughtful, legally sound responses while maintaining the highest standards of legal practice.
-
-# Core Capabilities and Responsibilities:
-
-## 1. Email Analysis
-- Identify the key legal issues, questions, or requests in the email
-- Recognize the type of legal matter (litigation, transactional, advisory, etc.)
-- Assess urgency and priority level
-- Identify all parties involved and their relationships
-- Note any deadlines, dates, or time-sensitive matters
-
-## 2. Professional Communication Standards
-- Maintain a professional, courteous tone appropriate for legal correspondence
-- Use clear, precise language avoiding unnecessary legalese
-- Structure responses logically with proper paragraphs and formatting
-- Ensure grammar and spelling are impeccable
-- Adapt tone based on recipient (client, opposing counsel, court, colleague)
-
-## 3. Legal Accuracy and Ethics
-- Never provide definitive legal advice without appropriate disclaimers
-- Flag areas requiring attorney review or additional research
-- Maintain attorney-client privilege considerations
-- Identify potential conflicts of interest
-- Suggest when matters should be escalated to senior counsel
-- Always err on the side of caution with legal conclusions
-
-## 4. Response Drafting Guidelines
-- Begin with appropriate salutation and reference to their communication
-- Acknowledge receipt and thank them for their message when appropriate
-- Address each point raised systematically
-- Provide clear action items and next steps
-- Include relevant timelines and deadlines
-- End with professional closing and clear contact information
-- Suggest any necessary disclaimers or confidentiality notices
-
-## 5. Special Considerations
-- For litigation matters: Be mindful of admissions, maintain strategic positioning
-- For transactional matters: Focus on deal progression and commercial reasonableness  
-- For client communications: Balance legal accuracy with accessibility
-- For opposing counsel: Maintain professional boundaries while advocating firmly
-- For internal communications: Be candid while maintaining professionalism
-
-## 6. Risk Management
-- Identify issues requiring malpractice insurance considerations
-- Flag statute of limitations concerns
-- Note any potential ethical violations
-- Highlight areas where written confirmation is advisable
-- Suggest when phone calls might be preferable to written communication
-
-## 7. Practical Features
-- When relevant, suggest template language for common scenarios
-- Provide alternative phrasings for sensitive topics
-- Include placeholders [IN BRACKETS] for information requiring attorney input
-- Highlight sections requiring particular attorney review with **[ATTORNEY REVIEW NEEDED]**
-
-Remember: You are a tool to enhance legal practice efficiency, not replace attorney judgment. Always encourage appropriate human review of substantive legal matters.`;
-
-      // Build the conversation with proper format for AI SDK
-      const aiMessages: ChatCompletionMessageParam[] = [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-      ];
-
-      // First, add all previous messages as context (excluding the most recent)
-      if (messages && messages.length > 1) {
-        const previousMessages = messages
-          .slice(0, -1)
-          .filter((msg) => msg.content?.trim() !== "")
-          .map((msg) => {
-            let content = msg.content || "";
-
-            // Add attachment information if present
-            if (msg.attachments && msg.attachments.length > 0) {
-              content += "\n\n[Attachments:";
-              msg.attachments.forEach((att) => {
-                content += `\n- ${att.name} (${att.contentType}, ${(
-                  att.size / 1024
-                ).toFixed(2)} KB)`;
-                if (att.parsedContent) {
-                  content += `\n  Content:\n${att.parsedContent}`;
-                }
-              });
-              content += "]";
-            }
-
-            return {
-              role:
-                msg.role === "user"
-                  ? ("user" as const)
-                  : ("assistant" as const),
-              content,
-            };
-          });
-        aiMessages.push(...previousMessages);
-      }
-
-      // Get the most recent message that needs a response
-      const mostRecentMessage =
-        messages && messages.length > 0 ? messages[messages.length - 1] : null;
-
-      // Format the request for response to the most recent message
-      if (mostRecentMessage) {
-        let emailContent = `Based on the conversation history above, please draft an appropriate response to this most recent email:
-            ---
-            From: ${
-              thread?.fromParticipants?.name ||
-              thread?.fromParticipants?.email ||
-              "[Sender]"
-            }
-            Subject: ${thread?.subject || "[No Subject]"}
-            Date: ${
-              new Date(mostRecentMessage._creationTime).toLocaleString() ||
-              "[Date]"
-            }
-
-            Email Content:
-            ${mostRecentMessage.content}`;
-
-        // Add attachment information for the most recent message
-        if (
-          mostRecentMessage.attachments &&
-          mostRecentMessage.attachments.length > 0
-        ) {
-          emailContent += "\n\nAttachments in this email:";
-          mostRecentMessage.attachments.forEach((att) => {
-            emailContent += `\n- ${att.name} (${att.contentType}, ${(
-              att.size / 1024
-            ).toFixed(2)} KB)`;
-            if (att.parsedContent) {
-              emailContent += `\n  Full Content:\n${att.parsedContent}`;
-            }
-          });
-        }
-
-        emailContent += `
-            ---
-
-            Please draft a response that:
-            1. Matches the appropriate tone based on the sender and context:
-              - For clients: Professional and clear, avoiding unnecessary legal jargon
-              - For colleagues: Natural and conversational while remaining professional
-              - For opposing counsel: Formal and precise
-              - For internal team: Friendly but efficient
-            2. Directly addresses all points in the above email
-            3. Considers the full conversation history for context
-            4. Maintains consistency with previous responses in this thread
-            5. Follows legal communication best practices where appropriate
-
-            IMPORTANT: Format your response as follows:
-            - First, provide any analysis or context about the email (if needed)
-            - Then, place the actual email response inside a code block using triple backticks:
-            
-            \`\`\`email
-            [Your email response here]
-            \`\`\`
-            
-            The code block should contain ONLY the email text that the user would copy and send, without any meta-commentary.
-
-            Note: If this appears to be a quick internal exchange, keep the response concise and conversational rather than overly formal.`;
-
-        aiMessages.push({
-          role: "user",
-          content: emailContent,
-        });
-      }
+      const msgs = getPromptMessages(messages);
 
       let fullContent = "";
 
       const response = await groq.chat.completions.create({
-        messages: aiMessages,
+        messages: msgs,
         model: "moonshotai/kimi-k2-instruct",
       });
 
@@ -411,10 +229,11 @@ Remember: You are a tool to enhance legal practice efficiency, not replace attor
       await ctx.runMutation(internal.messages.completeStreaming, {
         messageId: args.responseMessageId,
         finalContent:
-          fullContent || "I apologize, but I couldn't generate a response.",
+          fullContent || "I apologise, but I couldn't generate a response.",
       });
     } catch (error) {
       console.error("Error initializing Groq client:", error);
+
       await ctx.runMutation(internal.messages.completeStreaming, {
         messageId: args.responseMessageId,
         finalContent:
@@ -434,7 +253,6 @@ export const getThreadHistory = internalQuery({
       .order("asc")
       .collect();
 
-    // Get attachments for each message
     const messagesWithAttachments = await Promise.all(
       messages.map(async (message) => {
         const attachments = await ctx.db
@@ -515,12 +333,12 @@ export const generateThreadTitle = internalAction({
         messages: [
           {
             role: "user",
-            content: `Generate a short, descriptive title (max 5 words) for a conversation that starts with this message: "${args.content}". 
-        Requirements:
-        - Maximum 5 words
-        - Be specific and descriptive
-        - No quotes or punctuation
-        - Just return the title, nothing else`,
+            content: `Generate a short, descriptive title (max 5 words) for a conversation that starts with this message: ${args.content}.
+            Requirements:
+            - Maximum 5 words
+            - Be specific and descriptive
+            - No quotes or punctuation
+            - Just return the title, nothing else`,
           },
         ],
         model: "moonshotai/kimi-k2-instruct",
@@ -537,23 +355,20 @@ export const generateThreadTitle = internalAction({
         fullContent += chunk;
       }
 
-      const title = fullContent.trim();
-      const preview = generateContentPreview(args.content);
+      const subject = fullContent.trim();
 
-      // Update the thread with the generated title and preview
+      let contentPreview = args.content.trim();
+      if (contentPreview.length > 100) {
+        contentPreview = args.content.substring(0, 100);
+      }
+
       await ctx.runMutation(internal.messages.updateThreadTitleAndPreview, {
         threadId: args.threadId,
-        subject: title || "New Chat",
-        contentPreview: preview,
+        subject,
+        contentPreview,
       });
     } catch (error) {
       console.error("Failed to generate title:", error);
-      // Still update with content preview even if title generation fails
-      await ctx.runMutation(internal.messages.updateThreadTitleAndPreview, {
-        threadId: args.threadId,
-        subject: "New Chat",
-        contentPreview: generateContentPreview(args.content),
-      });
     }
   },
 });
@@ -572,3 +387,77 @@ export const updateThreadTitleAndPreview = internalMutation({
     });
   },
 });
+
+type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
+
+function getPromptMessages(
+  messages: Message[] | undefined | null
+): ChatCompletionMessageParam[] {
+  if (!messages?.length) {
+    return [{ role: "system" as const, content: SYSTEM_PROMPT }];
+  }
+
+  const validMessages = messages.filter(
+    (msg) => msg.role !== "system" && msg.content?.trim()
+  );
+
+  if (!validMessages.length) {
+    return [{ role: "system" as const, content: SYSTEM_PROMPT }];
+  }
+
+  const formattedMessages: ChatCompletionMessageParam[] = [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+  ];
+
+  const historyMessages = validMessages.slice(0, -1);
+  if (historyMessages.length > 0) {
+    formattedMessages.push(
+      ...historyMessages.map((msg) => ({
+        role: msg.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: msg.content!.trim(), // We know content exists from filter
+      }))
+    );
+  }
+
+  const mostRecentMessage = validMessages[validMessages.length - 1];
+  formattedMessages.push({
+    role: "user" as const,
+    content: formatEmailDraftRequest(mostRecentMessage.content!),
+  });
+
+  return formattedMessages;
+}
+
+// Separate the prompt templates for better maintainability
+const SYSTEM_PROMPT = `You are an expert legal AI assistant specializing in drafting professional email responses for lawyers. Your goal is to analyze incoming emails and create legally sound, contextually appropriate responses.`;
+
+const TONE_GUIDELINES = `
+- **Clients**: Professional and clear, avoiding unnecessary legal jargon
+- **Colleagues**: Natural and conversational while remaining professional
+- **Opposing counsel**: Formal and precise
+- **Internal team**: Friendly but efficient`;
+
+function formatEmailDraftRequest(emailContent: string): string {
+  return `Please draft a response to the following email:
+
+---
+${emailContent}
+---
+
+**Requirements:**
+1. Match the appropriate tone based on sender and context:${TONE_GUIDELINES}
+2. Address all points raised in the email
+3. Consider the full conversation history for context
+4. Maintain consistency with previous responses
+5. Follow legal communication best practices
+
+**Output Format:**
+- Provide brief analysis or context (if needed)
+- Then include the email response in a code block:
+
+\`\`\`email
+[Your complete email response here]
+\`\`\`
+
+Note: For quick internal exchanges, keep responses concise and conversational.`;
+}
