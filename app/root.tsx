@@ -14,6 +14,11 @@ import { ConvexReactClient } from "convex/react";
 import { Toaster } from "./components/ui/sonner";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import { env } from "env";
+import { rootAuthLoader } from "@clerk/react-router/ssr.server";
+
+export async function loader(args: Route.LoaderArgs) {
+  return rootAuthLoader(args);
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
