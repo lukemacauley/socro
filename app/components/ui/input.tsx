@@ -15,8 +15,7 @@ const inputVariants = cva(
         ],
         ghost: [
           "bg-transparent border-transparent",
-          "selection:bg-accent selection:text-accent-foreground",
-          "focus-visible:border-transparent focus-visible:ring-0 focus-visible:bg-accent",
+          "focus-visible:border-transparent focus-visible:ring-0 focus-visible:bg-muted",
           "aria-invalid:border-transparent aria-invalid:ring-0",
         ],
       },

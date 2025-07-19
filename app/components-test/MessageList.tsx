@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { api } from "convex/_generated/api";
 import {
   AIConversation,
@@ -11,8 +11,11 @@ import { AttachmentList } from "./AttachmentList";
 import { useQuery } from "convex-helpers/react/cache";
 import { Spinner } from "~/components/kibo-ui/spinner";
 import { Button } from "~/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCw, CheckIcon, CopyIcon } from "lucide-react";
 import { useAction } from "convex/react";
+import { cn } from "~/lib/utils";
+import { marked } from "marked";
+import { toast } from "sonner";
 
 export const MessageList = memo(function MessageList({
   threadId,
@@ -54,6 +57,8 @@ function MessageItem({
   const isAi = message.messageType === "ai_response";
   const isEmpty = !message.content || message.content.trim() === "";
 
+  const [isCopied, setIsCopied] = useState(false);
+
   const handleRetry = async () => {
     try {
       await retryMessage({ messageId: message._id });
@@ -62,31 +67,92 @@ function MessageItem({
     }
   };
 
+  const extractEmailCodeBlocks = (content: string): string => {
+    const emailCodeBlockRegex = /```email\n([\s\S]*?)\n```/g;
+    const matches = [...content.matchAll(emailCodeBlockRegex)];
+    if (!matches.length) return "";
+
+    return matches.map((match) => match[1]).join("\n\n");
+  };
+
+  const copyToClipboard = () => {
+    if (typeof window === "undefined" || !navigator.clipboard.write) {
+      return;
+    }
+
+    let textToCopy = message.content;
+
+    if (isAi && message.content) {
+      const emailBlocks = extractEmailCodeBlocks(message.content);
+      textToCopy = emailBlocks || message.content;
+    }
+
+    if (!textToCopy) {
+      console.error("No content to copy");
+      return;
+    }
+
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = marked(textToCopy, { async: false });
+
+    const htmlBlob = new Blob([tempDiv.innerHTML], { type: "text/html" });
+    const textBlob = new Blob([tempDiv.innerText], { type: "text/plain" });
+
+    navigator.clipboard
+      .write([
+        new ClipboardItem({
+          "text/html": htmlBlob,
+          "text/plain": textBlob,
+        }),
+      ])
+      .then(() => {
+        toast.success(
+          isAi ? "Email copied to clipboard " : "Message copied to clipboard"
+        );
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      });
+  };
+
   return (
     <AIMessage from={isAi ? "assistant" : "user"}>
       {isEmpty ? (
         <Spinner variant="bars" />
       ) : isAi ? (
-        <div className="w-full group">
-          <AIResponse>{message.content}</AIResponse>
-          <div className="mt-2">
-            <Button
-              size="icon"
-              variant="ghost"
-              tooltip="Retry message"
-              onClick={handleRetry}
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <RotateCcw className="size-4" />
-            </Button>
-          </div>
-        </div>
+        <AIResponse>{message.content}</AIResponse>
       ) : (
         <AIMessageContent>
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          {message.content}
           <AttachmentList attachments={message.attachments} />
         </AIMessageContent>
       )}
+      <div
+        className={cn(
+          "opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1",
+          isAi ? "mt-2" : ""
+        )}
+      >
+        <Button
+          size="icon"
+          variant="ghost"
+          tooltip="Retry message"
+          onClick={handleRetry}
+        >
+          <RotateCw className="size-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          tooltip={isAi ? "Copy email" : "Copy message"}
+          onClick={copyToClipboard}
+        >
+          {isCopied ? (
+            <CheckIcon className="size-4" />
+          ) : (
+            <CopyIcon className="size-4" />
+          )}
+        </Button>
+      </div>
     </AIMessage>
   );
 }

@@ -128,7 +128,7 @@ const components: Options["components"] = {
       return (
         <div
           className={cn(
-            "relative group",
+            "relative",
             // "mt-8 pt-8 border-t-4 border-double border-sidebar-border",
             className
           )}
@@ -143,7 +143,7 @@ const components: Options["components"] = {
               Email response below
             </div>
           </div>
-          <div className="absolute right-0 top-8">
+          {/* <div className="absolute right-0 top-8">
             <CodeBlockContext.Provider
               value={{ value: language, onValueChange: undefined, data }}
             >
@@ -153,8 +153,9 @@ const components: Options["components"] = {
                 onError={console.error}
               />
             </CodeBlockContext.Provider>
-          </div>
-          <div className="pr-12 mt-4 prose max-w-none">
+          </div> */}
+          {/* <div className="pr-12 mt-4 prose max-w-none"> */}
+          <div className="mt-4 prose max-w-none">
             <ReactMarkdown>{data[0].code}</ReactMarkdown>
           </div>
         </div>
@@ -213,7 +214,7 @@ export const AIResponse = memo(
     return (
       <div
         className={cn(
-          "size-full prose prose-p:text-primary prose-li:text-primary prose-strong:text-primary prose-headings:text-primary max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+          "size-full prose prose-p:text-accent-foreground prose-li:text-accent-foreground prose-strong:text-accent-foreground prose-headings:text-accent-foreground max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
           className
         )}
         {...props}
