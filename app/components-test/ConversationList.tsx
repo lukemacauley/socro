@@ -86,11 +86,11 @@ const ThreadItem = ({ t }: { t: Thread }) => {
   ];
 
   return (
-    <div className="relative group rounded-md px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+    <div className="relative group rounded-md hover:bg-accent hover:text-accent-foreground">
       <Link
         to={"/threads/" + t.threadId}
         onClick={() => setIsOpened({ threadId: t._id })}
-        className="flex flex-col sm:flex-row sm:items-center w-full sm:justify-between sm:gap-3"
+        className="flex flex-col sm:flex-row sm:items-center w-full sm:justify-between sm:gap-3 px-3 py-2 "
       >
         <div
           className={cn(
