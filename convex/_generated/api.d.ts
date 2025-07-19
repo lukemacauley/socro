@@ -19,6 +19,7 @@ import type * as router from "../router.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
 import type * as webhooks from "../webhooks.js";
+import type * as workflows from "../workflows.js";
 
 import type {
   ApiFromModules,
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   threads: typeof threads;
   users: typeof users;
   webhooks: typeof webhooks;
+  workflows: typeof workflows;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

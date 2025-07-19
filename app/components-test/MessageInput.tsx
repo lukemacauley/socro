@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useSidebar } from "~/components/ui/sidebar";
-import { useAction, useQuery } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "convex/_generated/api";
 import {
   AIInput,
@@ -19,12 +19,15 @@ import {
 import { useDropzone } from "react-dropzone";
 import { v7 as createId } from "uuid";
 import AttachmentButton from "./AttachmentButton";
+import type { Id } from "convex/_generated/dataModel";
 
 export const MessageInput = ({
   threadId,
+  clientThreadId,
   onSendFirstMessage,
 }: {
-  threadId?: string;
+  threadId?: Id<"threads">;
+  clientThreadId?: string;
   onSendFirstMessage?: (content: string, uploadId?: string) => void;
 }) => {
   const sendMessage = useAction(api.messages.sendMessage);
@@ -32,12 +35,6 @@ export const MessageInput = ({
     api.messages.createThreadAndSendMessage
   );
   const uploadFiles = useAction(api.attachments.uploadUserFiles);
-
-  // Get thread data if we have a threadId
-  const threadData = useQuery(
-    api.threads.getThreadByClientId,
-    threadId ? { threadId } : "skip"
-  );
 
   const { state } = useSidebar();
   const { getRootProps, isDragActive } = useDropzone();
@@ -58,27 +55,24 @@ export const MessageInput = ({
       const content = prompt;
       setPrompt("");
 
-      // If this is for creating a new thread in /new route
       if (onSendFirstMessage) {
         onSendFirstMessage(content, uploadId);
         return;
       }
 
-      // If we have a threadId, check if thread exists
       if (threadId) {
-        if (threadData?.thread) {
-          await sendMessage({
-            threadId: threadData.thread._id,
-            content,
-            uploadId,
-          });
-        } else {
-          await createThreadAndSendMessage({
-            content,
-            uploadId,
-            threadId,
-          });
-        }
+        await sendMessage({
+          threadId,
+          content,
+          uploadId,
+        });
+        return;
+      } else if (clientThreadId) {
+        await createThreadAndSendMessage({
+          content,
+          uploadId,
+          threadId: clientThreadId,
+        });
       }
 
       setFiles(undefined);
@@ -87,10 +81,10 @@ export const MessageInput = ({
     [
       prompt,
       threadId,
+      clientThreadId,
       sendMessage,
       createThreadAndSendMessage,
       onSendFirstMessage,
-      threadData,
     ]
   );
 

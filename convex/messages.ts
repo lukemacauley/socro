@@ -7,62 +7,9 @@ import {
   action,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { verifyThreadOwnership } from "./threads";
 import { type Id } from "./_generated/dataModel";
 import { Groq } from "groq-sdk";
 import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
-
-export const getMessages = query({
-  args: { threadId: v.id("threads") },
-  handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    if (!userId) {
-      return [];
-    }
-    await verifyThreadOwnership(ctx, args.threadId, userId);
-
-    const messages = await ctx.db
-      .query("messages")
-      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
-      .order("asc")
-      .collect();
-
-    // Get streaming chunks and attachments for messages
-    const messagesWithDetails = await Promise.all(
-      messages.map(async (message) => {
-        // Get attachments for this message
-        const attachments = await ctx.db
-          .query("messageAttachments")
-          .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
-          .collect();
-
-        // Get streaming chunks if it's an AI message
-        if (message.role === "ai" && message.isStreaming) {
-          const chunks = await ctx.db
-            .query("streamingChunks")
-            .withIndex("by_message", (q) => q.eq("messageId", message._id))
-            .order("asc")
-            .collect();
-
-          const streamedContent = chunks.map((chunk) => chunk.chunk).join("");
-          return {
-            ...message,
-            content: streamedContent || message.content,
-            chunks: chunks.length,
-            attachments,
-          };
-        }
-
-        return {
-          ...message,
-          attachments,
-        };
-      })
-    );
-
-    return messagesWithDetails;
-  },
-});
 
 export const sendMessage = action({
   args: {
@@ -77,7 +24,7 @@ export const sendMessage = action({
     userMessageId: Id<"messages">;
     responseMessageId: Id<"messages">;
   }> => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -109,16 +56,19 @@ export const retryMessage = action({
     messageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
     if (!userId) {
       throw new Error("Not authenticated");
     }
 
     // Get message and verify ownership in one mutation
-    const message = await ctx.runMutation(internal.messages.resetMessageForRetry, {
-      messageId: args.messageId,
-      userId,
-    });
+    const message = await ctx.runMutation(
+      internal.messages.resetMessageForRetry,
+      {
+        messageId: args.messageId,
+        userId,
+      }
+    );
 
     // Generate new response
     await ctx.runAction(internal.messages.generateStreamingResponse, {
@@ -144,7 +94,7 @@ export const createThreadAndSendMessage = action({
     userMessageId: Id<"messages">;
     responseMessageId: Id<"messages">;
   }> => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -192,8 +142,6 @@ export const insertWithResponsePlaceholder = internalMutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    await verifyThreadOwnership(ctx, args.threadId, args.userId);
-
     const userMessageId = await ctx.db.insert("messages", {
       content: args.content,
       role: "user",
@@ -228,10 +176,6 @@ export const generateStreamingResponse = internalAction({
     const messages = await ctx.runQuery(internal.messages.getThreadHistory, {
       threadId: args.threadId,
     });
-
-    // const thread = await ctx.runQuery(internal.threads.get, {
-    //   threadId: args.threadId,
-    // });
 
     try {
       const groq = new Groq();
@@ -345,7 +289,6 @@ export const createChatThread = internalMutation({
   },
 });
 
-// Internal action to generate AI title for thread
 export const generateThreadTitle = internalAction({
   args: {
     threadId: v.id("threads"),
@@ -399,7 +342,6 @@ export const generateThreadTitle = internalAction({
   },
 });
 
-// Internal mutation to update thread title and preview
 export const updateThreadTitleAndPreview = internalMutation({
   args: {
     threadId: v.id("threads"),
@@ -498,9 +440,6 @@ export const resetMessageForRetry = internalMutation({
     if (!message) {
       throw new Error("Message not found");
     }
-
-    // Verify ownership through thread
-    await verifyThreadOwnership(ctx, message.threadId, args.userId);
 
     // Only allow retry on AI messages
     if (message.role !== "ai") {

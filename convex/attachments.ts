@@ -12,7 +12,6 @@ import { MICROSOFT_GRAPH_BASE_URL } from "./webhooks";
 import Reducto, { toFile } from "reductoai";
 import { attachmentValidator } from "./lib/validators";
 
-// Types for attachment handling
 interface EmailAttachmentData {
   id?: string | null;
   name?: string | null;
@@ -29,48 +28,18 @@ interface ProcessedAttachment {
   contentType: string;
 }
 
-// Get attachments for a message
-export const getMessageAttachments = query({
-  args: { messageId: v.id("messages") },
-  handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    if (!userId) {
-      return [];
-    }
-
-    const attachments = await ctx.db
-      .query("messageAttachments")
-      .withIndex("by_message_id", (q) => q.eq("messageId", args.messageId))
-      .collect();
-
-    // Get signed URLs for each attachment
-    const attachmentsWithUrls = await Promise.all(
-      attachments.map(async (attachment) => {
-        const url = await ctx.storage.getUrl(attachment.storageId);
-        return {
-          ...attachment,
-          url,
-        };
-      })
-    );
-
-    return attachmentsWithUrls;
-  },
-});
-
-// Get attachment URL by storage ID
 export const getAttachmentUrl = query({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
-    if (!userId) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity === null) {
       throw new Error("Not authenticated");
     }
+
     return await ctx.storage.getUrl(args.storageId);
   },
 });
 
-// NEW: Frontend file upload action
 export const uploadUserFiles = action({
   args: {
     uploadId: v.string(),
@@ -84,7 +53,7 @@ export const uploadUserFiles = action({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(api.auth.loggedInUserId);
+    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -141,7 +110,6 @@ export const uploadUserFiles = action({
   },
 });
 
-// Helper function to validate and clean email attachment data
 function validateEmailAttachment(att: EmailAttachmentData): {
   id: string;
   name: string;
@@ -170,7 +138,6 @@ function validateEmailAttachment(att: EmailAttachmentData): {
   };
 }
 
-// UPDATED: Email attachment processor with proper type handling
 export const processEmailAttachments = internalAction({
   args: {
     messageId: v.id("messages"),
@@ -288,7 +255,6 @@ export const processEmailAttachments = internalAction({
   },
 });
 
-// Create attachment record in database
 export const createAttachmentRecord = internalMutation({
   args: {
     messageId: v.optional(v.id("messages")),
@@ -337,99 +303,6 @@ export const createAttachmentRecord = internalMutation({
   },
 });
 
-// Get attachment statistics
-export const getAttachmentStats = internalQuery({
-  args: { userId: v.optional(v.id("users")) },
-  handler: async (ctx, args) => {
-    const query = args.userId
-      ? ctx.db
-          .query("messageAttachments")
-          .withIndex("by_user_id", (q) => q.eq("userId", args.userId!))
-      : ctx.db.query("messageAttachments");
-
-    const attachments = await query.collect();
-
-    const totalSize = attachments.reduce((sum, att) => sum + att.size, 0);
-    const typeStats = attachments.reduce((acc, att) => {
-      const type = att.contentType.split("/")[0] || "unknown";
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return {
-      totalAttachments: attachments.length,
-      totalSize,
-      averageSize: attachments.length > 0 ? totalSize / attachments.length : 0,
-      typeDistribution: typeStats,
-      statusDistribution: attachments.reduce((acc, att) => {
-        acc[att.uploadStatus] = (acc[att.uploadStatus] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-    };
-  },
-});
-
-// Clean up failed attachments
-export const cleanupFailedAttachments = internalAction({
-  args: { olderThanHours: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const cutoffTime =
-      Date.now() - (args.olderThanHours || 24) * 60 * 60 * 1000;
-
-    const failedAttachments = await ctx.runQuery(
-      internal.attachments.getFailedAttachments,
-      {
-        cutoffTime,
-      }
-    );
-
-    let cleanedCount = 0;
-    for (const attachment of failedAttachments) {
-      try {
-        // Delete from storage if it exists
-        try {
-          await ctx.storage.delete(attachment.storageId);
-        } catch (error) {
-          // Storage item might not exist, continue
-        }
-
-        // Delete database record
-        await ctx.runMutation(internal.attachments.deleteAttachmentRecord, {
-          attachmentId: attachment._id,
-        });
-
-        cleanedCount++;
-      } catch (error) {
-        console.error(`Failed to cleanup attachment ${attachment._id}:`, error);
-      }
-    }
-
-    console.log(`[ATTACHMENTS] Cleaned up ${cleanedCount} failed attachments`);
-    return { cleanedCount };
-  },
-});
-
-// Get failed attachments for cleanup
-export const getFailedAttachments = internalQuery({
-  args: { cutoffTime: v.number() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("messageAttachments")
-      .withIndex("by_upload_status", (q) => q.eq("uploadStatus", "failed"))
-      .filter((q) => q.lt(q.field("_creationTime"), args.cutoffTime))
-      .collect();
-  },
-});
-
-// Delete attachment record
-export const deleteAttachmentRecord = internalMutation({
-  args: { attachmentId: v.id("messageAttachments") },
-  handler: async (ctx, args) => {
-    await ctx.db.delete(args.attachmentId);
-  },
-});
-
-// Placeholder for Reducto processing - implement based on your needs
 async function processAttachmentWithReducto(
   emailId: string,
   attachmentId: string,

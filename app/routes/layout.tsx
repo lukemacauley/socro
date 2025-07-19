@@ -61,7 +61,7 @@ export default function Layout() {
 
   const threadName = useQuery(
     api.threads.getThreadName,
-    isId && threadId ? { id: threadId } : "skip"
+    isId && threadId ? { threadId } : "skip"
   );
 
   const updateName = useMutation(api.threads.updateThreadName);

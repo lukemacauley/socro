@@ -8,7 +8,6 @@ import {
 import { AIMessage, AIMessageContent } from "~/components/kibo-ui/ai/message";
 import { AIResponse } from "~/components/kibo-ui/ai/response";
 import { AttachmentList } from "./AttachmentList";
-import { useQuery } from "convex-helpers/react/cache";
 import { Spinner } from "~/components/kibo-ui/spinner";
 import { Button } from "~/components/ui/button";
 import { RotateCw, CheckIcon, CopyIcon } from "lucide-react";
@@ -17,17 +16,16 @@ import { cn } from "~/lib/utils";
 import { marked } from "marked";
 import { toast } from "sonner";
 
-export const MessageList = memo(function MessageList({
-  threadId,
-}: {
-  threadId?: string;
-}) {
-  const thread = useQuery(
-    api.threads.getThreadByClientId,
-    threadId ? { threadId } : "skip"
-  );
+export type Message = NonNullable<
+  typeof api.threads.getThreadByClientId._returnType
+>["messages"][number];
 
-  if (!thread?.thread._id) {
+export const MessageList = memo(function MessageList({
+  messages,
+}: {
+  messages: Message[] | undefined;
+}) {
+  if (!messages || messages.length === 0) {
     return <div className="flex-1 flex flex-col min-h-0 pt-12" />;
   }
 
@@ -36,7 +34,7 @@ export const MessageList = memo(function MessageList({
       <AIConversation className="bg-primary-foreground">
         <AIConversationContent>
           <div className="max-w-3xl mx-auto">
-            {thread.messages.map((m) => (
+            {messages.map((m) => (
               <MessageItem message={m} key={m._id} />
             ))}
           </div>
@@ -47,11 +45,7 @@ export const MessageList = memo(function MessageList({
   );
 });
 
-function MessageItem({
-  message,
-}: {
-  message: (typeof api.messages.getMessages._returnType)[number];
-}) {
+function MessageItem({ message }: { message: Message }) {
   const retryMessage = useAction(api.messages.retryMessage);
 
   const isAi = message.messageType === "ai_response";

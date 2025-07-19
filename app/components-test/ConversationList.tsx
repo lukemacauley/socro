@@ -132,7 +132,7 @@ const ThreadItem = ({ t }: { t: Thread }) => {
             <Button
               key={b.status}
               size="icon-sm"
-              variant="ghost-primary"
+              variant="ghost"
               tooltip={isActive ? b.inactiveTooltip : b.activeTooltip}
               onClick={(e) => {
                 e.preventDefault();

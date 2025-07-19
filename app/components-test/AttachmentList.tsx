@@ -1,10 +1,9 @@
 import { memo } from "react";
-import { api } from "convex/_generated/api";
 import AttachmentButton from "./AttachmentButton";
 import { Paperclip } from "lucide-react";
+import type { Message } from "./MessageList";
 
-type Attachment =
-  (typeof api.messages.getMessages._returnType)[number]["attachments"][number];
+type Attachment = Message["attachments"][number];
 
 export const AttachmentList = memo(function AttachmentList({
   attachments,

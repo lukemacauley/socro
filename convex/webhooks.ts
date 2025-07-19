@@ -8,7 +8,6 @@ import {
   isProcessedFileAttachment,
 } from "./lib/email";
 
-// ==================== Constants ====================
 export const MICROSOFT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 export const WEBHOOK_SUBSCRIPTION_DURATION_MINUTES = 4230; // ~70 hours
 
@@ -93,8 +92,6 @@ export const fetchAndProcessEmail = internalAction({
   },
 });
 
-// ==================== User Management ====================
-
 export const updateUserMicrosoftAuth = internalMutation({
   args: {
     userId: v.id("users"),
@@ -106,8 +103,6 @@ export const updateUserMicrosoftAuth = internalMutation({
     });
   },
 });
-
-// ==================== Webhook Setup ====================
 
 export const setupMicrosoftWebhook = internalAction({
   args: { clerkUserId: v.string() },
@@ -216,8 +211,6 @@ export const checkExistingSubscription = async (
   }
 };
 
-// ==================== Authentication ====================
-
 export const getMicrosoftAccessToken = async (
   clerkUserId: string
 ): Promise<string> => {
@@ -303,8 +296,6 @@ export const createMicrosoftSubscription = async (
     throw new Error(`Failed to create inbox subscription: ${error}`);
   }
 };
-
-// ==================== Subscription Refresh ====================
 
 export const refreshAllMicrosoftSubscriptions = internalAction({
   args: {},
