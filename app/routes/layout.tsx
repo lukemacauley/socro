@@ -20,6 +20,7 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "~/components/ui/sidebar";
+import { validate } from "uuid";
 
 type Breadcrumb = {
   label: string;
@@ -33,7 +34,6 @@ export default function Layout() {
 
   const breadcrumbItems: Breadcrumb[] = [];
 
-  let isId = false;
   let currentPath = "";
 
   pathSegments.forEach((segment, index) => {
@@ -47,7 +47,6 @@ export default function Layout() {
       label = "New";
     } else {
       label = "";
-      isId = true;
     }
 
     breadcrumbItems.push({
@@ -58,10 +57,11 @@ export default function Layout() {
   });
 
   const threadId = pathSegments.pop();
+  const isUUID = validate(threadId);
 
   const threadName = useQuery(
     api.threads.getThreadName,
-    isId && threadId ? { threadId } : "skip"
+    isUUID && threadId ? { threadId } : "skip"
   );
 
   const updateName = useMutation(api.threads.updateThreadName);
@@ -69,7 +69,7 @@ export default function Layout() {
   const handleUpdateName = async (newName: string) => {
     try {
       if (threadId) {
-        await updateName({ id: threadId, name: newName });
+        await updateName({ threadId, name: newName });
         toast.success("Thread name updated successfully");
         return;
       }
@@ -97,7 +97,7 @@ export default function Layout() {
                     <BreadcrumbItem>
                       {item.isLast ? (
                         <BreadcrumbPage>
-                          {isId ? (
+                          {isUUID ? (
                             <GhostInput
                               value={threadName || "New Thread"}
                               onSave={handleUpdateName}

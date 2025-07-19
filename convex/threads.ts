@@ -67,7 +67,7 @@ export const getThreadName = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (identity === null) {
-      throw new Error("Not authenticated");
+      return "Untitled Thread";
     }
 
     const thread = await ctx.db
@@ -99,7 +99,7 @@ export const getThreadName = query({
 });
 
 export const updateThreadName = mutation({
-  args: { id: v.string(), name: v.string() },
+  args: { threadId: v.string(), name: v.string() },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (identity === null) {
@@ -108,11 +108,11 @@ export const updateThreadName = mutation({
 
     const thread = await ctx.db
       .query("threads")
-      .withIndex("by_client_id", (q) => q.eq("threadId", args.id))
+      .withIndex("by_client_id", (q) => q.eq("threadId", args.threadId))
       .unique();
 
     if (!thread?._id) {
-      throw new Error(`Thread not found: ${args.id}`);
+      throw new Error(`Thread not found: ${args.threadId}`);
     }
 
     await ctx.db.patch(thread._id, {
