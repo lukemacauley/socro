@@ -25,7 +25,7 @@ export const createThread = mutation({
     await ctx.db.insert("threads", {
       threadId: args.threadId,
       lastActivityAt: Date.now(),
-      threadType: "chat",
+      type: "chat",
       userId,
     });
   },
@@ -47,7 +47,7 @@ export const getThreads = query({
       .withIndex("by_user_id", (q) => q.eq("userId", userId));
 
     if (args.threadType !== undefined && args.threadType !== null) {
-      query = query.filter((q) => q.eq(q.field("threadType"), args.threadType));
+      query = query.filter((q) => q.eq(q.field("type"), args.threadType));
     }
 
     if (args.threadStatus !== undefined) {
@@ -72,7 +72,7 @@ export const getThreadName = query({
 
     const thread = await ctx.db
       .query("threads")
-      .withIndex("by_client_id", (q) => q.eq("threadId", args.threadId))
+      .withIndex("by_client_thread_id", (q) => q.eq("threadId", args.threadId))
       .unique();
 
     if (!thread) {
@@ -108,7 +108,7 @@ export const updateThreadName = mutation({
 
     const thread = await ctx.db
       .query("threads")
-      .withIndex("by_client_id", (q) => q.eq("threadId", args.threadId))
+      .withIndex("by_client_thread_id", (q) => q.eq("threadId", args.threadId))
       .unique();
 
     if (!thread?._id) {
@@ -126,73 +126,41 @@ export const getThreadByClientId = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_external_id", (q) => q.eq("externalId", identity.subject))
-      .unique();
-
-    if (!user) {
       return null;
     }
 
-    const userId = user._id;
-
-    // Get thread by client ID
     const thread = await ctx.db
       .query("threads")
-      .withIndex("by_client_id", (q) => q.eq("threadId", args.threadId))
-      .filter((q) => q.eq(q.field("userId"), userId))
+      .withIndex("by_client_thread_id", (q) => q.eq("threadId", args.threadId))
       .unique();
 
     if (!thread) {
       return null;
     }
 
-    // Get all messages in the thread
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_thread_id", (q) => q.eq("threadId", thread._id))
       .order("asc")
       .collect();
 
-    // Get streaming chunks and attachments for messages
-    const messagesWithDetails = await Promise.all(
-      messages.map(async (message) => {
-        // Get attachments for this message
-        const attachments = await ctx.db
-          .query("messageAttachments")
-          .withIndex("by_message_id", (q) => q.eq("messageId", message._id))
-          .collect();
+    const attachments = await ctx.db
+      .query("messageAttachments")
+      .withIndex("by_thread_id", (q) => q.eq("threadId", thread._id))
+      .collect();
 
-        if (message.role === "ai" && message.isStreaming) {
-          const chunks = await ctx.db
-            .query("streamingChunks")
-            .withIndex("by_message", (q) => q.eq("messageId", message._id))
-            .order("asc")
-            .collect();
+    const messagesWithAttachments = messages.map((message) => {
+      const messageAttachments = attachments.filter(
+        (attachment) => attachment.messageId === message._id
+      );
 
-          const streamedContent = chunks.map((chunk) => chunk.chunk).join("");
-          return {
-            ...message,
-            content: streamedContent || message.content,
-            chunks: chunks.length,
-            attachments,
-          };
-        }
-        return {
-          ...message,
-          attachments,
-        };
-      })
-    );
+      return {
+        ...message,
+        attachments: messageAttachments,
+      };
+    });
 
-    return {
-      thread,
-      messages: messagesWithDetails,
-    };
+    return { threadId: thread._id, messages: messagesWithAttachments };
   },
 });
 
@@ -221,9 +189,9 @@ export const processIncomingEmail = internalMutation({
         name: nullOrUndefinedString,
       })
     ),
-    externalThreadId: v.optional(v.string()),
+    microsoftThreadId: v.optional(v.string()),
     lastActivityAt: v.number(),
-    externalSubscriptionId: v.string(),
+    microsoftSubscriptionId: v.string(),
     content: nullOrUndefinedString,
     contentPreview: nullOrUndefinedString,
     hasAttachments: nullOrUndefinedBoolean,
@@ -252,7 +220,7 @@ export const processIncomingEmail = internalMutation({
     responseMessageId: Id<"messages">;
   }> => {
     const user = await ctx.runQuery(internal.users.getBySubscriptionId, {
-      subscriptionId: args.externalSubscriptionId,
+      subscriptionId: args.microsoftSubscriptionId,
     });
 
     if (!user) {
@@ -265,8 +233,8 @@ export const processIncomingEmail = internalMutation({
     // Create or update email thread
     let thread = await ctx.db
       .query("threads")
-      .withIndex("by_external_id", (q) =>
-        q.eq("externalThreadId", args.externalThreadId)
+      .withIndex("by_microsoft_thread_id", (q) =>
+        q.eq("microsoftThreadId", args.microsoftThreadId)
       )
       .unique();
 
@@ -281,11 +249,10 @@ export const processIncomingEmail = internalMutation({
         threadId: clientThreadId,
         fromParticipants: args.fromParticipants,
         toParticipants: args.toParticipants,
-        externalThreadId: args.externalThreadId,
+        microsoftThreadId: args.microsoftThreadId,
         lastActivityAt: args.lastActivityAt,
-        threadType: "email",
+        type: "email",
         contentPreview: args.contentPreview,
-        externalSubscriptionId: args.externalSubscriptionId,
         userId,
       });
       threadId = newThreadId;
@@ -303,8 +270,7 @@ export const processIncomingEmail = internalMutation({
       content: args.content,
       userId,
       threadId,
-      messageType: isSentEmail ? "sent_email" : "received_email",
-      threadType: "email",
+      type: isSentEmail ? "sent_email" : "received_email",
       role: "system",
     });
 
@@ -313,7 +279,7 @@ export const processIncomingEmail = internalMutation({
       role: "ai",
       userId,
       threadId,
-      messageType: "ai_response",
+      type: "ai_response",
       isStreaming: true,
       streamingComplete: false,
     });

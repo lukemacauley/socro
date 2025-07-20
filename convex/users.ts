@@ -8,7 +8,7 @@ export const getByClerkId = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_external_id", (q) => q.eq("externalId", args.clerkId))
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
       .first();
   },
 });
@@ -20,7 +20,7 @@ export const upsertFromClerk = internalMutation({
       name: `${data.first_name} ${data.last_name}`.trim(),
       email: data.email_addresses[0].email_address,
       imageUrl: data.image_url,
-      externalId: data.id,
+      clerkId: data.id,
       createdAt: Date.now(),
     };
 
@@ -58,8 +58,8 @@ export const getBySubscriptionId = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_subscription_id", (q) =>
-        q.eq("externalSubscriptionId", args.subscriptionId)
+      .withIndex("by_microsoft_subscription_id", (q) =>
+        q.eq("microsoftSubscriptionId", args.subscriptionId)
       )
       .unique();
   },
@@ -70,7 +70,7 @@ export const getAllWithSubscriptions = internalQuery({
   handler: async (ctx) => {
     return await ctx.db
       .query("users")
-      .filter((q) => q.neq(q.field("externalSubscriptionId"), undefined))
+      .filter((q) => q.neq(q.field("microsoftSubscriptionId"), undefined))
       .collect();
   },
 });

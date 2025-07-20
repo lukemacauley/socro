@@ -32,7 +32,7 @@ export const fetchAndProcessEmail = internalAction({
     }
 
     // Get Microsoft access token
-    const accessToken = await getMicrosoftAccessToken(user.externalId);
+    const accessToken = await getMicrosoftAccessToken(user.clerkId);
 
     // Fetch the full email from Microsoft Graph API
     const email = await fetchEmailFromMicrosoft(accessToken, args.emailId);
@@ -63,11 +63,11 @@ export const fetchAndProcessEmail = internalAction({
             email: r.emailAddress?.address,
             name: r.emailAddress?.name,
           })) || [],
-        externalThreadId: email.conversationId ?? "",
+        microsoftThreadId: email.conversationId ?? "",
         lastActivityAt: email.receivedDateTime
           ? new Date(email.receivedDateTime).getTime()
           : Date.now(),
-        externalSubscriptionId: args.subscriptionId,
+        microsoftSubscriptionId: args.subscriptionId,
         content: email.body?.content,
         contentPreview: email.bodyPreview,
         hasAttachments: email.hasAttachments,
@@ -99,7 +99,7 @@ export const updateUserMicrosoftAuth = internalMutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.userId, {
-      externalSubscriptionId: args.subscriptionId,
+      microsoftSubscriptionId: args.subscriptionId,
     });
   },
 });
@@ -321,12 +321,11 @@ export const refreshAllMicrosoftSubscriptions = internalAction({
 
         // Get fresh access token from Clerk - this is the key part!
         // Even if the subscription hasn't expired, we get a fresh token
-        const accessToken = await getMicrosoftAccessToken(user.externalId);
+        const accessToken = await getMicrosoftAccessToken(user.clerkId);
 
-        if (user.externalSubscriptionId) {
-          // Try to renew the existing subscription
+        if (user.microsoftSubscriptionId) {
           const renewed = await renewSubscription(
-            user.externalSubscriptionId,
+            user.microsoftSubscriptionId,
             accessToken
           );
 

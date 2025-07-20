@@ -147,8 +147,22 @@ export const insertWithResponsePlaceholder = internalMutation({
       role: "user",
       userId: args.userId,
       threadId: args.threadId,
-      messageType: "user_message",
+      type: "user_message",
     });
+
+    if (args.uploadId) {
+      const attachments = await ctx.db
+        .query("messageAttachments")
+        .withIndex("by_upload_id", (q) => q.eq("uploadId", args.uploadId))
+        .collect();
+
+      for (const attachment of attachments) {
+        await ctx.db.patch(attachment._id, {
+          messageId: userMessageId,
+          threadId: args.threadId,
+        });
+      }
+    }
 
     const responseMessageId = await ctx.db.insert("messages", {
       content: "",
@@ -157,7 +171,7 @@ export const insertWithResponsePlaceholder = internalMutation({
       threadId: args.threadId,
       isStreaming: true,
       streamingComplete: false,
-      messageType: "ai_response",
+      type: "ai_response",
     });
 
     return {
@@ -280,7 +294,7 @@ export const createChatThread = internalMutation({
       subject: "New Chat",
       threadId: args.threadId,
       lastActivityAt: Date.now(),
-      threadType: "chat",
+      type: "chat",
       opened: true,
       userId: args.userId,
     });
@@ -358,6 +372,23 @@ export const updateThreadTitleAndPreview = internalMutation({
 
 type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
 
+function formatMessageWithAttachments(message: Message): string {
+  let content = message.content!.trim();
+
+  // Add attachment information if available
+  if (message.attachments && message.attachments.length > 0) {
+    content += "\n\n[Attachments in this message:";
+    message.attachments.forEach((att) => {
+      if (att.parsedContent) {
+        content += `\n  Content:\n${att.parsedContent}`;
+      }
+    });
+    content += "]";
+  }
+
+  return content;
+}
+
 function getPromptMessages(
   messages: Message[] | undefined | null
 ): ChatCompletionMessageParam[] {
@@ -382,7 +413,7 @@ function getPromptMessages(
     formattedMessages.push(
       ...historyMessages.map((msg) => ({
         role: msg.role === "user" ? ("user" as const) : ("assistant" as const),
-        content: msg.content!.trim(), // We know content exists from filter
+        content: formatMessageWithAttachments(msg),
       }))
     );
   }
@@ -390,7 +421,9 @@ function getPromptMessages(
   const mostRecentMessage = validMessages[validMessages.length - 1];
   formattedMessages.push({
     role: "user" as const,
-    content: formatEmailDraftRequest(mostRecentMessage.content!),
+    content: formatEmailDraftRequest(
+      formatMessageWithAttachments(mostRecentMessage)
+    ),
   });
 
   return formattedMessages;
