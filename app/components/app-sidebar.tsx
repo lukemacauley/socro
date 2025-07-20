@@ -55,7 +55,10 @@ export const NAVIGATION: {
   { title: "History", icon: History, url: "/history" },
 ];
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  isFallback,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { isFallback?: boolean }) {
   const { state } = useSidebar();
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -75,15 +78,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={NAVIGATION} />
         {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
+
       <SidebarFooter>
-        <div className="p-2">
-          <SignedOut>
-            <SignInButton />
-          </SignedOut>
-          <SignedIn>
-            <UserButton />
-          </SignedIn>
-        </div>
+        {!isFallback && (
+          <div className="p-2">
+            <SignedOut>
+              <SignInButton />
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+          </div>
+        )}
         {/* <NavUser user={data.user} /> */}
       </SidebarFooter>
       <SidebarRail />
