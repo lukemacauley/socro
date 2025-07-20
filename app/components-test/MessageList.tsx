@@ -48,7 +48,7 @@ export const MessageList = memo(function MessageList({
 function MessageItem({ message }: { message: Message }) {
   const retryMessage = useAction(api.messages.retryMessage);
 
-  const isAi = message.messageType === "ai_response";
+  const isAi = message.type === "ai_response";
   const isEmpty = !message.content || message.content.trim() === "";
 
   const [isCopied, setIsCopied] = useState(false);

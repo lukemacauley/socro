@@ -44,11 +44,12 @@ export const MessageInput = ({
   const [prompt, setPrompt] = useState("");
   const [files, setFiles] = useState<File[] | undefined>(undefined);
   const [uploadId, setUploadId] = useState<string | undefined>(undefined);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!prompt.trim()) {
+      if (!prompt.trim() || isUploading) {
         return;
       }
 
@@ -85,35 +86,39 @@ export const MessageInput = ({
       sendMessage,
       createThreadAndSendMessage,
       onSendFirstMessage,
+      isUploading,
     ]
   );
 
   const handleUploadFiles = useCallback(
-    async (_files: File | File[] | null) => {
-      if (!_files) {
-        return;
-      }
-
-      const fileArray = Array.isArray(_files) ? _files : [_files];
+    async (f: File | File[]) => {
+      const fileArray = Array.isArray(f) ? f : [f];
 
       setFiles((prev) => [...(prev || []), ...fileArray]);
+      setIsUploading(true);
 
-      const files = await Promise.all(
-        fileArray.map(async (file) => ({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          data: await file.arrayBuffer(),
-        }))
-      );
+      try {
+        const files = await Promise.all(
+          fileArray.map(async (file) => ({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data: await file.arrayBuffer(),
+          }))
+        );
 
-      const uploadId = createId();
-      setUploadId(uploadId);
+        const uploadId = createId();
+        setUploadId(uploadId);
 
-      await uploadFiles({
-        files,
-        uploadId,
-      });
+        await uploadFiles({
+          files: files,
+          uploadId,
+        });
+      } catch (error) {
+        console.error("Error uploading files:", error);
+      } finally {
+        setIsUploading(false);
+      }
     },
     [uploadFiles]
   );
@@ -183,7 +188,7 @@ export const MessageInput = ({
                   <Paperclip size={16} />
                 </AIInputButton>
               </AIInputTools>
-              <AIInputSubmit disabled={!prompt} size="icon" />
+              <AIInputSubmit disabled={!prompt || isUploading} size="icon" />
             </AIInputToolbar>
           </AIInput>
         )}

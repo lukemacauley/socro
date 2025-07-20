@@ -2,11 +2,10 @@ import { v } from "convex/values";
 import {
   internalAction,
   internalMutation,
-  internalQuery,
   query,
   action,
 } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
 import { MICROSOFT_GRAPH_BASE_URL } from "./webhooks";
 import Reducto, { toFile } from "reductoai";
@@ -60,53 +59,73 @@ export const uploadUserFiles = action({
 
     const processedAttachments: ProcessedAttachment[] = [];
 
-    try {
-      console.log(
-        `[ATTACHMENTS] Processing ${args.files.length} user-uploaded files`
-      );
+    for (const file of args.files) {
+      try {
+        const blob = new Blob([file.data], { type: file.type });
+        const storageId = await ctx.storage.store(blob);
+        const uploadUrl = await ctx.storage.getUrl(storageId);
 
-      for (const file of args.files) {
+        let parsedContent: string | null = null;
+
         try {
-          // Store file in Convex storage
-          const blob = new Blob([file.data], { type: file.type });
-          const storageId = await ctx.storage.store(blob);
+          if (!uploadUrl) {
+            continue;
+          }
+          const reducto = new Reducto();
 
-          // Create attachment record
-          const attachmentId = await ctx.runMutation(
-            internal.attachments.createAttachmentRecord,
-            {
-              uploadId: args.uploadId,
-              userId,
-              storageId,
-              externalAttachmentId: `user_upload_${Date.now()}_${Math.random()}`,
-              name: file.name,
-              contentType: file.type,
-              size: file.size,
-              uploadStatus: "completed",
-              parsedContent: null, // No parsing for user uploads initially
-            }
-          );
-
-          processedAttachments.push({
-            storageId,
-            attachmentId,
-            name: file.name,
-            size: file.size,
-            contentType: file.type,
+          const result = await reducto.parse.run({
+            document_url: uploadUrl,
+            options: { ocr_mode: "standard", extraction_mode: "hybrid" },
+            advanced_options: {
+              keep_line_breaks: true,
+              ocr_system: "highres",
+            },
           });
-        } catch (error) {
-          console.error(
-            `[ATTACHMENTS] Failed to upload file ${file.name}:`,
-            error
-          );
-        }
-      }
 
-      return processedAttachments;
-    } catch (error) {
-      console.error(`[ATTACHMENTS] Failed to process user uploads:`, error);
-      throw error;
+          parsedContent =
+            result.result.type === "full"
+              ? result.result.chunks.map((chunk) => chunk.content).join("\n\n")
+              : `Document processed. Result URL: ${result.result.url}`;
+        } catch (error) {
+          console.error(`[REDUCTO] Error processing user upload:`, error);
+        }
+
+        // Create attachment record
+        const attachmentId = await ctx.runMutation(
+          internal.attachments.createAttachmentRecord,
+          {
+            uploadId: args.uploadId,
+            userId,
+            storageId,
+            name: file.name,
+            contentType: file.type,
+            size: file.size,
+            uploadStatus: "completed",
+            parsedContent,
+            metadata: {
+              source: "chat",
+              contentParsed: !!parsedContent,
+              downloadedAt: Date.now(),
+            },
+          }
+        );
+
+        processedAttachments.push({
+          storageId,
+          attachmentId,
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        });
+      } catch (error) {
+        console.error(
+          `[ATTACHMENTS] Failed to upload file ${file.name}:`,
+          error
+        );
+      }
     }
+
+    return processedAttachments;
   },
 });
 
@@ -209,7 +228,7 @@ export const processEmailAttachments = internalAction({
               messageId: args.messageId,
               userId: args.userId,
               storageId,
-              externalAttachmentId: attachment.id,
+              microsoftAttachmentId: attachment.id,
               name: attachment.name,
               contentType: attachment.contentType,
               size: attachment.size,
@@ -261,7 +280,7 @@ export const createAttachmentRecord = internalMutation({
     uploadId: v.optional(v.string()),
     userId: v.id("users"),
     storageId: v.id("_storage"),
-    externalAttachmentId: v.string(),
+    microsoftAttachmentId: v.optional(v.string()),
     name: v.string(),
     contentType: v.string(),
     size: v.number(),
@@ -278,9 +297,7 @@ export const createAttachmentRecord = internalMutation({
         processingTime: v.optional(v.number()),
         originalUrl: v.optional(v.string()),
         downloadedAt: v.optional(v.number()),
-        source: v.optional(
-          v.union(v.literal("email"), v.literal("user_upload"))
-        ),
+        source: v.optional(v.union(v.literal("email"), v.literal("chat"))),
         contentParsed: v.optional(v.boolean()),
         parsingError: v.optional(v.string()),
       })
@@ -292,7 +309,7 @@ export const createAttachmentRecord = internalMutation({
       uploadId: args.uploadId,
       userId: args.userId,
       storageId: args.storageId,
-      externalAttachmentId: args.externalAttachmentId,
+      microsoftAttachmentId: args.microsoftAttachmentId,
       name: args.name,
       contentType: args.contentType,
       size: args.size,

@@ -20,7 +20,7 @@ export function ConversationView({
       <MessageList messages={data?.messages} />
       <MessageInput
         clientThreadId={clientThreadId}
-        threadId={data?.thread._id}
+        threadId={data?.threadId}
         onSendFirstMessage={onSendFirstMessage}
       />
     </div>
