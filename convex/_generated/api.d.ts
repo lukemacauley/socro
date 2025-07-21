@@ -16,6 +16,7 @@ import type * as lib_email from "../lib/email.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
 import type * as router from "../router.js";
+import type * as streamingHttp from "../streamingHttp.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
 import type * as webhooks from "../webhooks.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "lib/validators": typeof lib_validators;
   messages: typeof messages;
   router: typeof router;
+  streamingHttp: typeof streamingHttp;
   threads: typeof threads;
   users: typeof users;
   webhooks: typeof webhooks;

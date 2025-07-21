@@ -4,8 +4,15 @@ import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { ChangeNotificationCollection } from "@microsoft/microsoft-graph-types";
+import { streamMessage } from "./streamingHttp";
 
 const http = httpRouter();
+
+http.route({
+  path: "/stream",
+  method: "GET",
+  handler: streamMessage,
+});
 
 http.route({
   path: "/webhook/microsoft",

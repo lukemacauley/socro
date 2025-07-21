@@ -51,12 +51,6 @@ const applicationTables = {
     .index("by_thread_id", ["threadId"])
     .index("by_user_id", ["userId"]),
 
-  streamingChunks: defineTable({
-    messageId: v.id("messages"),
-    chunk: v.string(),
-    chunkIndex: v.number(),
-  }).index("by_message", ["messageId", "chunkIndex"]),
-
   messageAttachments: defineTable({
     messageId: v.optional(v.id("messages")), // Attachments can be linked to messages
     uploadId: v.optional(v.string()), // UUID for frontend uploads

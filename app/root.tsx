@@ -81,7 +81,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-const convex = new ConvexReactClient(env.VITE_CONVEX_URL as string);
+const convex = new ConvexReactClient(env.VITE_CONVEX_URL);
 
 export default function App({ loaderData }: Route.ComponentProps) {
   return (

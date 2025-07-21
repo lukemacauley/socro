@@ -15,6 +15,8 @@ import { useAction } from "convex/react";
 import { cn } from "~/lib/utils";
 import { marked } from "marked";
 import { toast } from "sonner";
+import { useMessageStream } from "~/hooks/useMessageStream";
+import type { Id } from "convex/_generated/dataModel";
 
 export type Message = NonNullable<
   typeof api.threads.getThreadByClientId._returnType
@@ -22,8 +24,10 @@ export type Message = NonNullable<
 
 export const MessageList = memo(function MessageList({
   messages,
+  threadId,
 }: {
   messages: Message[] | undefined;
+  threadId: Id<"threads"> | undefined;
 }) {
   if (!messages || messages.length === 0) {
     return <div className="flex-1 flex flex-col min-h-0 pt-12" />;
@@ -35,7 +39,7 @@ export const MessageList = memo(function MessageList({
         <AIConversationContent>
           <div className="max-w-3xl mx-auto">
             {messages.map((m) => (
-              <MessageItem message={m} key={m._id} />
+              <MessageItem message={m} threadId={threadId} key={m._id} />
             ))}
           </div>
         </AIConversationContent>
@@ -45,17 +49,35 @@ export const MessageList = memo(function MessageList({
   );
 });
 
-function MessageItem({ message }: { message: Message }) {
+function MessageItem({
+  message,
+  threadId,
+}: {
+  message: Message;
+  threadId: Id<"threads"> | undefined;
+}) {
+  const messageId = message._id;
+
   const retryMessage = useAction(api.messages.retryMessage);
 
+  const { streamedContent, streamError } = useMessageStream(
+    messageId,
+    threadId || message.threadId,
+    message.isStreaming
+  );
+
   const isAi = message.type === "ai_response";
-  const isEmpty = !message.content || message.content.trim() === "";
+
+  const displayContent =
+    message.isStreaming && streamedContent ? streamedContent : message.content;
+
+  const isEmpty = !displayContent || displayContent.trim() === "";
 
   const [isCopied, setIsCopied] = useState(false);
 
   const handleRetry = async () => {
     try {
-      await retryMessage({ messageId: message._id });
+      await retryMessage({ messageId });
     } catch (error) {
       console.error("Failed to retry message:", error);
     }
@@ -74,11 +96,11 @@ function MessageItem({ message }: { message: Message }) {
       return;
     }
 
-    let textToCopy = message.content;
+    let textToCopy = displayContent;
 
-    if (isAi && message.content) {
-      const emailBlocks = extractEmailCodeBlocks(message.content);
-      textToCopy = emailBlocks || message.content;
+    if (isAi && displayContent) {
+      const emailBlocks = extractEmailCodeBlocks(displayContent);
+      textToCopy = emailBlocks || displayContent;
     }
 
     if (!textToCopy) {
@@ -113,12 +135,17 @@ function MessageItem({ message }: { message: Message }) {
       {isEmpty ? (
         <Spinner variant="bars" />
       ) : isAi ? (
-        <AIResponse>{message.content}</AIResponse>
+        <AIResponse>{displayContent}</AIResponse>
       ) : (
         <AIMessageContent>
-          {message.content}
+          {displayContent}
           <AttachmentList attachments={message.attachments} />
         </AIMessageContent>
+      )}
+      {streamError && (
+        <div className="text-red-500 text-sm mt-2">
+          Streaming error: {streamError}
+        </div>
       )}
       <div
         className={cn(

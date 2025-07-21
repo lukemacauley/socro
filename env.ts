@@ -13,6 +13,7 @@ export const env = createEnv({
   client: {
     VITE_CLERK_PUBLISHABLE_KEY: z.string().min(1),
     VITE_CONVEX_URL: z.string().url(),
+    VITE_CLERK_FRONTEND_API_URL: z.string().url().optional(),
   },
 
   /**

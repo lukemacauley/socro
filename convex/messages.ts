@@ -187,43 +187,13 @@ export const generateStreamingResponse = internalAction({
     responseMessageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
-    const messages = await ctx.runQuery(internal.messages.getThreadHistory, {
-      threadId: args.threadId,
-    });
-
-    try {
-      const groq = new Groq();
-      const msgs = getPromptMessages(messages);
-
-      let fullContent = "";
-
-      const response = await groq.chat.completions.create({
-        messages: msgs,
-        model: "moonshotai/kimi-k2-instruct",
-      });
-
-      for await (const textPart of response.choices) {
-        const chunk = textPart.message.content;
-        if (!chunk) {
-          continue;
-        }
-        fullContent += chunk;
-      }
-
-      await ctx.runMutation(internal.messages.completeStreaming, {
-        messageId: args.responseMessageId,
-        finalContent:
-          fullContent || "I apologise, but I couldn't generate a response.",
-      });
-    } catch (error) {
-      console.error("Error initializing Groq client:", error);
-
-      await ctx.runMutation(internal.messages.completeStreaming, {
-        messageId: args.responseMessageId,
-        finalContent:
-          "Sorry, I encountered an error while generating the response. Please try again in a moment.",
-      });
-    }
+    // The actual streaming happens via the HTTP endpoint
+    // This action now just serves as a trigger
+    // The client will connect to the SSE endpoint to receive the stream
+    console.log(
+      "Streaming will happen via HTTP endpoint for message:",
+      args.responseMessageId
+    );
   },
 });
 
@@ -252,21 +222,6 @@ export const getThreadHistory = internalQuery({
     );
 
     return messagesWithAttachments;
-  },
-});
-
-export const addStreamingChunk = internalMutation({
-  args: {
-    messageId: v.id("messages"),
-    chunk: v.string(),
-    chunkIndex: v.number(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("streamingChunks", {
-      messageId: args.messageId,
-      chunk: args.chunk,
-      chunkIndex: args.chunkIndex,
-    });
   },
 });
 
@@ -477,16 +432,6 @@ export const resetMessageForRetry = internalMutation({
     // Only allow retry on AI messages
     if (message.role !== "ai") {
       throw new Error("Can only retry AI messages");
-    }
-
-    // Clear streaming chunks
-    const chunks = await ctx.db
-      .query("streamingChunks")
-      .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
-      .collect();
-
-    for (const chunk of chunks) {
-      await ctx.db.delete(chunk._id);
     }
 
     // Reset message state
