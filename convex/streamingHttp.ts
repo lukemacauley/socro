@@ -1,13 +1,31 @@
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { Groq } from "groq-sdk";
 import type { Id } from "./_generated/dataModel";
-import { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
+import { type ModelMessage, streamText } from "ai";
+import { groq } from "@ai-sdk/groq";
+import { anthropic } from "@ai-sdk/anthropic";
+
+type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
+
+function formatMessageWithAttachments(message: Message): string {
+  let content = message.content!.trim();
+  // Add attachment information if available
+  if (message.attachments && message.attachments.length > 0) {
+    content += "\n\n[Attachments in this message:";
+    message.attachments.forEach((att) => {
+      if (att.parsedContent) {
+        content += `\n  Content:\n${att.parsedContent}`;
+      }
+    });
+    content += "]";
+  }
+  return content;
+}
 
 export const streamMessage = httpAction(async (ctx, request) => {
   const url = new URL(request.url);
-  const messageId = url.searchParams.get("messageId");
-  const threadId = url.searchParams.get("threadId");
+  const messageId = url.searchParams.get("messageId") as Id<"messages"> | null;
+  const threadId = url.searchParams.get("threadId") as Id<"threads"> | null;
 
   if (!messageId || !threadId) {
     return new Response("Missing parameters", { status: 400 });
@@ -20,10 +38,8 @@ export const streamMessage = httpAction(async (ctx, request) => {
   (async () => {
     try {
       const messages = await ctx.runQuery(internal.messages.getThreadHistory, {
-        threadId: threadId as Id<"threads">,
+        threadId,
       });
-
-      const groq = new Groq();
 
       const systemPrompt = `You are an expert legal AI assistant specializing in drafting professional email responses for lawyers. Your goal is to analyze incoming emails and create legally sound, contextually appropriate responses.`;
 
@@ -31,35 +47,33 @@ export const streamMessage = httpAction(async (ctx, request) => {
         (msg) => msg.role !== "system" && msg.content?.trim()
       );
 
-      const formattedMessages: ChatCompletionMessageParam[] = [
-        { role: "system" as const, content: systemPrompt },
+      const formattedMessages: ModelMessage[] = [
         ...validMessages.map((msg) => ({
           role:
             msg.role === "user" ? ("user" as const) : ("assistant" as const),
-          content: msg.content || "",
+          content: formatMessageWithAttachments(msg),
         })),
       ];
 
       let fullContent = "";
       let chunkIndex = 0;
 
-      const response = await groq.chat.completions.create({
+      const result = streamText({
+        model: anthropic("claude-sonnet-4-20250514"),
+        system: systemPrompt,
         messages: formattedMessages,
-        model: "moonshotai/kimi-k2-instruct",
-        stream: true,
       });
 
-      for await (const chunk of response) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          fullContent += content;
+      for await (const chunk of result.textStream) {
+        if (chunk) {
+          fullContent += chunk;
 
           try {
             await writer.write(
               encoder.encode(
                 `data: ${JSON.stringify({
                   type: "chunk",
-                  content,
+                  content: chunk,
                   chunkIndex,
                   messageId,
                 })}\n\n`
@@ -87,7 +101,7 @@ export const streamMessage = httpAction(async (ctx, request) => {
       );
 
       await ctx.runMutation(internal.messages.completeStreaming, {
-        messageId: messageId as Id<"messages">,
+        messageId,
         finalContent:
           fullContent || "I apologise, but I couldn't generate a response.",
       });
@@ -103,7 +117,7 @@ export const streamMessage = httpAction(async (ctx, request) => {
       );
 
       await ctx.runMutation(internal.messages.completeStreaming, {
-        messageId: messageId as Id<"messages">,
+        messageId,
         finalContent:
           "Sorry, I encountered an error while generating the response.",
       });

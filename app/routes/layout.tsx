@@ -21,6 +21,7 @@ import {
   SidebarTrigger,
 } from "~/components/ui/sidebar";
 import { validate } from "uuid";
+import { TooltipProvider } from "~/components/ui/tooltip";
 
 type Breadcrumb = {
   label: string;
@@ -80,53 +81,55 @@ export default function Layout() {
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
-            <Breadcrumb>
-              <BreadcrumbList>
-                {breadcrumbItems.map((item, index) => (
-                  <Fragment key={index}>
-                    <BreadcrumbItem>
-                      {item.isLast ? (
-                        <BreadcrumbPage>
-                          {isUUID ? (
-                            <GhostInput
-                              value={threadName || "New Thread"}
-                              onSave={handleUpdateName}
-                              emptyMessage="Thread name cannot be empty"
-                              className="px-2.5 -ml-2.5 max-w-none w-50"
-                            />
-                          ) : (
-                            threadName || item.label
-                          )}
-                        </BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink asChild>
-                          <Link to={item.href}>{item.label}</Link>
-                        </BreadcrumbLink>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator
+                orientation="vertical"
+                className="mr-2 data-[orientation=vertical]:h-4"
+              />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  {breadcrumbItems.map((item, index) => (
+                    <Fragment key={index}>
+                      <BreadcrumbItem>
+                        {item.isLast ? (
+                          <BreadcrumbPage>
+                            {isUUID ? (
+                              <GhostInput
+                                value={threadName || "New Thread"}
+                                onSave={handleUpdateName}
+                                emptyMessage="Thread name cannot be empty"
+                                className="px-2.5 -ml-2.5 max-w-none w-50"
+                              />
+                            ) : (
+                              threadName || item.label
+                            )}
+                          </BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink asChild>
+                            <Link to={item.href}>{item.label}</Link>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                      {index < breadcrumbItems.length - 1 && (
+                        <BreadcrumbSeparator />
                       )}
-                    </BreadcrumbItem>
-                    {index < breadcrumbItems.length - 1 && (
-                      <BreadcrumbSeparator />
-                    )}
-                  </Fragment>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
+                    </Fragment>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          </header>
+          <div className="bg-primary-foreground">
+            <Outlet />
           </div>
-        </header>
-        <div className="bg-primary-foreground">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }
