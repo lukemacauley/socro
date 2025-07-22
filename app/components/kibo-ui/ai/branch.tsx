@@ -122,7 +122,7 @@ export const AIBranchSelector = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 self-end px-10",
+        "flex items-center gap-2 self-end",
         from === "assistant" ? "justify-start" : "justify-end",
         className
       )}
@@ -144,13 +144,8 @@ export const AIBranchPrevious = ({
 
   return (
     <Button
-      aria-label="Previous branch"
-      className={cn(
-        "size-7 shrink-0 rounded-full text-muted-foreground transition-colors",
-        "hover:bg-accent hover:text-foreground",
-        "disabled:pointer-events-none disabled:opacity-50",
-        className
-      )}
+      aria-label="Previous model answer"
+      tooltip="Previous model answer"
       disabled={totalBranches <= 1}
       onClick={goToPrevious}
       size="icon"
@@ -172,13 +167,8 @@ export const AIBranchNext = ({ className, children }: AIBranchNextProps) => {
 
   return (
     <Button
-      aria-label="Next branch"
-      className={cn(
-        "size-7 shrink-0 rounded-full text-muted-foreground transition-colors",
-        "hover:bg-accent hover:text-foreground",
-        "disabled:pointer-events-none disabled:opacity-50",
-        className
-      )}
+      aria-label="Next model answer"
+      tooltip="Next model answer"
       disabled={totalBranches <= 1}
       onClick={goToNext}
       size="icon"
