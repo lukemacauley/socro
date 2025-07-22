@@ -59,7 +59,8 @@ export const streamMessage = httpAction(async (ctx, request) => {
       let chunkIndex = 0;
 
       const result = streamText({
-        model: anthropic("claude-sonnet-4-20250514"),
+        // model: anthropic("claude-sonnet-4-20250514"),
+        model: groq("moonshotai/kimi-k2-instruct"),
         system: systemPrompt,
         messages: formattedMessages,
       });
