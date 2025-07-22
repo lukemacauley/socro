@@ -115,7 +115,9 @@ const ThreadItem = ({ t }: { t: Thread }) => {
               "font-medium text-xs sm:text-sm text-card-foreground flex-none truncate"
             )}
           >
-            {t.subject}
+            {t.subject && t.subject.length > 60
+              ? `${t.subject?.substring(0, 60)}...`
+              : t.subject}
           </div>
           <div className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-1">
             {t.contentPreview}
