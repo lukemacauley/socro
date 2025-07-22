@@ -60,7 +60,7 @@ function MessageItem({
 
   const retryMessage = useAction(api.messages.retryMessage);
 
-  const { streamedContent, streamError } = useMessageStream(
+  const { streamedContent } = useMessageStream(
     messageId,
     threadId || message.threadId,
     message.isStreaming
@@ -141,11 +141,6 @@ function MessageItem({
           {displayContent}
           <AttachmentList attachments={message.attachments} />
         </AIMessageContent>
-      )}
-      {streamError && (
-        <div className="text-red-500 text-sm mt-2">
-          Streaming error: {streamError}
-        </div>
       )}
       <div
         className={cn(

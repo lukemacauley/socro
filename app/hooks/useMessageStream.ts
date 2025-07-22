@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import type { Id } from "convex/_generated/dataModel";
+import { env } from "env";
 
 interface StreamData {
   type: "chunk" | "complete" | "error";
@@ -18,8 +19,6 @@ export function useMessageStream(
   const reconnectDelay = 1000;
 
   const [streamedContent, setStreamedContent] = useState("");
-  const [streamError, setStreamError] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [connectionState, setConnectionState] = useState<
     "idle" | "connecting" | "connected" | "error" | "complete"
   >("idle");
@@ -54,9 +53,8 @@ export function useMessageStream(
       return;
     }
 
-    const convexUrl = import.meta.env.VITE_CONVEX_SITE_URL;
+    const convexUrl = env.VITE_CONVEX_SITE_URL;
     if (!convexUrl) {
-      setStreamError("Convex URL not configured");
       setConnectionState("error");
       return;
     }
@@ -66,8 +64,6 @@ export function useMessageStream(
     // Reset state
     chunksRef.current.clear();
     setStreamedContent("");
-    setStreamError(null);
-    setIsConnecting(true);
     setConnectionState("connecting");
 
     const sseUrl = `${convexUrl}/stream?messageId=${messageId}&threadId=${threadId}`;
@@ -82,7 +78,6 @@ export function useMessageStream(
         console.log(
           `[CLIENT] SSE connected in ${Date.now() - connectStartTime}ms`
         );
-        setIsConnecting(false);
         setConnectionState("connected");
         reconnectCountRef.current = 0; // Reset reconnect count on successful connection
       };
@@ -112,20 +107,17 @@ export function useMessageStream(
 
             case "error":
               const errorMsg = data.error || "Unknown error";
-              setStreamError(errorMsg);
               setConnectionState("error");
               cleanup();
               break;
           }
         } catch (err) {
           console.error("Failed to parse SSE data:", err);
-          setStreamError("Failed to parse server data");
         }
       };
 
       eventSource.onerror = (error) => {
         console.error("SSE error:", error);
-        setIsConnecting(false);
 
         // Check if we should attempt reconnection
         if (
@@ -142,16 +134,13 @@ export function useMessageStream(
             connect();
           }, reconnectDelay * reconnectCountRef.current);
         } else {
-          setStreamError("Connection lost");
           setConnectionState("error");
           cleanup();
         }
       };
     } catch (error) {
       console.error("Failed to create EventSource:", error);
-      setStreamError("Failed to establish connection");
       setConnectionState("error");
-      setIsConnecting(false);
     }
   }, [
     messageId,
@@ -170,14 +159,5 @@ export function useMessageStream(
 
   return {
     streamedContent,
-    streamError,
-    isConnecting,
-    connectionState,
-    // Expose methods for manual control if needed
-    retry: () => {
-      reconnectCountRef.current = 0;
-      connect();
-    },
-    cancel: cleanup,
   };
 }
