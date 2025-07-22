@@ -2,13 +2,13 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import type { Id } from "convex/_generated/dataModel";
 import { env } from "env";
 
-interface StreamData {
+type StreamData = {
   type: "chunk" | "complete" | "error";
+  messageId: string;
   content?: string;
   chunkIndex?: number;
   error?: string;
-  messageId: string;
-}
+};
 
 export function useMessageStream(
   messageId: Id<"messages"> | null,
@@ -47,7 +47,6 @@ export function useMessageStream(
   }, []);
 
   const connect = useCallback(() => {
-    // Validate inputs
     if (!messageId || !threadId || !isStreaming) {
       setConnectionState("idle");
       return;
