@@ -1,7 +1,8 @@
+import { Id } from "./_generated/dataModel";
 import { internalQuery } from "./_generated/server";
 
 export const loggedInUserId = internalQuery({
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<Id<"users"> | null> => {
     const identity = await ctx.auth.getUserIdentity();
     if (identity === null) {
       return null;

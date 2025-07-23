@@ -1,4 +1,4 @@
-import { useQuery } from "convex-helpers/react/cache";
+import { usePaginatedQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
 import { Link } from "react-router";
 import { Archive, ArchiveRestore, Pin, PinOff } from "lucide-react";
@@ -6,8 +6,9 @@ import { useMutation } from "convex/react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 import RelativeTime from "~/components/relative-time";
+import { useInfiniteScroll } from "~/lib/use-infinite-scroll";
 
-type Thread = (typeof api.threads.getThreads._returnType)[number];
+type Thread = (typeof api.threads.getThreads._returnType)["page"][number];
 type ThreadStatus = Thread["status"];
 type DateSection =
   | "today"
@@ -21,9 +22,13 @@ export function ConversationList({
 }: {
   threadStatus?: ThreadStatus;
 }) {
-  const threads = useQuery(api.threads.getThreads, { threadStatus });
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.threads.getThreads,
+    { threadStatus },
+    { initialNumItems: 50 }
+  );
 
-  const groupedThreads = threads ? groupThreadsByDate(threads) : null;
+  const groupedThreads = results ? groupThreadsByDate(results) : null;
 
   const sectionOrder: DateSection[] = [
     "pinned",
@@ -32,6 +37,10 @@ export function ConversationList({
     "past7days",
     "past30days",
   ];
+
+  const observerRef = useInfiniteScroll(() => {
+    loadMore(50);
+  }, status === "CanLoadMore");
 
   return (
     <div className="h-full flex flex-col">
@@ -60,6 +69,7 @@ export function ConversationList({
             );
           })}
       </div>
+      <div ref={observerRef} className="h-1" />
     </div>
   );
 }

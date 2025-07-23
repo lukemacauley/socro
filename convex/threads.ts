@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query, internalMutation, mutation } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import {
   nullOrUndefinedBoolean,
   nullOrUndefinedNumber,
@@ -9,6 +9,7 @@ import {
 } from "./lib/validators";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { v7 as createId } from "uuid";
+import { paginationOptsValidator } from "convex/server";
 
 type Thread = DataModel["threads"]["document"];
 
@@ -35,16 +36,26 @@ export const getThreads = query({
   args: {
     threadType: v.optional(v.union(v.literal("chat"), v.literal("email"))),
     threadStatus: v.optional(threadStatus),
+    paginationOpts: paginationOptsValidator,
   },
-  handler: async (ctx, args): Promise<Thread[]> => {
-    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
-    if (!userId) {
-      return [];
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity === null) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
     }
 
     let query = ctx.db
       .query("threads")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId));
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id));
 
     if (args.threadType !== undefined && args.threadType !== null) {
       query = query.filter((q) => q.eq(q.field("type"), args.threadType));
@@ -58,7 +69,7 @@ export const getThreads = query({
       }
     }
 
-    return await query.order("desc").collect();
+    return await query.order("desc").paginate(args.paginationOpts);
   },
 });
 
