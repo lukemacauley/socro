@@ -369,6 +369,10 @@ async function processAttachmentWithReducto(
 
     const file = await toFile(fileInput, attachmentName);
     const upload = await reductoClient.upload({ file });
+    // const edited = await reductoClient.edit.run({
+    //   document_url: upload,
+    //   edit_instructions: "Remove all images",
+    // });
     const result = await reductoClient.parse.run({
       document_url: upload,
       options: { ocr_mode: "standard", extraction_mode: "hybrid" },
