@@ -1,14 +1,6 @@
 import { v } from "convex/values";
-import { query, internalMutation, mutation } from "./_generated/server";
-import { internal } from "./_generated/api";
-import {
-  nullOrUndefinedBoolean,
-  nullOrUndefinedNumber,
-  nullOrUndefinedString,
-  threadStatus,
-} from "./lib/validators";
-import type { DataModel, Id } from "./_generated/dataModel";
-import { v7 as createId } from "uuid";
+import { query, mutation } from "./_generated/server";
+import { threadStatus } from "./lib/validators";
 import { paginationOptsValidator } from "convex/server";
 
 export const getThreads = query({
