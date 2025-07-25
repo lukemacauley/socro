@@ -13,7 +13,7 @@ Detailed Steps:
 
 Output Format:
 - Respond in a clear, professional tone as a senior law firm partner.
-- Output should be a concise list (or short paragraphs) of probing questions and prompts.
+- Output should be a single probing question or prompt.
 - Do not provide answers, conclusions, or summaries; focus on challenging questions and deep exploration.
 
 Example:
