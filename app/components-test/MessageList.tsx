@@ -83,25 +83,12 @@ function MessageItem({
     }
   };
 
-  const extractEmailCodeBlocks = (content: string): string => {
-    const emailCodeBlockRegex = /```email\n([\s\S]*?)\n```/g;
-    const matches = [...content.matchAll(emailCodeBlockRegex)];
-    if (!matches.length) return "";
-
-    return matches.map((match) => match[1]).join("\n\n");
-  };
-
   const copyToClipboard = () => {
     if (typeof window === "undefined" || !navigator.clipboard.write) {
       return;
     }
 
-    let textToCopy = displayContent;
-
-    if (isAi && displayContent) {
-      const emailBlocks = extractEmailCodeBlocks(displayContent);
-      textToCopy = emailBlocks || displayContent;
-    }
+    const textToCopy = displayContent;
 
     if (!textToCopy) {
       console.error("No content to copy");
@@ -122,9 +109,7 @@ function MessageItem({
         }),
       ])
       .then(() => {
-        toast.success(
-          isAi ? "Email copied to clipboard " : "Message copied to clipboard"
-        );
+        toast.success("Message copied to clipboard");
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
       });
@@ -159,7 +144,7 @@ function MessageItem({
         <Button
           size="icon"
           variant="ghost"
-          tooltip={isAi ? "Copy email" : "Copy message"}
+          tooltip="Copy message"
           onClick={copyToClipboard}
         >
           {isCopied ? (

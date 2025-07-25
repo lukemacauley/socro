@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { type ModelMessage, streamText } from "ai";
 import { groq } from "@ai-sdk/groq";
 import { anthropic } from "@ai-sdk/anthropic";
+import { PIAB_SYSTEM_PROMPT_ANTHROPIC } from "../app/lib/constants";
 
 type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
 
@@ -59,9 +60,9 @@ export const streamMessage = httpAction(async (ctx, request) => {
       let chunkIndex = 0;
 
       const result = streamText({
-        // model: anthropic("claude-sonnet-4-20250514"),
+        // model: anthropic("claude-opus-4-20250514"),
         model: groq("moonshotai/kimi-k2-instruct"),
-        system: systemPrompt,
+        system: PIAB_SYSTEM_PROMPT_ANTHROPIC, //systemPrompt,
         messages: formattedMessages,
       });
 
