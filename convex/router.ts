@@ -3,7 +3,6 @@ import type { WebhookEvent } from "@clerk/backend";
 import { Webhook } from "svix";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { ChangeNotificationCollection } from "@microsoft/microsoft-graph-types";
 import { streamMessage } from "./streamingHttp";
 
 const http = httpRouter();
@@ -12,48 +11,6 @@ http.route({
   path: "/stream",
   method: "GET",
   handler: streamMessage,
-});
-
-http.route({
-  path: "/webhook/microsoft",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    try {
-      const validationToken = new URL(request.url).searchParams.get(
-        "validationToken"
-      );
-
-      if (validationToken) {
-        return new Response(validationToken, {
-          status: 200,
-          headers: { "Content-Type": "text/plain" },
-        });
-      }
-
-      const body: ChangeNotificationCollection = await request.json();
-
-      if (body.value && Array.isArray(body.value)) {
-        for (const notification of body.value) {
-          if (notification.changeType === "created") {
-            const emailId = notification.resource?.split("/").pop() || "";
-
-            await ctx.scheduler.runAfter(
-              0,
-              internal.webhooks.fetchAndProcessEmail,
-              {
-                emailId,
-                subscriptionId: notification.subscriptionId || "",
-              }
-            );
-          }
-        }
-      }
-      return new Response("OK", { status: 200 });
-    } catch (error) {
-      console.error("[WEBHOOK HTTP] Error processing webhook:", error);
-      return new Response("Error processing webhook", { status: 500 });
-    }
-  }),
 });
 
 // Clerk webhook endpoint
@@ -71,20 +28,6 @@ http.route({
         await ctx.runMutation(internal.users.upsertFromClerk, {
           data: event.data,
         });
-
-        const hasMicrosoftOAuth = event.data.external_accounts?.some(
-          (account) => account.provider === "oauth_microsoft"
-        );
-
-        if (hasMicrosoftOAuth) {
-          await ctx.scheduler.runAfter(
-            0,
-            internal.webhooks.setupMicrosoftWebhook,
-            {
-              clerkUserId: event.data.id,
-            }
-          );
-        }
         break;
 
       case "user.deleted": {

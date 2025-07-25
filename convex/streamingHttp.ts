@@ -42,11 +42,7 @@ export const streamMessage = httpAction(async (ctx, request) => {
         threadId,
       });
 
-      const systemPrompt = `You are an expert legal AI assistant specializing in drafting professional email responses for lawyers. Your goal is to analyze incoming emails and create legally sound, contextually appropriate responses.`;
-
-      const validMessages = messages.filter(
-        (msg) => msg.role !== "system" && msg.content?.trim()
-      );
+      const validMessages = messages.filter((msg) => msg.content?.trim());
 
       const formattedMessages: ModelMessage[] = [
         ...validMessages.map((msg) => ({

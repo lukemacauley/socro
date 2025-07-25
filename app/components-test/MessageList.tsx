@@ -66,7 +66,7 @@ function MessageItem({
     message.isStreaming
   );
 
-  const isAi = message.type === "ai_response";
+  const isAi = message.type === "ai";
 
   const displayContent =
     message.isStreaming && streamedContent ? streamedContent : message.content;

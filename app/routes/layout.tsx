@@ -57,20 +57,20 @@ export default function Layout() {
     });
   });
 
-  const threadId = pathSegments.pop();
-  const isUUID = validate(threadId);
+  const browserId = pathSegments.pop();
+  const isUUID = validate(browserId);
 
   const threadName = useQuery(
     api.threads.getThreadName,
-    isUUID && threadId ? { threadId } : "skip"
+    isUUID && browserId ? { browserId } : "skip"
   );
 
   const updateName = useMutation(api.threads.updateThreadName);
 
   const handleUpdateName = async (newName: string) => {
     try {
-      if (threadId) {
-        await updateName({ threadId, name: newName });
+      if (browserId) {
+        await updateName({ browserId, name: newName });
         toast.success("Thread name updated successfully");
         return;
       }

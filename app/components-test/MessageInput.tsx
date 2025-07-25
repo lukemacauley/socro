@@ -72,7 +72,7 @@ export const MessageInput = ({
         await createThreadAndSendMessage({
           content,
           uploadId,
-          threadId: clientThreadId,
+          browserId: clientThreadId,
         });
       }
 

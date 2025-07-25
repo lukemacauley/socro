@@ -1,15 +1,13 @@
 import { v } from "convex/values";
 import {
-  query,
   internalQuery,
   internalMutation,
   internalAction,
   action,
 } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
 import { Groq } from "groq-sdk";
-import type { ChatCompletionMessageParam } from "groq-sdk/resources/chat/completions.mjs";
 
 export const sendMessage = action({
   args: {
@@ -84,7 +82,7 @@ export const createThreadAndSendMessage = action({
   args: {
     content: v.string(),
     uploadId: v.optional(v.string()),
-    threadId: v.string(),
+    browserId: v.string(),
   },
   handler: async (
     ctx,
@@ -101,7 +99,7 @@ export const createThreadAndSendMessage = action({
 
     const threadId = await ctx.runMutation(internal.messages.createChatThread, {
       userId,
-      threadId: args.threadId,
+      browserId: args.browserId,
     });
 
     const { userMessageId, responseMessageId } = await ctx.runMutation(
@@ -147,7 +145,7 @@ export const insertWithResponsePlaceholder = internalMutation({
       role: "user",
       userId: args.userId,
       threadId: args.threadId,
-      type: "user_message",
+      type: "user",
     });
 
     if (args.uploadId) {
@@ -171,7 +169,7 @@ export const insertWithResponsePlaceholder = internalMutation({
       threadId: args.threadId,
       isStreaming: true,
       streamingComplete: false,
-      type: "ai_response",
+      type: "ai",
     });
 
     return {
@@ -242,15 +240,13 @@ export const completeStreaming = internalMutation({
 export const createChatThread = internalMutation({
   args: {
     userId: v.id("users"),
-    threadId: v.string(),
+    browserId: v.string(),
   },
   handler: async (ctx, args) => {
     const threadId = await ctx.db.insert("threads", {
-      subject: "New Chat",
-      threadId: args.threadId,
+      title: "New Chat",
+      browserId: args.browserId,
       lastActivityAt: Date.now(),
-      type: "chat",
-      opened: true,
       userId: args.userId,
     });
 
@@ -293,7 +289,7 @@ export const generateThreadTitle = internalAction({
         fullContent += chunk;
       }
 
-      const subject = fullContent.trim();
+      const title = fullContent.trim();
 
       let contentPreview = args.content.trim();
       if (contentPreview.length > 100) {
@@ -302,7 +298,7 @@ export const generateThreadTitle = internalAction({
 
       await ctx.runMutation(internal.messages.updateThreadTitleAndPreview, {
         threadId: args.threadId,
-        subject,
+        title,
         contentPreview,
       });
     } catch (error) {
@@ -314,109 +310,16 @@ export const generateThreadTitle = internalAction({
 export const updateThreadTitleAndPreview = internalMutation({
   args: {
     threadId: v.id("threads"),
-    subject: v.string(),
+    title: v.string(),
     contentPreview: v.string(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.threadId, {
-      subject: args.subject,
+      title: args.title,
       contentPreview: args.contentPreview,
     });
   },
 });
-
-type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
-
-function formatMessageWithAttachments(message: Message): string {
-  let content = message.content!.trim();
-
-  // Add attachment information if available
-  if (message.attachments && message.attachments.length > 0) {
-    content += "\n\n[Attachments in this message:";
-    message.attachments.forEach((att) => {
-      if (att.parsedContent) {
-        content += `\n  Content:\n${att.parsedContent}`;
-      }
-    });
-    content += "]";
-  }
-
-  return content;
-}
-
-function getPromptMessages(
-  messages: Message[] | undefined | null
-): ChatCompletionMessageParam[] {
-  if (!messages?.length) {
-    return [{ role: "system" as const, content: SYSTEM_PROMPT }];
-  }
-
-  const validMessages = messages.filter(
-    (msg) => msg.role !== "system" && msg.content?.trim()
-  );
-
-  if (!validMessages.length) {
-    return [{ role: "system" as const, content: SYSTEM_PROMPT }];
-  }
-
-  const formattedMessages: ChatCompletionMessageParam[] = [
-    { role: "system" as const, content: SYSTEM_PROMPT },
-  ];
-
-  const historyMessages = validMessages.slice(0, -1);
-  if (historyMessages.length > 0) {
-    formattedMessages.push(
-      ...historyMessages.map((msg) => ({
-        role: msg.role === "user" ? ("user" as const) : ("assistant" as const),
-        content: formatMessageWithAttachments(msg),
-      }))
-    );
-  }
-
-  const mostRecentMessage = validMessages[validMessages.length - 1];
-  formattedMessages.push({
-    role: "user" as const,
-    content: formatEmailDraftRequest(
-      formatMessageWithAttachments(mostRecentMessage)
-    ),
-  });
-
-  return formattedMessages;
-}
-
-// Separate the prompt templates for better maintainability
-const SYSTEM_PROMPT = `You are an expert legal AI assistant specializing in drafting professional email responses for lawyers. Your goal is to analyze incoming emails and create legally sound, contextually appropriate responses.`;
-
-const TONE_GUIDELINES = `
-- **Clients**: Professional and clear, avoiding unnecessary legal jargon
-- **Colleagues**: Natural and conversational while remaining professional
-- **Opposing counsel**: Formal and precise
-- **Internal team**: Friendly but efficient`;
-
-function formatEmailDraftRequest(emailContent: string): string {
-  return `Please draft a response to the following email:
-
----
-${emailContent}
----
-
-**Requirements:**
-1. Match the appropriate tone based on sender and context:${TONE_GUIDELINES}
-2. Address all points raised in the email
-3. Consider the full conversation history for context
-4. Maintain consistency with previous responses
-5. Follow legal communication best practices
-
-**Output Format:**
-- Provide brief analysis or context (if needed)
-- Then include the email response in a code block:
-
-\`\`\`email
-[Your complete email response here]
-\`\`\`
-
-Note: For quick internal exchanges, keep responses concise and conversational.`;
-}
 
 export const resetMessageForRetry = internalMutation({
   args: {

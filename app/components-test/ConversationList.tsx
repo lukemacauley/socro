@@ -76,7 +76,6 @@ export function ConversationList({
 
 const ThreadItem = ({ t }: { t: Thread }) => {
   const updateStatus = useMutation(api.threads.updateStatus);
-  const setIsOpened = useMutation(api.threads.setIsOpened);
 
   const statusButtons = [
     {
@@ -98,14 +97,14 @@ const ThreadItem = ({ t }: { t: Thread }) => {
   return (
     <div className="relative group rounded-md hover:bg-accent hover:text-accent-foreground">
       <Link
-        to={"/threads/" + t.threadId}
-        onClick={() => setIsOpened({ threadId: t._id })}
+        to={"/threads/" + t.browserId}
         className="flex flex-col sm:flex-row sm:items-center w-full sm:justify-between sm:gap-3 px-3 py-2 "
       >
         <div
           className={cn(
             "size-1.5 absolute left-0",
-            t.opened ? "invisible" : "relative flex"
+            // t.opened ? "invisible" :
+            "relative flex"
           )}
         >
           <span className="bg-emerald-500 absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
@@ -125,9 +124,9 @@ const ThreadItem = ({ t }: { t: Thread }) => {
               "font-medium text-xs sm:text-sm text-card-foreground flex-none truncate"
             )}
           >
-            {t.subject && t.subject.length > 60
-              ? `${t.subject?.substring(0, 60)}...`
-              : t.subject}
+            {t.title && t.title.length > 60
+              ? `${t.title?.substring(0, 60)}...`
+              : t.title}
           </div>
           <div className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-1">
             {t.contentPreview}

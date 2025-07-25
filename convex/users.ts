@@ -21,7 +21,6 @@ export const upsertFromClerk = internalMutation({
       email: data.email_addresses[0].email_address,
       imageUrl: data.image_url,
       clerkId: data.id,
-      createdAt: Date.now(),
     };
 
     const user = await ctx.runQuery(internal.users.getByClerkId, {
@@ -50,27 +49,5 @@ export const deleteFromClerk = internalMutation({
         `Can't delete user, there is none for Clerk user ID: ${clerkUserId}`
       );
     }
-  },
-});
-
-export const getBySubscriptionId = internalQuery({
-  args: { subscriptionId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("by_microsoft_subscription_id", (q) =>
-        q.eq("microsoftSubscriptionId", args.subscriptionId)
-      )
-      .unique();
-  },
-});
-
-export const getAllWithSubscriptions = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("users")
-      .filter((q) => q.neq(q.field("microsoftSubscriptionId"), undefined))
-      .collect();
   },
 });

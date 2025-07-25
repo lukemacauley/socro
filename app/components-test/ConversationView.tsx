@@ -12,7 +12,7 @@ export function ConversationView({
 }) {
   const data = useQuery(
     api.threads.getThreadByClientId,
-    clientThreadId ? { threadId: clientThreadId } : "skip"
+    clientThreadId ? { browserId: clientThreadId } : "skip"
   );
 
   return (

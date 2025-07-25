@@ -11,13 +11,13 @@ export default function Page() {
   );
 
   const handleSendFirstMessage = async (content: string, uploadId?: string) => {
-    const threadId = createId();
-    navigate(`/threads/${threadId}`);
+    const browserId = createId();
+    navigate(`/threads/${browserId}`);
 
     await createThreadAndSendMessage({
       content,
       uploadId,
-      threadId,
+      browserId,
     });
   };
 

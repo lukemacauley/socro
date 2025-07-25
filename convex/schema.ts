@@ -1,11 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import {
-  threadStatus,
-  emailParticipant,
-  messageType,
-  nullOrUndefinedString,
-} from "./lib/validators";
+import { threadStatus } from "./lib/validators";
 
 const applicationTables = {
   users: defineTable({
@@ -13,38 +8,32 @@ const applicationTables = {
     email: v.string(),
     clerkId: v.string(),
     imageUrl: v.optional(v.string()),
-    createdAt: v.number(),
-    lastActiveAt: v.optional(v.number()),
-    microsoftSubscriptionId: v.optional(v.string()),
-    responseTemplate: v.optional(v.string()),
-  })
-    .index("by_clerk_id", ["clerkId"])
-    .index("by_microsoft_subscription_id", ["microsoftSubscriptionId"])
-    .index("by_email", ["email"]),
+    lastActivityAt: v.optional(v.number()),
+    role: v.optional(
+      v.union(v.literal("partner"), v.literal("associate"), v.literal("admin"))
+    ),
+  }).index("by_clerk_id", ["clerkId"]),
 
   threads: defineTable({
-    threadId: v.optional(v.string()), // UUID for instant client navigation
-    microsoftThreadId: v.optional(v.string()), // Microsoft Graph conversation ID
+    browserId: v.optional(v.string()), // UUID for instant client navigation
     userId: v.id("users"),
-    subject: v.optional(v.string()),
-    contentPreview: nullOrUndefinedString,
-    fromParticipants: v.optional(emailParticipant),
-    toParticipants: v.optional(v.array(emailParticipant)),
+    title: v.optional(v.string()),
+    contentPreview: v.optional(v.string()),
+    practiceArea: v.optional(v.string()), // "corporate", "litigation", etc.
+    difficulty: v.optional(v.number()), // 1-5
+
     lastActivityAt: v.number(),
     status: v.optional(threadStatus),
-    opened: v.optional(v.boolean()),
-    type: v.union(v.literal("chat"), v.literal("email")),
   })
     .index("by_user_id", ["userId"])
     .index("by_status", ["status"])
-    .index("by_microsoft_thread_id", ["microsoftThreadId"])
-    .index("by_client_thread_id", ["threadId"]),
+    .index("by_browser_id", ["browserId"]),
   messages: defineTable({
     threadId: v.id("threads"),
     userId: v.id("users"),
-    content: nullOrUndefinedString,
-    role: v.union(v.literal("user"), v.literal("ai"), v.literal("system")),
-    type: messageType,
+    content: v.string(),
+    role: v.union(v.literal("user"), v.literal("ai")),
+    type: v.union(v.literal("ai"), v.literal("user"), v.literal("evaluation")),
     isStreaming: v.optional(v.boolean()),
     streamingComplete: v.optional(v.boolean()),
   })
@@ -52,12 +41,11 @@ const applicationTables = {
     .index("by_user_id", ["userId"]),
 
   messageAttachments: defineTable({
-    messageId: v.optional(v.id("messages")), // Attachments can be linked to messages
-    uploadId: v.optional(v.string()), // UUID for frontend uploads
+    messageId: v.optional(v.id("messages")),
     threadId: v.optional(v.id("threads")), // Get all attachments in a thread
+    uploadId: v.optional(v.string()), // UUID for frontend uploads
     userId: v.id("users"),
-    storageId: v.id("_storage"), // Storage ID for the file in Convex storage
-    microsoftAttachmentId: v.optional(v.string()), // For Microsoft Graph attachments to query later
+    storageId: v.id("_storage"),
     name: v.string(),
     contentType: v.string(),
     size: v.number(),
@@ -67,22 +55,22 @@ const applicationTables = {
       v.literal("completed"),
       v.literal("failed")
     ),
-    parsedContent: nullOrUndefinedString, // For parsed content from Reducto
-    metadata: v.optional(
-      v.object({
-        pageCount: v.optional(v.number()),
-        processingTime: v.optional(v.number()),
-        originalUrl: v.optional(v.string()),
-        downloadedAt: v.optional(v.number()),
-        source: v.optional(v.union(v.literal("email"), v.literal("chat"))),
-        contentParsed: v.optional(v.boolean()),
-        parsingError: v.optional(v.string()),
-      })
-    ),
+    parsedContent: v.optional(v.string()), // For parsed content from Reducto
   })
     .index("by_message_id", ["messageId"])
     .index("by_thread_id", ["threadId"])
     .index("by_upload_id", ["uploadId"]),
+  userStats: defineTable({
+    userId: v.id("users"),
+    scenariosCompleted: v.optional(v.number()),
+    scenariosStarted: v.optional(v.number()),
+    totalPoints: v.optional(v.number()),
+    averageScore: v.optional(v.number()),
+    currentStreak: v.optional(v.number()),
+    bestStreak: v.optional(v.number()),
+  })
+    .index("by_total_points", ["totalPoints"])
+    .index("by_user_id", ["userId"]),
 };
 
 export default defineSchema({
