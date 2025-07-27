@@ -10,7 +10,7 @@ export const loggedInUserId = internalQuery({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_work_os_id", (q) => q.eq("workOSId", identity.subject))
+      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
       .first();
 
     if (!user) {

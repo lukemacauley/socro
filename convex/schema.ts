@@ -14,13 +14,14 @@ const applicationTables = {
     role: v.optional(
       v.union(v.literal("partner"), v.literal("associate"), v.literal("admin"))
     ),
-  }).index("by_work_os_id", ["workOSId"]),
+  })
+    .index("by_workos_id", ["workOSId"])
+    .index("by_organisation_id", ["organisationId"]),
   organisations: defineTable({
     name: v.string(),
     workOSId: v.string(), // WorkOS organization ID
-    slug: v.optional(v.string()), // URL-friendly identifier
-  }).index("by_work_os_id", ["workOSId"]),
-
+    slug: v.optional(v.string()),
+  }).index("by_workos_id", ["workOSId"]),
   threads: defineTable({
     browserId: v.optional(v.string()), // UUID for instant client navigation
     userId: v.id("users"),
@@ -28,7 +29,6 @@ const applicationTables = {
     contentPreview: v.optional(v.string()),
     practiceArea: v.optional(v.string()), // "corporate", "litigation", etc.
     difficulty: v.optional(v.number()), // 1-5
-
     lastActivityAt: v.number(),
     status: v.optional(threadStatus),
   })

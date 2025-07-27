@@ -20,7 +20,7 @@ export const getByWorkOSId = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_work_os_id", (q) => q.eq("workOSId", args.workOSId))
+      .withIndex("by_workos_id", (q) => q.eq("workOSId", args.workOSId))
       .first();
   },
 });
