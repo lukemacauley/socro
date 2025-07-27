@@ -51,7 +51,19 @@ http.route({
         });
         break;
       }
-
+      case "organization_membership.created":
+      case "organization_membership.updated": {
+        await ctx.runMutation(internal.users.updateOrganisationMembership, {
+          data,
+        });
+        break;
+      }
+      case "organization_membership.deleted": {
+        await ctx.runMutation(internal.users.removeOrganisationMembership, {
+          workOSUserId: data.userId,
+        });
+        break;
+      }
       default: {
         throw new Error(`Unhandled event type: ${event}`);
       }

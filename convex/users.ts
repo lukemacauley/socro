@@ -64,6 +64,60 @@ export const deleteFromWorkOS = internalMutation({
   },
 });
 
+export const updateOrganisationMembership = internalMutation({
+  args: { data: v.any() as Validator<UserMembershipWebhookEvent> }, // no runtime validation, trust WorkOS
+  async handler(ctx, { data }) {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: data.userId,
+    });
+
+    if (user === null) {
+      console.warn(
+        `Can't update organisation membership, user not found for WorkOS user ID: ${data.userId}`
+      );
+      return;
+    }
+
+    const organisation = await ctx.runQuery(
+      internal.organisations.getByWorkOSId,
+      {
+        workOSId: data.organizationId,
+      }
+    );
+
+    if (organisation === null) {
+      console.warn(
+        `Can't update organisation membership, organisation not found for WorkOS organisation ID: ${data.organizationId}`
+      );
+      return;
+    }
+
+    await ctx.db.patch(user._id, {
+      organisationId: organisation._id,
+    });
+  },
+});
+
+export const removeOrganisationMembership = internalMutation({
+  args: { workOSUserId: v.string() },
+  async handler(ctx, args) {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: args.workOSUserId,
+    });
+
+    if (user === null) {
+      console.warn(
+        `Can't remove organisation membership, user not found for WorkOS user ID: ${args.workOSUserId}`
+      );
+      return;
+    }
+
+    await ctx.db.patch(user._id, {
+      organisationId: undefined,
+    });
+  },
+});
+
 export const getLeaderboard = query({
   args: {
     paginationOpts: paginationOptsValidator,

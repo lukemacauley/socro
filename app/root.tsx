@@ -83,7 +83,10 @@ const convex = new ConvexReactClient(env.VITE_CONVEX_URL);
 
 export default function App(_args: Route.ComponentProps) {
   return (
-    <AuthKitProvider clientId={env.VITE_WORKOS_CLIENT_ID}>
+    <AuthKitProvider
+      clientId={env.VITE_WORKOS_CLIENT_ID}
+      redirectUri={env.VITE_WORKOS_REDIRECT_URI}
+    >
       <ConvexProvider client={convex}>
         <ConvexQueryCacheProvider>
           <Outlet />
