@@ -13,11 +13,13 @@ import type * as auth from "../auth.js";
 import type * as http from "../http.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
+import type * as organisations from "../organisations.js";
 import type * as router from "../router.js";
 import type * as streamingHttp from "../streamingHttp.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
 import type * as workflows from "../workflows.js";
+import type * as workos from "../workos.js";
 
 import type {
   ApiFromModules,
@@ -39,11 +41,13 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/validators": typeof lib_validators;
   messages: typeof messages;
+  organisations: typeof organisations;
   router: typeof router;
   streamingHttp: typeof streamingHttp;
   threads: typeof threads;
   users: typeof users;
   workflows: typeof workflows;
+  workos: typeof workos;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

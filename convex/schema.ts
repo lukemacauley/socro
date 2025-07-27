@@ -6,13 +6,20 @@ const applicationTables = {
   users: defineTable({
     name: v.string(),
     email: v.string(),
-    clerkId: v.string(),
+    organisationId: v.optional(v.id("organisations")),
+    workOSId: v.optional(v.string()),
+    clerkId: v.optional(v.string()), // Deprecated, use workOSId instead
     imageUrl: v.optional(v.string()),
     lastActivityAt: v.optional(v.number()),
     role: v.optional(
       v.union(v.literal("partner"), v.literal("associate"), v.literal("admin"))
     ),
-  }).index("by_clerk_id", ["clerkId"]),
+  }).index("by_work_os_id", ["workOSId"]),
+  organisations: defineTable({
+    name: v.string(),
+    workOSId: v.string(), // WorkOS organization ID
+    slug: v.optional(v.string()), // URL-friendly identifier
+  }).index("by_work_os_id", ["workOSId"]),
 
   threads: defineTable({
     browserId: v.optional(v.string()), // UUID for instant client navigation

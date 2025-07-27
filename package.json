@@ -31,6 +31,8 @@
     "@shikijs/transformers": "^3.7.0",
     "@t3-oss/env-core": "^0.13.8",
     "@tanstack/react-table": "^8.21.3",
+    "@workos-inc/authkit-react": "^0.11.0",
+    "@workos-inc/node": "^7.62.1",
     "ai": "5.0.0-beta.25",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

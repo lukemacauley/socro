@@ -1,31 +1,42 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
-import { type UserJSON } from "@clerk/backend";
 import { v, type Validator } from "convex/values";
 import { internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
+import type {
+  UserCreatedEvent,
+  UserUpdatedEvent,
+  OrganizationMembershipCreated,
+  OrganizationMembershipUpdated,
+} from "@workos-inc/node";
 
-export const getByClerkId = internalQuery({
-  args: { clerkId: v.string() },
+type UserWebhookEvent = (UserCreatedEvent | UserUpdatedEvent)["data"];
+type UserMembershipWebhookEvent = (
+  | OrganizationMembershipCreated
+  | OrganizationMembershipUpdated
+)["data"];
+
+export const getByWorkOSId = internalQuery({
+  args: { workOSId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_work_os_id", (q) => q.eq("workOSId", args.workOSId))
       .first();
   },
 });
 
-export const upsertFromClerk = internalMutation({
-  args: { data: v.any() as Validator<UserJSON> }, // no runtime validation, trust Clerk
+export const upsertFromWorkOS = internalMutation({
+  args: { data: v.any() as Validator<UserWebhookEvent> }, // no runtime validation, trust WorkOS
   async handler(ctx, { data }) {
     const userAttributes = {
-      name: `${data.first_name} ${data.last_name}`.trim(),
-      email: data.email_addresses[0].email_address,
-      imageUrl: data.image_url,
-      clerkId: data.id,
+      name: `${data.firstName} ${data.lastName}`.trim(),
+      email: data.email,
+      imageUrl: data.profilePictureUrl ? data.profilePictureUrl : undefined,
+      workOSId: data.id,
     };
 
-    const user = await ctx.runQuery(internal.users.getByClerkId, {
-      clerkId: data.id,
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: data.id,
     });
 
     if (user === null) {
@@ -36,18 +47,18 @@ export const upsertFromClerk = internalMutation({
   },
 });
 
-export const deleteFromClerk = internalMutation({
-  args: { clerkUserId: v.string() },
-  handler: async (ctx, { clerkUserId }) => {
-    const user = await ctx.runQuery(internal.users.getByClerkId, {
-      clerkId: clerkUserId,
+export const deleteFromWorkOS = internalMutation({
+  args: { workOSId: v.string() },
+  async handler(ctx, args) {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: args.workOSId,
     });
 
     if (user !== null) {
       await ctx.db.delete(user._id);
     } else {
       console.warn(
-        `Can't delete user, there is none for Clerk user ID: ${clerkUserId}`
+        `Can't delete user, there is none for WorkOS user ID: ${args.workOSId}`
       );
     }
   },

@@ -15,12 +15,12 @@ import {
   SidebarRail,
   useSidebar,
 } from "~/components/ui/sidebar";
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from "@clerk/react-router";
+// import {
+//   SignedIn,
+//   SignedOut,
+//   SignInButton,
+//   UserButton,
+// } from "@clerk/react-router";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
 
@@ -79,7 +79,7 @@ export function AppSidebar({
         {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
 
-      <SidebarFooter>
+      {/* <SidebarFooter>
         {!isFallback && (
           <div className="p-2">
             <SignedOut>
@@ -90,8 +90,7 @@ export function AppSidebar({
             </SignedIn>
           </div>
         )}
-        {/* <NavUser user={data.user} /> */}
-      </SidebarFooter>
+      </SidebarFooter> */}
       <SidebarRail />
     </Sidebar>
   );
