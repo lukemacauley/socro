@@ -7,15 +7,18 @@ import {
   PinOff,
   Trophy,
   Home,
+  Search,
 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarRail,
   useSidebar,
   SidebarGroup,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
 } from "~/components/ui/sidebar";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
@@ -23,8 +26,8 @@ import { Button } from "~/components/ui/button";
 import { usePaginatedQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
 import { useMutation } from "convex/react";
-import RelativeTime from "~/components/relative-time";
 import { useInfiniteScroll } from "~/lib/use-infinite-scroll";
+import { useState } from "react";
 
 type Thread = (typeof api.threads.getThreads._returnType)["page"][number];
 type ThreadStatus = Thread["status"];
@@ -40,9 +43,12 @@ export function AppSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar> & { isFallback?: boolean }) {
   const { state } = useSidebar();
+
+  const [query, setQuery] = useState("");
+
   const { results, status, loadMore } = usePaginatedQuery(
     api.threads.getThreads,
-    !isFallback ? { threadStatus: "active" } : "skip",
+    isFallback ? "skip" : { threadStatus: "active", query },
     { initialNumItems: 50 }
   );
   const updateStatus = useMutation(api.threads.updateStatus);
@@ -67,7 +73,7 @@ export function AppSidebar({
         <Link to="/">
           <h1
             className={cn(
-              "font-medium text-xl tracking-tight leading-relaxed text-primary",
+              "font-medium text-xl text-center w-full tracking-tight leading-relaxed text-primary",
               state === "collapsed" ? "text-center" : "text-left px-2"
             )}
           >
@@ -76,43 +82,78 @@ export function AppSidebar({
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <div className="px-2 mb-4">
-            <Button asChild className="w-full" size="sm">
-              <Link to="/">{state !== "collapsed" && "New Chat"}</Link>
-            </Button>
-          </div>
-          <div className="space-y-1 px-2">
-            {groupedThreads &&
-              sectionOrder.map((section) => {
-                const sectionThreads = groupedThreads[section];
-                if (sectionThreads.length === 0) {
-                  return null;
-                }
+        {state === "collapsed" ? (
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="New Chat">
+                  <Link to="/">
+                    <MessageSquare />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Home">
+                  <Link to="/">
+                    <Home />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Leaderboard">
+                  <Link to="/leaderboard">
+                    <Trophy />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        ) : (
+          <SidebarGroup>
+            <div className="px-2 mb-2">
+              <Button asChild className="w-full" size="sm">
+                <Link to="/">New Chat</Link>
+              </Button>
+            </div>
+            <div className="border-b border-sidebar-border flex items-center gap-2 p-2 mb-4">
+              <Search className="size-4" />
+              <input
+                placeholder="Search threads..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="text-sm ring-0 focus:ring-0 w-full bg-transparent placeholder:text-muted-foreground outline-none"
+              />
+            </div>
+            <div className="space-y-1 px-2">
+              {groupedThreads &&
+                sectionOrder.map((section) => {
+                  const sectionThreads = groupedThreads[section];
+                  if (sectionThreads.length === 0) {
+                    return null;
+                  }
 
-                return (
-                  <div key={section} className="space-y-1">
-                    {state !== "collapsed" && (
+                  return (
+                    <div key={section} className="space-y-1">
                       <h3 className="text-xs text-muted-foreground whitespace-nowrap">
                         {getSectionTitle(section)}
                       </h3>
-                    )}
-                    <div className="space-y-0.5 pt-1 pb-4">
-                      {sectionThreads.map((thread) => (
-                        <ThreadItem
-                          key={thread._id}
-                          thread={thread}
-                          updateStatus={updateStatus}
-                          isCollapsed={state === "collapsed"}
-                        />
-                      ))}
+                      <div className="space-y-0.5 pt-1 pb-4">
+                        {sectionThreads.map((thread) => (
+                          <ThreadItem
+                            key={thread._id}
+                            thread={thread}
+                            updateStatus={updateStatus}
+                            isCollapsed={state !== "expanded"}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
-          <div ref={observerRef} className="h-1" />
-        </SidebarGroup>
+                  );
+                })}
+            </div>
+            <div ref={observerRef} className="h-1" />
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
@@ -163,7 +204,7 @@ const ThreadItem = ({
       </Link>
       {!isCollapsed && (
         <div className="absolute right-0 top-0 h-full flex items-center transition-all duration-200 opacity-0 translate-x-2 group-hover/thread:opacity-100 group-hover/thread:translate-x-0 pointer-events-none">
-          <div className="h-full flex items-center gap-0.5 pr-1 pl-20 bg-gradient-to-r rounded-md from-transparent via-accent to-accent">
+          <div className="h-full flex items-center gap-0.5 pr-1 pl-16 bg-gradient-to-r rounded-md from-transparent via-accent to-accent">
             <div className="h-full flex items-center gap-0.5 pointer-events-auto">
               {statusButtons.map((b) => {
                 const isActive = thread.status === b.status;

@@ -34,8 +34,12 @@ const applicationTables = {
     status: v.optional(threadStatus),
   })
     .index("by_user_id", ["userId"])
-    .index("by_status", ["status"])
-    .index("by_browser_id", ["browserId"]),
+    .index("by_browser_id", ["browserId"])
+    .index("by_user_and_status", ["userId", "status"])
+    .searchIndex("search_body", {
+      searchField: "title",
+      filterFields: ["userId", "status"],
+    }),
   messages: defineTable({
     threadId: v.id("threads"),
     userId: v.id("users"),
