@@ -5,9 +5,10 @@ import {
   ArchiveRestore,
   Pin,
   PinOff,
-  Trophy,
-  Home,
   Search,
+  type LucideIcon,
+  MessagesSquare,
+  Crown,
 } from "lucide-react";
 import {
   Sidebar,
@@ -16,9 +17,6 @@ import {
   SidebarRail,
   useSidebar,
   SidebarGroup,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
 } from "~/components/ui/sidebar";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
@@ -28,6 +26,7 @@ import { api } from "convex/_generated/api";
 import { useMutation } from "convex/react";
 import { useInfiniteScroll } from "~/lib/use-infinite-scroll";
 import { useState } from "react";
+import { NavMain } from "./nav-main";
 
 type Thread = (typeof api.threads.getThreads._returnType)["page"][number];
 type ThreadStatus = Thread["status"];
@@ -67,6 +66,29 @@ export function AppSidebar({
     "past30days",
   ];
 
+  const NAVIGATION: {
+    title: string;
+    url: string;
+    icon?: LucideIcon;
+    isActive?: boolean;
+    items?: {
+      title: string;
+      url: string;
+    }[];
+  }[] = [
+    { title: "New Chat", icon: MessageSquare, url: "/" },
+    {
+      title: "Threads",
+      icon: MessagesSquare,
+      url: "/threads",
+    },
+    {
+      title: "Leaderboard",
+      icon: Crown,
+      url: "/leaderboard",
+    },
+  ];
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -83,31 +105,7 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         {state === "collapsed" ? (
-          <SidebarGroup>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="New Chat">
-                  <Link to="/">
-                    <MessageSquare />
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Home">
-                  <Link to="/">
-                    <Home />
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Leaderboard">
-                  <Link to="/leaderboard">
-                    <Trophy />
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
+          <NavMain items={NAVIGATION} />
         ) : (
           <SidebarGroup>
             <div className="px-2 mb-2">
