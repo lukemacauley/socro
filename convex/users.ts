@@ -8,7 +8,7 @@ import type {
   OrganizationMembershipCreated,
   OrganizationMembershipUpdated,
 } from "@workos-inc/node";
-import { UserJSON } from "@clerk/backend";
+import { type UserJSON } from "@clerk/backend";
 
 type UserWebhookEvent = (UserCreatedEvent | UserUpdatedEvent)["data"];
 type UserMembershipWebhookEvent = (

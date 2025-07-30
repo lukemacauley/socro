@@ -24,27 +24,27 @@ import {
 // import { AuthKitProvider } from "@workos-inc/authkit-react";
 import { rootAuthLoader } from "@clerk/react-router/ssr.server";
 
-export function HydrateFallback() {
-  return (
-    <SidebarProvider>
-      <AppSidebar isFallback />
-      <SidebarInset>
-        <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
-          </div>
-        </header>
-        <div className="bg-primary-foreground">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
-  );
-}
+// export function HydrateFallback() {
+//   return (
+//     <SidebarProvider>
+//       <AppSidebar isFallback />
+//       <SidebarInset>
+//         <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
+//           <div className="flex items-center gap-2 px-4">
+//             <SidebarTrigger className="-ml-1" />
+//             <Separator
+//               orientation="vertical"
+//               className="mr-2 data-[orientation=vertical]:h-4"
+//             />
+//           </div>
+//         </header>
+//         <div className="bg-primary-foreground">
+//           <Outlet />
+//         </div>
+//       </SidebarInset>
+//     </SidebarProvider>
+//   );
+// }
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
