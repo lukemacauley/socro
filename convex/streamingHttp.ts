@@ -44,6 +44,35 @@ export const streamMessage = httpAction(async (ctx, request) => {
 
       const validMessages = messages.filter((msg) => msg.content?.trim());
 
+      // Get the latest user message
+      const latestUserMessage = validMessages
+        .filter((msg) => msg.role === "user")
+        .pop();
+      let enhancedSystemPrompt = PIAB_SYSTEM_PROMPT_ANTHROPIC;
+
+      // Get demo questions for new conversations
+      if (latestUserMessage && validMessages.length <= 2) {
+        try {
+          const { topic, questions } = await ctx.runAction(
+            internal.demo.getRelevantQuestions,
+            {
+              userMessage: latestUserMessage.content || "",
+            }
+          );
+
+          // Enhance system prompt with ONE deep question
+          enhancedSystemPrompt = `${PIAB_SYSTEM_PROMPT_ANTHROPIC}
+
+IMPORTANT: Start your response with this specific deep, challenging question that cuts to the heart of their legal issue:
+
+"${questions[0]}"
+
+After posing this question, wait for their response before providing any further guidance. Your goal is to make them think deeply about the complexities and nuances of their situation through this single, penetrating question.`;
+        } catch (error) {
+          console.log("Could not get demo questions:", error);
+        }
+      }
+
       const formattedMessages: ModelMessage[] = [
         ...validMessages.map((msg) => ({
           role:
@@ -58,7 +87,7 @@ export const streamMessage = httpAction(async (ctx, request) => {
       const result = streamText({
         // model: anthropic("claude-opus-4-20250514"),
         model: groq("moonshotai/kimi-k2-instruct"),
-        system: PIAB_SYSTEM_PROMPT_ANTHROPIC, //systemPrompt,
+        system: enhancedSystemPrompt,
         messages: formattedMessages,
       });
 

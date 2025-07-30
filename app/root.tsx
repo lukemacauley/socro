@@ -8,7 +8,9 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ClerkProvider, useAuth } from "@clerk/react-router";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { ConvexReactClient } from "convex/react";
 import { Toaster } from "./components/ui/sonner";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import { env } from "env";
@@ -19,7 +21,8 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "./components/ui/sidebar";
-import { AuthKitProvider } from "@workos-inc/authkit-react";
+// import { AuthKitProvider } from "@workos-inc/authkit-react";
+import { rootAuthLoader } from "@clerk/react-router/ssr.server";
 
 export function HydrateFallback() {
   return (
@@ -79,20 +82,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+export async function loader(args: Route.LoaderArgs) {
+  return rootAuthLoader(args);
+}
+
 const convex = new ConvexReactClient(env.VITE_CONVEX_URL);
 
-export default function App(_args: Route.ComponentProps) {
+export default function App({ loaderData }: Route.ComponentProps) {
   return (
-    <AuthKitProvider
-      clientId={env.VITE_WORKOS_CLIENT_ID}
-      redirectUri={env.VITE_WORKOS_REDIRECT_URI}
+    // <AuthKitProvider
+    //   clientId={env.VITE_WORKOS_CLIENT_ID}
+    //   redirectUri={env.VITE_WORKOS_REDIRECT_URI}
+    // >
+    <ClerkProvider
+      loaderData={loaderData}
+      signUpFallbackRedirectUrl="/"
+      signInFallbackRedirectUrl="/"
+      publishableKey={env.VITE_CLERK_PUBLISHABLE_KEY}
     >
-      <ConvexProvider client={convex}>
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <ConvexQueryCacheProvider>
           <Outlet />
         </ConvexQueryCacheProvider>
-      </ConvexProvider>
-    </AuthKitProvider>
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+    // </AuthKitProvider>
   );
 }
 

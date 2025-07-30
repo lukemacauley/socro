@@ -14,9 +14,13 @@ export const getThreads = query({
       throw new Error("Not authenticated");
     }
 
+    // const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+    //   workOSId: identity.subject,
+    // });
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
 
     if (!user) {

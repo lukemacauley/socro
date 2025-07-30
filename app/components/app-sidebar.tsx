@@ -5,6 +5,7 @@ import {
   History,
   type LucideIcon,
   MessagesSquare,
+  Crown,
 } from "lucide-react";
 import { NavMain } from "~/components/nav-main";
 import {
@@ -34,23 +35,16 @@ export const NAVIGATION: {
     url: string;
   }[];
 }[] = [
-  { title: "Chat", icon: MessageSquare, url: "/new" },
+  { title: "New Chat", icon: MessageSquare, url: "/new" },
   {
     title: "Threads",
     icon: MessagesSquare,
     url: "/threads",
-    // isActive: true,
-    // items: [
-    //   { title: "All", url: "/threads" },
-    //   { title: "New", url: "/threads?status=new" },
-    //   // { title: "In Progress", url: "/threads/?status=in_progress" },
-    //   { title: "Archived", url: "/threads?status=archived" },
-    // ],
   },
   {
-    title: "Vault",
-    icon: Server,
-    url: "/vault",
+    title: "Leaderboard",
+    icon: Crown,
+    url: "/leaderboard",
   },
   { title: "History", icon: History, url: "/history" },
 ];

@@ -16,6 +16,7 @@ const applicationTables = {
     ),
   })
     .index("by_workos_id", ["workOSId"])
+    .index("by_clerk_id", ["clerkId"])
     .index("by_organisation_id", ["organisationId"]),
   organisations: defineTable({
     name: v.string(),
