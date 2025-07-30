@@ -22,15 +22,65 @@ export type Message = NonNullable<
   typeof api.threads.getThreadByClientId._returnType
 >["messages"][number];
 
+const initialSuggestions = [
+  {
+    title: "Help with Torts",
+    description: "Get help understanding tort law concepts and cases",
+    prompt: "Help me with torts",
+  },
+  {
+    title: "Criminal Law Basics",
+    description: "Learn about criminal law principles and defenses",
+    prompt: "Explain the basics of criminal law",
+  },
+  {
+    title: "Contract Review",
+    description: "Understand contract terms and obligations",
+    prompt: "Help me review a contract",
+  },
+  {
+    title: "Legal Research",
+    description: "Find relevant cases and statutes for your issue",
+    prompt: "I need help with legal research",
+  },
+];
+
 export const MessageList = memo(function MessageList({
   messages,
   threadId,
+  onSendFirstMessage,
 }: {
   messages: Message[] | undefined;
   threadId: Id<"threads"> | undefined;
+  onSendFirstMessage?: (content: string) => void;
 }) {
   if (!messages || messages.length === 0) {
-    return <div className="flex-1 flex flex-col min-h-0 pt-12" />;
+    return (
+      <div className="flex-1 flex flex-col min-h-0 pt-12">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="max-w-2xl w-full px-6">
+            <h2 className="text-2xl font-semibold text-center mb-8">
+              What can I help you with?
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {initialSuggestions.map((suggestion, index) => (
+                <Button
+                  variant="outline"
+                  key={index}
+                  onClick={() => onSendFirstMessage?.(suggestion.prompt)}
+                  className="block group h-auto p-4 whitespace-normal font-normal"
+                >
+                  <h3 className="font-medium mb-1">{suggestion.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {suggestion.description}
+                  </p>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

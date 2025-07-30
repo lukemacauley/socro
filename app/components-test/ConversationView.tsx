@@ -17,7 +17,11 @@ export function ConversationView({
 
   return (
     <div className="flex flex-col h-screen">
-      <MessageList messages={data?.messages} threadId={data?.threadId} />
+      <MessageList
+        messages={data?.messages}
+        threadId={data?.threadId}
+        onSendFirstMessage={onSendFirstMessage}
+      />
       <MessageInput
         clientThreadId={clientThreadId}
         threadId={data?.threadId}
