@@ -1,9 +1,7 @@
 import * as React from "react";
 import {
-  MessageSquare,
-  Server,
-  History,
   type LucideIcon,
+  MessageSquare,
   MessagesSquare,
   Crown,
 } from "lucide-react";
@@ -16,12 +14,6 @@ import {
   SidebarRail,
   useSidebar,
 } from "~/components/ui/sidebar";
-// import {
-//   SignedIn,
-//   SignedOut,
-//   SignInButton,
-//   UserButton,
-// } from "@clerk/react-router";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
 
@@ -35,7 +27,7 @@ export const NAVIGATION: {
     url: string;
   }[];
 }[] = [
-  { title: "New Chat", icon: MessageSquare, url: "/new" },
+  { title: "New Chat", icon: MessageSquare, url: "/" },
   {
     title: "Threads",
     icon: MessagesSquare,
@@ -46,7 +38,6 @@ export const NAVIGATION: {
     icon: Crown,
     url: "/leaderboard",
   },
-  { title: "History", icon: History, url: "/history" },
 ];
 
 export function AppSidebar({
@@ -64,7 +55,7 @@ export function AppSidebar({
               state === "collapsed" ? "text-center" : "text-left px-2"
             )}
           >
-            {state === "collapsed" ? "CG" : "Con Gas"}
+            {state === "collapsed" ? "S" : "Socro"}
           </h1>
         </Link>
       </SidebarHeader>

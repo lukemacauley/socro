@@ -17,7 +17,7 @@ import {
   DropzoneEmptyState,
 } from "~/components/kibo-ui/dropzone";
 import { useDropzone } from "react-dropzone";
-import { v7 as createId } from "uuid";
+import { v4 as createId } from "uuid";
 import AttachmentButton from "./AttachmentButton";
 import type { Id } from "convex/_generated/dataModel";
 

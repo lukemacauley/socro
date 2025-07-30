@@ -16,6 +16,20 @@ type UserMembershipWebhookEvent = (
   | OrganizationMembershipUpdated
 )["data"];
 
+export const current = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    return await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+  },
+});
+
 export const getByWorkOSId = internalQuery({
   args: { workOSId: v.string() },
   handler: async (ctx, args) => {

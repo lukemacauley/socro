@@ -17,6 +17,7 @@ import { marked } from "marked";
 import { toast } from "sonner";
 import { useMessageStream } from "~/hooks/useMessageStream";
 import type { Id } from "convex/_generated/dataModel";
+import { useQuery } from "convex-helpers/react/cache";
 
 export type Message = NonNullable<
   typeof api.threads.getThreadByClientId._returnType
@@ -54,13 +55,15 @@ export const MessageList = memo(function MessageList({
   threadId: Id<"threads"> | undefined;
   onSendFirstMessage?: (content: string) => void;
 }) {
+  const user = useQuery(api.users.current);
+
   if (!messages || messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col min-h-0 pt-12">
-        <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex items-center justify-center mb-16">
           <div className="max-w-2xl w-full px-6">
             <h2 className="text-2xl font-semibold text-center mb-8">
-              What can I help you with?
+              What can I help you with, {user?.name}?
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {initialSuggestions.map((suggestion, index) => (
@@ -84,7 +87,7 @@ export const MessageList = memo(function MessageList({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 pt-12">
+    <div className="flex-1 flex flex-col min-h-0">
       <AIConversation className="bg-primary-foreground">
         <AIConversationContent>
           <div className="max-w-3xl mx-auto">

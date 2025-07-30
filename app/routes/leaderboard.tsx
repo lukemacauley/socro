@@ -13,7 +13,7 @@ export default function Page() {
   );
 
   return (
-    <div className="container mx-auto py-20 px-4">
+    <div className="container mx-auto p-4">
       <DataTable columns={columns} data={results} />
     </div>
   );

@@ -100,16 +100,6 @@ const ThreadItem = ({ t }: { t: Thread }) => {
         to={"/threads/" + t.browserId}
         className="flex flex-col sm:flex-row sm:items-center w-full sm:justify-between sm:gap-3 px-3 py-2 "
       >
-        <div
-          className={cn(
-            "size-1.5 absolute left-0",
-            // t.opened ? "invisible" :
-            "relative flex"
-          )}
-        >
-          <span className="bg-emerald-500 absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
-          <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-        </div>
         <div className="min-w-0 flex-1 flex-col sm:flex-row flex sm:items-center sm:gap-3">
           {/* <div className="w-full sm:w-80 flex-shrink-0 flex items-center gap-2 justify-between">
             <div className="text-sm sm:text-sm text-card-foreground font-medium">

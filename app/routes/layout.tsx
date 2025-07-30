@@ -1,7 +1,9 @@
+import { SignIn, SignUp, useAuth } from "@clerk/react-router";
 import { Separator } from "@radix-ui/react-separator";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
-import { useMutation } from "convex/react";
+import { Authenticated, Unauthenticated, useMutation } from "convex/react";
+import { LogOut } from "lucide-react";
 import { Outlet, useLocation, Link } from "react-router";
 import { Fragment } from "react/jsx-runtime";
 import { toast } from "sonner";
@@ -16,6 +18,7 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator,
 } from "~/components/ui/breadcrumb";
+import { Button } from "~/components/ui/button";
 import {
   SidebarInset,
   SidebarProvider,
@@ -31,6 +34,7 @@ type Breadcrumb = {
 
 export default function Layout() {
   const location = useLocation();
+  const { signOut } = useAuth();
   const pathSegments = location.pathname.split("/").filter(Boolean);
 
   const breadcrumbItems: Breadcrumb[] = [];
@@ -82,54 +86,70 @@ export default function Layout() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
-            <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4"
-              />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  {breadcrumbItems.map((item, index) => (
-                    <Fragment key={index}>
-                      <BreadcrumbItem>
-                        {item.isLast ? (
-                          <BreadcrumbPage>
-                            {isUUID ? (
-                              <GhostInput
-                                value={threadName || "New Thread"}
-                                onSave={handleUpdateName}
-                                emptyMessage="Thread name cannot be empty"
-                                className="px-2.5 -ml-2.5 max-w-none w-50"
-                              />
-                            ) : (
-                              threadName || item.label
-                            )}
-                          </BreadcrumbPage>
-                        ) : (
-                          <BreadcrumbLink asChild>
-                            <Link to={item.href}>{item.label}</Link>
-                          </BreadcrumbLink>
+      <Unauthenticated>
+        <div className="flex items-center justify-center h-screen gap-8 w-full">
+          <SignIn oauthFlow="popup" afterSignOutUrl="/" />
+          <SignUp oauthFlow="popup" afterSignOutUrl="/" />
+        </div>
+      </Unauthenticated>
+      <Authenticated>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="sticky w-full px-4 top-0 z-10 flex h-12 shrink-0 items-center justify-center gap-2 border-b border-sidebar-border bg-sidebar">
+              <div className="flex flex-1 items-center gap-2">
+                <SidebarTrigger className="-ml-1" />
+                <Separator
+                  orientation="vertical"
+                  className="mr-2 data-[orientation=vertical]:h-4"
+                />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    {breadcrumbItems.map((item, index) => (
+                      <Fragment key={index}>
+                        <BreadcrumbItem>
+                          {item.isLast ? (
+                            <BreadcrumbPage>
+                              {isUUID ? (
+                                <GhostInput
+                                  value={threadName || "New Thread"}
+                                  onSave={handleUpdateName}
+                                  emptyMessage="Thread name cannot be empty"
+                                  className="px-2.5 -ml-2.5 max-w-none w-50"
+                                />
+                              ) : (
+                                threadName || item.label
+                              )}
+                            </BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink asChild>
+                              <Link to={item.href}>{item.label}</Link>
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                        {index < breadcrumbItems.length - 1 && (
+                          <BreadcrumbSeparator />
                         )}
-                      </BreadcrumbItem>
-                      {index < breadcrumbItems.length - 1 && (
-                        <BreadcrumbSeparator />
-                      )}
-                    </Fragment>
-                  ))}
-                </BreadcrumbList>
-              </Breadcrumb>
+                      </Fragment>
+                    ))}
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => signOut()}
+                tooltip="Sign out"
+              >
+                <LogOut />
+              </Button>
+            </header>
+            <div className="bg-primary-foreground">
+              <Outlet />
             </div>
-          </header>
-          <div className="bg-primary-foreground">
-            <Outlet />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+          </SidebarInset>
+        </SidebarProvider>
+      </Authenticated>
     </TooltipProvider>
   );
 }
