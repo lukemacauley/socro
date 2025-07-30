@@ -15,7 +15,7 @@ export const env = createEnv({
     VITE_CONVEX_URL: z.url(),
     VITE_CLERK_FRONTEND_API_URL: z.url().optional(),
     VITE_CONVEX_SITE_URL: z.url(),
-    VITE_WORKOS_CLIENT_ID: z.string().min(1),
+    // VITE_WORKOS_CLIENT_ID: z.string().min(1),
     // VITE_WORKOS_REDIRECT_URI: z.url(),
   },
 
