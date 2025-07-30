@@ -4,15 +4,15 @@ import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
 
 export function ConversationView({
-  clientThreadId,
+  browserId,
   onSendFirstMessage,
 }: {
-  clientThreadId?: string;
+  browserId?: string;
   onSendFirstMessage?: (content: string, uploadId?: string) => void;
 }) {
   const data = useQuery(
     api.threads.getThreadByClientId,
-    clientThreadId ? { browserId: clientThreadId } : "skip"
+    browserId ? { browserId } : "skip"
   );
 
   return (
@@ -23,7 +23,7 @@ export function ConversationView({
         onSendFirstMessage={onSendFirstMessage}
       />
       <MessageInput
-        clientThreadId={clientThreadId}
+        browserId={browserId}
         threadId={data?.threadId}
         onSendFirstMessage={onSendFirstMessage}
       />

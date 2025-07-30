@@ -23,11 +23,11 @@ import type { Id } from "convex/_generated/dataModel";
 
 export const MessageInput = ({
   threadId,
-  clientThreadId,
+  browserId,
   onSendFirstMessage,
 }: {
   threadId?: Id<"threads">;
-  clientThreadId?: string;
+  browserId?: string;
   onSendFirstMessage?: (content: string, uploadId?: string) => void;
 }) => {
   const sendMessage = useAction(api.messages.sendMessage);
@@ -68,11 +68,11 @@ export const MessageInput = ({
           uploadId,
         });
         return;
-      } else if (clientThreadId) {
+      } else if (browserId) {
         await createThreadAndSendMessage({
           content,
           uploadId,
-          browserId: clientThreadId,
+          browserId,
         });
       }
 
@@ -82,7 +82,7 @@ export const MessageInput = ({
     [
       prompt,
       threadId,
-      clientThreadId,
+      browserId,
       sendMessage,
       createThreadAndSendMessage,
       onSendFirstMessage,
