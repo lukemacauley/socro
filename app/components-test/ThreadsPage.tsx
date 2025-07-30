@@ -1,19 +1,21 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ConversationList } from "./ConversationList";
+import { useSearchParams } from "react-router";
 
 export default function Threads() {
-  return (
-    <Tabs defaultValue="all" className="p-4">
-      <TabsList>
-        <TabsTrigger value="all">All</TabsTrigger>
-        <TabsTrigger value="archived">Archived</TabsTrigger>
-      </TabsList>
-      <TabsContent value="all">
-        <ConversationList threadStatus="active" />
-      </TabsContent>
-      <TabsContent value="archived">
+  const [params] = useSearchParams();
+  const status = params.get("status");
+
+  if (status === "archived") {
+    return (
+      <div className="p-4">
         <ConversationList threadStatus="archived" />
-      </TabsContent>
-    </Tabs>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <ConversationList threadStatus="active" />
+    </div>
   );
 }

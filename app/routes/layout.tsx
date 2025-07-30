@@ -3,7 +3,7 @@ import { Separator } from "@radix-ui/react-separator";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
 import { Authenticated, Unauthenticated, useMutation } from "convex/react";
-import { LogOut } from "lucide-react";
+import { Archive, LogOut } from "lucide-react";
 import { Outlet, useLocation, Link } from "react-router";
 import { Fragment } from "react/jsx-runtime";
 import { toast } from "sonner";
@@ -135,14 +135,21 @@ export default function Layout() {
                   </BreadcrumbList>
                 </Breadcrumb>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => signOut()}
-                tooltip="Sign out"
-              >
-                <LogOut />
-              </Button>
+              <div className="flex items-center gap-0.5">
+                <Button variant="ghost" size="sm" tooltip="Archive" asChild>
+                  <Link to="/threads?status=archived">
+                    <Archive />
+                  </Link>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => signOut()}
+                  tooltip="Sign out"
+                >
+                  <LogOut />
+                </Button>
+              </div>
             </header>
             <div className="bg-primary-foreground">
               <Outlet />
