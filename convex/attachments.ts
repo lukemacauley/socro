@@ -3,7 +3,7 @@ import { internalMutation, query, action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
 import Reducto, { toFile } from "reductoai";
-import { authedAction } from "./lib/utils";
+import { authedAction, authedQuery } from "./lib/utils";
 
 interface ProcessedAttachment {
   storageId: Id<"_storage">;
@@ -13,14 +13,9 @@ interface ProcessedAttachment {
   contentType: string;
 }
 
-export const getAttachmentUrl = query({
+export const getAttachmentUrl = authedQuery({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
     return await ctx.storage.getUrl(args.storageId);
   },
 });

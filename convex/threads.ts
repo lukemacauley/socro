@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { threadStatus } from "./lib/validators";
 import { paginationOptsValidator } from "convex/server";
-import { authedQuery } from "./lib/utils";
+import { authedMutation, authedQuery } from "./lib/utils";
 
 export const getThreads = authedQuery({
   args: {
@@ -88,14 +88,9 @@ export const getThreadName = query({
   },
 });
 
-export const updateThreadName = mutation({
+export const updateThreadName = authedMutation({
   args: { browserId: v.string(), name: v.string() },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
     const thread = await ctx.db
       .query("threads")
       .withIndex("by_browser_id", (q) => q.eq("browserId", args.browserId))
@@ -111,14 +106,9 @@ export const updateThreadName = mutation({
   },
 });
 
-export const getThreadByClientId = query({
+export const getThreadByClientId = authedQuery({
   args: { browserId: v.string() },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      return null;
-    }
-
     const thread = await ctx.db
       .query("threads")
       .withIndex("by_browser_id", (q) => q.eq("browserId", args.browserId))
@@ -154,17 +144,12 @@ export const getThreadByClientId = query({
   },
 });
 
-export const updateStatus = mutation({
+export const updateStatus = authedMutation({
   args: {
     threadId: v.id("threads"),
     status: v.optional(threadStatus),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
     await ctx.db.patch(args.threadId, {
       status: args.status,
     });

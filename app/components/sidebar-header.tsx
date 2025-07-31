@@ -18,6 +18,7 @@ export function SidebarHeader({
 }) {
   const { state } = useSidebar();
   const user = useQuery(api.users.current);
+
   const isAdmin = user?.role === "admin";
 
   return (

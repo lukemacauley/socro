@@ -130,7 +130,7 @@ export const removeOrganisationMembership = internalMutation({
   },
 });
 
-export const getLeaderboard = query({
+export const getLeaderboard = authedQuery({
   args: {
     paginationOpts: paginationOptsValidator,
     sortBy: v.optional(v.string()),
