@@ -31,13 +31,13 @@ export function SidebarHeader({
           {state === "collapsed" ? "S" : "Socro"}
         </h1>
       </Link>
-      {isAdmin && (
-        <Button variant="secondary" asChild>
-          <Link to="/leaderboard" className="w-full">
-            Leaderboard
-          </Link>
-        </Button>
-      )}
+      {/* {isAdmin && ( */}
+      <Button variant="secondary" asChild>
+        <Link to="/leaderboard" className="w-full">
+          Leaderboard
+        </Link>
+      </Button>
+      {/* )} */}
       <Button asChild className="w-full" size="sm">
         <Link to="/">New Chat</Link>
       </Button>

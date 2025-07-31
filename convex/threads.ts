@@ -2,36 +2,22 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { threadStatus } from "./lib/validators";
 import { paginationOptsValidator } from "convex/server";
-import { internal } from "./_generated/api";
+import { authedQuery } from "./lib/utils";
 
-export const getThreads = query({
+export const getThreads = authedQuery({
   args: {
     query: v.optional(v.string()),
     threadStatus: v.optional(threadStatus),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity === null) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const userId = user._id;
-
     if (args.query) {
       return await ctx.db
         .query("threads")
         .withSearchIndex("search_body", (q) => {
-          let search = q.search("title", args.query || "").eq("userId", userId);
+          let search = q
+            .search("title", args.query || "")
+            .eq("userId", ctx.userId);
 
           // Add status filtering within the search index if specified
           // Note: For "active" status, we'll handle it differently since it means "not archived"
@@ -56,7 +42,7 @@ export const getThreads = query({
       if (args.threadStatus === "active") {
         return await ctx.db
           .query("threads")
-          .withIndex("by_user_id", (q) => q.eq("userId", userId))
+          .withIndex("by_user_id", (q) => q.eq("userId", ctx.userId))
           .filter((q) => q.neq(q.field("status"), "archived"))
           .order("desc")
           .paginate(args.paginationOpts);
@@ -64,7 +50,7 @@ export const getThreads = query({
         return await ctx.db
           .query("threads")
           .withIndex("by_user_and_status", (q) =>
-            q.eq("userId", userId).eq("status", args.threadStatus)
+            q.eq("userId", ctx.userId).eq("status", args.threadStatus)
           )
           .order("desc")
           .paginate(args.paginationOpts);
@@ -72,7 +58,7 @@ export const getThreads = query({
     } else {
       return await ctx.db
         .query("threads")
-        .withIndex("by_user_id", (q) => q.eq("userId", userId))
+        .withIndex("by_user_id", (q) => q.eq("userId", ctx.userId))
         .order("desc")
         .paginate(args.paginationOpts);
     }

@@ -1,17 +1,13 @@
 import { v } from "convex/values";
-import { action } from "./_generated/server";
 import Groq from "groq-sdk";
-import { internal } from "./_generated/api";
+import { authedAction } from "./lib/utils";
 
-export const createWorkflow = action({
+export const createWorkflow = authedAction({
   args: {
     content: v.string(),
   },
   handler: async (ctx, args) => {
-    const userID = await ctx.runQuery(internal.auth.loggedInUserId);
-    if (!userID) {
-      throw new Error("Not authenticated");
-    }
+    const userId = ctx.userId;
 
     try {
       const groq = new Groq();

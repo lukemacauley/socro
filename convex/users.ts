@@ -1,4 +1,4 @@
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v, type Validator } from "convex/values";
 import { internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
@@ -8,7 +8,7 @@ import type {
   OrganizationMembershipCreated,
   OrganizationMembershipUpdated,
 } from "@workos-inc/node";
-import { DataModel } from "./_generated/dataModel";
+import { authedQuery } from "./lib/utils";
 
 function camelToSnakeCase(str: string) {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
@@ -20,17 +20,19 @@ type UserMembershipWebhookEvent = (
   | OrganizationMembershipUpdated
 )["data"];
 
-export const current = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
-
+export const getByWorkOSId = internalQuery({
+  args: { workOSId: v.string() },
+  handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
+      .withIndex("by_workos_id", (q) => q.eq("workOSId", args.workOSId))
       .first();
+  },
+});
+
+export const current = authedQuery({
+  handler: async (ctx) => {
+    return ctx.user;
   },
 });
 
@@ -45,7 +47,7 @@ export const upsertFromWorkOS = internalMutation({
       lastActivityAt: Date.now(),
     };
 
-    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
       workOSId: data.id,
     });
 
@@ -60,7 +62,7 @@ export const upsertFromWorkOS = internalMutation({
 export const deleteFromWorkOS = internalMutation({
   args: { workOSId: v.string() },
   async handler(ctx, args) {
-    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
       workOSId: args.workOSId,
     });
 
@@ -77,7 +79,7 @@ export const deleteFromWorkOS = internalMutation({
 export const updateOrganisationMembership = internalMutation({
   args: { data: v.any() as Validator<UserMembershipWebhookEvent> }, // no runtime validation, trust WorkOS
   async handler(ctx, { data }) {
-    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
       workOSId: data.userId,
     });
 
@@ -111,7 +113,7 @@ export const updateOrganisationMembership = internalMutation({
 export const removeOrganisationMembership = internalMutation({
   args: { workOSUserId: v.string() },
   async handler(ctx, args) {
-    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
       workOSId: args.workOSUserId,
     });
 
@@ -135,11 +137,6 @@ export const getLeaderboard = query({
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
   },
   handler: async (ctx, args) => {
-    // const identity = await ctx.auth.getUserIdentity();
-    // if (identity === null) {
-    //   throw new Error("Not authenticated");
-    // }
-
     const sortBy = args.sortBy || "totalPoints";
     const sortOrder = args.sortOrder || "desc";
 

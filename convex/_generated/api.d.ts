@@ -9,9 +9,9 @@
  */
 
 import type * as attachments from "../attachments.js";
-import type * as auth from "../auth.js";
 import type * as demo from "../demo.js";
 import type * as http from "../http.js";
+import type * as lib_utils from "../lib/utils.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as messages from "../messages.js";
 import type * as organisations from "../organisations.js";
@@ -39,9 +39,9 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   attachments: typeof attachments;
-  auth: typeof auth;
   demo: typeof demo;
   http: typeof http;
+  "lib/utils": typeof lib_utils;
   "lib/validators": typeof lib_validators;
   messages: typeof messages;
   organisations: typeof organisations;

@@ -3,13 +3,13 @@ import {
   internalQuery,
   internalMutation,
   internalAction,
-  action,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
 import { Groq } from "groq-sdk";
+import { authedAction } from "./lib/utils";
 
-export const sendMessage = action({
+export const sendMessage = authedAction({
   args: {
     content: v.string(),
     uploadId: v.optional(v.string()),
@@ -22,18 +22,13 @@ export const sendMessage = action({
     userMessageId: Id<"messages">;
     responseMessageId: Id<"messages">;
   }> => {
-    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
     const { userMessageId, responseMessageId } = await ctx.runMutation(
       internal.messages.insertWithResponsePlaceholder,
       {
         threadId: args.threadId,
         content: args.content,
         uploadId: args.uploadId,
-        userId,
+        userId: ctx.userId,
       }
     );
 
@@ -49,22 +44,16 @@ export const sendMessage = action({
   },
 });
 
-export const retryMessage = action({
+export const retryMessage = authedAction({
   args: {
     messageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    // Get message and verify ownership in one mutation
     const message = await ctx.runMutation(
       internal.messages.resetMessageForRetry,
       {
         messageId: args.messageId,
-        userId,
+        userId: ctx.userId,
       }
     );
 
@@ -78,7 +67,7 @@ export const retryMessage = action({
   },
 });
 
-export const createThreadAndSendMessage = action({
+export const createThreadAndSendMessage = authedAction({
   args: {
     content: v.string(),
     uploadId: v.optional(v.string()),
@@ -92,13 +81,8 @@ export const createThreadAndSendMessage = action({
     userMessageId: Id<"messages">;
     responseMessageId: Id<"messages">;
   }> => {
-    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
     const threadId = await ctx.runMutation(internal.messages.createChatThread, {
-      userId,
+      userId: ctx.userId,
       browserId: args.browserId,
     });
 
@@ -108,7 +92,7 @@ export const createThreadAndSendMessage = action({
         threadId,
         content: args.content,
         uploadId: args.uploadId,
-        userId,
+        userId: ctx.userId,
       }
     );
 

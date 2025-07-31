@@ -3,6 +3,7 @@ import { internalMutation, query, action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
 import Reducto, { toFile } from "reductoai";
+import { authedAction } from "./lib/utils";
 
 interface ProcessedAttachment {
   storageId: Id<"_storage">;
@@ -24,7 +25,7 @@ export const getAttachmentUrl = query({
   },
 });
 
-export const uploadUserFiles = action({
+export const uploadUserFiles = authedAction({
   args: {
     uploadId: v.string(),
     files: v.array(
@@ -37,11 +38,6 @@ export const uploadUserFiles = action({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.runQuery(internal.auth.loggedInUserId);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
     const processedAttachments: ProcessedAttachment[] = [];
 
     for (const file of args.files) {
@@ -80,7 +76,7 @@ export const uploadUserFiles = action({
           internal.attachments.createAttachmentRecord,
           {
             uploadId: args.uploadId,
-            userId,
+            userId: ctx.userId,
             storageId,
             name: file.name,
             contentType: file.type,
