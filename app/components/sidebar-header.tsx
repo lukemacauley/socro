@@ -33,7 +33,7 @@ export function SidebarHeader({
         </h1>
       </Link>
       {/* {isAdmin && ( */}
-      <Button variant="secondary" asChild>
+      <Button variant="secondary" size="sm" asChild>
         <Link to="/leaderboard" className="w-full">
           Leaderboard
         </Link>
