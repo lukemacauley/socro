@@ -1,7 +1,7 @@
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v, type Validator } from "convex/values";
 import { internal } from "./_generated/api";
-import { paginationOptsValidator } from "convex/server";
+import { paginationOptsValidator, SystemIndexes } from "convex/server";
 import type {
   UserCreatedEvent,
   UserUpdatedEvent,
@@ -9,6 +9,10 @@ import type {
   OrganizationMembershipUpdated,
 } from "@workos-inc/node";
 import { type UserJSON } from "@clerk/backend";
+
+function camelToSnakeCase(str: string) {
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
 
 type UserWebhookEvent = (UserCreatedEvent | UserUpdatedEvent)["data"];
 type UserMembershipWebhookEvent = (
@@ -136,6 +140,8 @@ export const removeOrganisationMembership = internalMutation({
 export const getLeaderboard = query({
   args: {
     paginationOpts: paginationOptsValidator,
+    sortBy: v.optional(v.string()),
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
   },
   handler: async (ctx, args) => {
     // const identity = await ctx.auth.getUserIdentity();
@@ -143,11 +149,27 @@ export const getLeaderboard = query({
     //   throw new Error("Not authenticated");
     // }
 
-    const userStatsPage = await ctx.db
-      .query("userStats")
-      .withIndex("by_total_points", (q) => q.gt("totalPoints", 0))
-      .order("desc")
-      .paginate(args.paginationOpts);
+    const sortBy = args.sortBy || "totalPoints";
+    const sortOrder = args.sortOrder || "desc";
+
+    // Convert camelCase to snake_case for index name
+    const indexName = `by_${camelToSnakeCase(sortBy)}`;
+
+    let userStatsPage;
+    let sortError = false;
+    try {
+      userStatsPage = await ctx.db
+        .query("userStats")
+        .withIndex(indexName as any)
+        .order(sortOrder)
+        .paginate(args.paginationOpts);
+    } catch {
+      userStatsPage = await ctx.db
+        .query("userStats")
+        .order(sortOrder)
+        .paginate(args.paginationOpts);
+      sortError = true;
+    }
 
     const leaderboard = await Promise.all(
       userStatsPage.page.map(async (stats) => {
@@ -164,8 +186,18 @@ export const getLeaderboard = query({
       })
     );
 
+    let sortedLeaderboard = leaderboard;
+
+    if (sortError) {
+      sortedLeaderboard = leaderboard.sort((a, b) => {
+        const aValue = (a as any)[sortBy] || 0;
+        const bValue = (b as any)[sortBy] || 0;
+        return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
+      });
+    }
+
     return {
-      page: leaderboard,
+      page: sortedLeaderboard,
       isDone: userStatsPage.isDone,
       continueCursor: userStatsPage.continueCursor,
     };

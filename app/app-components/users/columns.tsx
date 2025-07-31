@@ -14,15 +14,15 @@ export const columns: ColumnDef<LeaderboardUser>[] = [
     header: "Total Points",
   },
   {
-    accessorKey: "gamesPlayed",
+    accessorKey: "scenariosCompleted",
     header: "Threads Answered",
   },
   {
     accessorKey: "averageScore",
     header: "Average Score",
   },
-  {
-    accessorKey: "lastActive",
-    header: "Last Active",
-  },
+  // {
+  //   accessorKey: "lastActive",
+  //   header: "Last Active",
+  // },
 ];

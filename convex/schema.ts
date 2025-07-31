@@ -81,7 +81,14 @@ const applicationTables = {
     currentStreak: v.optional(v.number()),
     bestStreak: v.optional(v.number()),
   })
+    // For sorts
+    .index("by_average_score", ["averageScore"])
+    .index("by_current_streak", ["currentStreak"])
+    .index("by_best_streak", ["bestStreak"])
     .index("by_total_points", ["totalPoints"])
+    .index("by_scenarios_completed", ["scenariosCompleted"])
+    .index("by_scenarios_started", ["scenariosStarted"])
+    // For user lookups
     .index("by_user_id", ["userId"]),
 };
 

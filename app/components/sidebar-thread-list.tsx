@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
 import { Archive, ArchiveRestore, Pin, PinOff, Search } from "lucide-react";
 import { usePaginatedQuery } from "convex-helpers/react/cache";
 import { useMutation } from "convex/react";
@@ -7,6 +6,7 @@ import { api } from "convex/_generated/api";
 import { Button } from "~/components/ui/button";
 import { useInfiniteScroll } from "~/lib/use-infinite-scroll";
 import { SidebarGroup } from "~/components/ui/sidebar";
+import { cn } from "~/lib/utils";
 
 type Thread = (typeof api.threads.getThreads._returnType)["page"][number];
 type ThreadStatus = Thread["status"];
@@ -17,9 +17,7 @@ type DateSection =
   | "past30days"
   | "pinned";
 
-export function SidebarThreadList() {
-  const [query, setQuery] = useState("");
-
+export function SidebarThreadList({ query }: { query: string }) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.threads.getThreads,
     { threadStatus: "active", query },
@@ -44,20 +42,6 @@ export function SidebarThreadList() {
 
   return (
     <SidebarGroup>
-      <div className="px-2 mb-2">
-        <Button asChild className="w-full" size="sm">
-          <Link to="/">New Chat</Link>
-        </Button>
-      </div>
-      <div className="border-b border-sidebar-border flex items-center gap-2 p-2 mb-4">
-        <Search className="size-4" />
-        <input
-          placeholder="Search threads..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="text-sm ring-0 focus:ring-0 w-full bg-transparent placeholder:text-muted-foreground outline-none"
-        />
-      </div>
       <div className="space-y-1 px-2">
         {groupedThreads &&
           sectionOrder.map((section) => {
@@ -96,6 +80,9 @@ const ThreadItem = ({
   thread: Thread;
   updateStatus: any;
 }) => {
+  const params = useParams();
+  const isCurrentThread = thread.browserId === params.id;
+
   const statusButtons = [
     {
       status: "pinned" as ThreadStatus,
@@ -114,7 +101,12 @@ const ThreadItem = ({
   ];
 
   return (
-    <div className="relative group/thread rounded-md hover:bg-accent hover:text-accent-foreground">
+    <div
+      className={cn(
+        "relative group/thread rounded-md hover:bg-accent hover:text-accent-foreground",
+        isCurrentThread ? "bg-accent text-accent-foreground" : ""
+      )}
+    >
       <Link
         to={"/threads/" + thread.browserId}
         className="flex flex-col w-full px-2 py-1.5"
@@ -130,6 +122,7 @@ const ThreadItem = ({
           <div className="h-full flex items-center gap-0.5 pointer-events-auto">
             {statusButtons.map((b) => {
               const isActive = thread.status === b.status;
+
               return (
                 <Button
                   key={b.status}
