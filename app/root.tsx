@@ -8,43 +8,12 @@ import {
 } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
-import { ClerkProvider, useAuth } from "@clerk/react-router";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import { Toaster } from "./components/ui/sonner";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import { env } from "env";
-import { Separator } from "@radix-ui/react-separator";
-import { AppSidebar } from "./components/app-sidebar";
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "./components/ui/sidebar";
-// import { AuthKitProvider } from "@workos-inc/authkit-react";
-import { rootAuthLoader } from "@clerk/react-router/ssr.server";
-
-// export function HydrateFallback() {
-//   return (
-//     <SidebarProvider>
-//       <AppSidebar isFallback />
-//       <SidebarInset>
-//         <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
-//           <div className="flex items-center gap-2 px-4">
-//             <SidebarTrigger className="-ml-1" />
-//             <Separator
-//               orientation="vertical"
-//               className="mr-2 data-[orientation=vertical]:h-4"
-//             />
-//           </div>
-//         </header>
-//         <div className="bg-primary-foreground">
-//           <Outlet />
-//         </div>
-//       </SidebarInset>
-//     </SidebarProvider>
-//   );
-// }
+import { AuthKitProvider, useAuth } from "@workos-inc/authkit-react";
+import { ConvexProviderWithAuthKit } from "@convex-dev/workos";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -82,31 +51,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export async function loader(args: Route.LoaderArgs) {
-  return rootAuthLoader(args);
-}
-
 const convex = new ConvexReactClient(env.VITE_CONVEX_URL);
 
-export default function App({ loaderData }: Route.ComponentProps) {
+export default function App() {
   return (
-    // <AuthKitProvider
-    //   clientId={env.VITE_WORKOS_CLIENT_ID}
-    //   redirectUri={env.VITE_WORKOS_REDIRECT_URI}
-    // >
-    <ClerkProvider
-      loaderData={loaderData}
-      signUpFallbackRedirectUrl="/"
-      signInFallbackRedirectUrl="/"
-      publishableKey={env.VITE_CLERK_PUBLISHABLE_KEY}
+    <AuthKitProvider
+      clientId={env.VITE_WORKOS_CLIENT_ID}
+      redirectUri={env.VITE_WORKOS_REDIRECT_URI}
     >
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+      <ConvexProviderWithAuthKit client={convex} useAuth={useAuth}>
         <ConvexQueryCacheProvider>
           <Outlet />
         </ConvexQueryCacheProvider>
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
-    // </AuthKitProvider>
+      </ConvexProviderWithAuthKit>
+    </AuthKitProvider>
   );
 }
 
@@ -138,3 +96,25 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     </main>
   );
 }
+
+// export function HydrateFallback() {
+//   return (
+//     <SidebarProvider>
+//       <AppSidebar isFallback />
+//       <SidebarInset>
+//         <header className="fixed w-full top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar">
+//           <div className="flex items-center gap-2 px-4">
+//             <SidebarTrigger className="-ml-1" />
+//             <Separator
+//               orientation="vertical"
+//               className="mr-2 data-[orientation=vertical]:h-4"
+//             />
+//           </div>
+//         </header>
+//         <div className="bg-primary-foreground">
+//           <Outlet />
+//         </div>
+//       </SidebarInset>
+//     </SidebarProvider>
+//   );
+// }

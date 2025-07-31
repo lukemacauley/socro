@@ -1,4 +1,4 @@
-import { SignIn, SignUp, useAuth } from "@clerk/react-router";
+import { useAuth } from "@workos-inc/authkit-react";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { Archive, LogOut } from "lucide-react";
 import { Outlet, Link } from "react-router";
@@ -8,14 +8,14 @@ import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { TooltipProvider } from "~/components/ui/tooltip";
 
 export default function Layout() {
-  const { signOut } = useAuth();
+  const { signOut, signIn, signUp } = useAuth();
 
   return (
     <TooltipProvider>
       <Unauthenticated>
         <div className="flex items-center justify-center h-screen gap-8 w-full">
-          <SignIn oauthFlow="popup" afterSignOutUrl="/" />
-          <SignUp oauthFlow="popup" afterSignOutUrl="/" />
+          <Button onClick={() => signIn()}>Sign In</Button>
+          <Button onClick={() => signUp()}>Sign Up</Button>
         </div>
       </Unauthenticated>
       <Authenticated>

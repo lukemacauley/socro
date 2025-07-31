@@ -8,7 +8,6 @@ const applicationTables = {
     email: v.string(),
     organisationId: v.optional(v.id("organisations")),
     workOSId: v.optional(v.string()),
-    clerkId: v.optional(v.string()), // Deprecated, use workOSId instead
     imageUrl: v.optional(v.string()),
     lastActivityAt: v.optional(v.number()),
     role: v.optional(
@@ -16,7 +15,6 @@ const applicationTables = {
     ),
   })
     .index("by_workos_id", ["workOSId"])
-    .index("by_clerk_id", ["clerkId"])
     .index("by_organisation_id", ["organisationId"]),
   organisations: defineTable({
     name: v.string(),

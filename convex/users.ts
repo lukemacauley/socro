@@ -1,14 +1,14 @@
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { v, type Validator } from "convex/values";
 import { internal } from "./_generated/api";
-import { paginationOptsValidator, SystemIndexes } from "convex/server";
+import { paginationOptsValidator } from "convex/server";
 import type {
   UserCreatedEvent,
   UserUpdatedEvent,
   OrganizationMembershipCreated,
   OrganizationMembershipUpdated,
 } from "@workos-inc/node";
-import { type UserJSON } from "@clerk/backend";
+import { DataModel } from "./_generated/dataModel";
 
 function camelToSnakeCase(str: string) {
   return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
@@ -29,17 +29,7 @@ export const current = query({
 
     return await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-  },
-});
-
-export const getByWorkOSId = internalQuery({
-  args: { workOSId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workOSId", args.workOSId))
+      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
       .first();
   },
 });
@@ -52,9 +42,10 @@ export const upsertFromWorkOS = internalMutation({
       email: data.email,
       imageUrl: data.profilePictureUrl ? data.profilePictureUrl : undefined,
       workOSId: data.id,
+      lastActivityAt: Date.now(),
     };
 
-    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
       workOSId: data.id,
     });
 
@@ -69,7 +60,7 @@ export const upsertFromWorkOS = internalMutation({
 export const deleteFromWorkOS = internalMutation({
   args: { workOSId: v.string() },
   async handler(ctx, args) {
-    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
       workOSId: args.workOSId,
     });
 
@@ -86,7 +77,7 @@ export const deleteFromWorkOS = internalMutation({
 export const updateOrganisationMembership = internalMutation({
   args: { data: v.any() as Validator<UserMembershipWebhookEvent> }, // no runtime validation, trust WorkOS
   async handler(ctx, { data }) {
-    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
       workOSId: data.userId,
     });
 
@@ -120,7 +111,7 @@ export const updateOrganisationMembership = internalMutation({
 export const removeOrganisationMembership = internalMutation({
   args: { workOSUserId: v.string() },
   async handler(ctx, args) {
-    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+    const user = await ctx.runQuery(internal.auth.getByWorkOSId, {
       workOSId: args.workOSUserId,
     });
 
@@ -201,52 +192,5 @@ export const getLeaderboard = query({
       isDone: userStatsPage.isDone,
       continueCursor: userStatsPage.continueCursor,
     };
-  },
-});
-
-export const upsertFromClerk = internalMutation({
-  args: { data: v.any() as Validator<UserJSON> }, // no runtime validation, trust Clerk
-  async handler(ctx, { data }) {
-    const userAttributes = {
-      name: `${data.first_name} ${data.last_name}`.trim(),
-      email: data.email_addresses[0].email_address,
-      clerkId: data.id,
-    };
-
-    const user = await ctx.runQuery(internal.users.getByClerkId, {
-      clerkId: data.id,
-    });
-
-    if (user === null) {
-      await ctx.db.insert("users", userAttributes);
-    } else {
-      await ctx.db.patch(user._id, userAttributes);
-    }
-  },
-});
-export const deleteFromClerk = internalMutation({
-  args: { clerkUserId: v.string() },
-  handler: async (ctx, { clerkUserId }) => {
-    const user = await ctx.runQuery(internal.users.getByClerkId, {
-      clerkId: clerkUserId,
-    });
-
-    if (user !== null) {
-      await ctx.db.delete(user._id);
-    } else {
-      console.warn(
-        `Can't delete user, there is none for Clerk user ID: ${clerkUserId}`
-      );
-    }
-  },
-});
-
-export const getByClerkId = internalQuery({
-  args: { clerkId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .first();
   },
 });
