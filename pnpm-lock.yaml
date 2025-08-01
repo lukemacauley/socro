@@ -75,7 +75,7 @@ importers:
         specifier: ^0.11.0
         version: 0.11.0(react@19.1.1)
       '@workos-inc/node':
-        specifier: ^7.62.1
+        specifier: ^7.63.0
         version: 7.63.0(express@4.21.2)
       ai:
         specifier: 5.0.0
