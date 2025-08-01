@@ -60,7 +60,13 @@ export const MessageList = memo(function MessageList({
   if (!messages || messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 flex items-center justify-center mb-16">
+        <div
+          className={
+            onSendFirstMessage
+              ? "flex-1 flex items-center justify-center mb-16"
+              : "hidden"
+          }
+        >
           <div className="max-w-2xl w-full px-6">
             <h2 className="text-2xl font-semibold text-center mb-8">
               What can I help you with, {user?.name}?
