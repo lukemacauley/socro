@@ -189,7 +189,7 @@ function MessageItem({
       <div
         className={cn(
           "opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1",
-          isAi ? "mt-2" : ""
+          isAi ? "mt-2 flex-row" : "flex-row-reverse"
         )}
       >
         <Button

@@ -10,16 +10,10 @@ import { SidebarCollapsed } from "./sidebar-collapsed";
 import { SidebarThreadList } from "./sidebar-thread-list";
 import { useState } from "react";
 
-function SidebarContentWrapper({
-  isFallback,
-  query,
-}: {
-  query: string;
-  isFallback?: boolean;
-}) {
+function SidebarContentWrapper({ query }: { query: string }) {
   const { state } = useSidebar();
 
-  if (isFallback || state === "collapsed") {
+  if (state === "collapsed") {
     return <SidebarCollapsed />;
   }
 
@@ -27,7 +21,6 @@ function SidebarContentWrapper({
 }
 
 export function AppSidebar({
-  isFallback,
   ...props
 }: React.ComponentProps<typeof Sidebar> & { isFallback?: boolean }) {
   const [query, setQuery] = useState("");
@@ -35,7 +28,7 @@ export function AppSidebar({
     <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader query={query} setQuery={setQuery} />
       <SidebarContent>
-        <SidebarContentWrapper isFallback={isFallback} query={query} />
+        <SidebarContentWrapper query={query} />
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

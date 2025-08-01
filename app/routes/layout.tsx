@@ -22,7 +22,7 @@ export default function Layout() {
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
-            <header>
+            <header className="p-2">
               {/* //className="sticky w-full px-4 top-0 z-10 flex h-12 shrink-0 items-center justify-center gap-2"> */}
               <div className="flex items-center justify-end flex-1 gap-0.5">
                 <Button variant="ghost" size="sm" tooltip="Archive" asChild>
@@ -33,7 +33,7 @@ export default function Layout() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ returnTo: "/", navigate: true })}
                   tooltip="Sign out"
                 >
                   <LogOut />
