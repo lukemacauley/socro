@@ -7,8 +7,6 @@ export const createWorkflow = authedAction({
     content: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-
     try {
       const groq = new Groq();
 

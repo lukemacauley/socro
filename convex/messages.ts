@@ -6,8 +6,9 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
-import { Groq } from "groq-sdk";
 import { authedAction } from "./lib/utils";
+import { generateText } from "ai";
+import { groq } from "@ai-sdk/groq";
 
 export const sendMessage = authedAction({
   args: {
@@ -245,9 +246,8 @@ export const generateThreadTitle = internalAction({
   },
   handler: async (ctx, args) => {
     try {
-      const groq = new Groq();
-
-      const response = await groq.chat.completions.create({
+      const response = await generateText({
+        model: groq("moonshotai/kimi-k2-instruct"),
         messages: [
           {
             role: "user",
@@ -259,21 +259,12 @@ export const generateThreadTitle = internalAction({
             - Just return the title, nothing else`,
           },
         ],
-        model: "moonshotai/kimi-k2-instruct",
-        stream: false,
       });
 
-      let fullContent = "";
-
-      for await (const textPart of response.choices) {
-        const chunk = textPart.message.content;
-        if (!chunk) {
-          continue;
-        }
-        fullContent += chunk;
+      let title = "";
+      if (response.text) {
+        title = response.text.trim();
       }
-
-      const title = fullContent.trim();
 
       let contentPreview = args.content.trim();
       if (contentPreview.length > 100) {
