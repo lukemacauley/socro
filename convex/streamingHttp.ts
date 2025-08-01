@@ -5,21 +5,37 @@ import { type ModelMessage, streamText } from "ai";
 import { groq } from "@ai-sdk/groq";
 import { anthropic } from "@ai-sdk/anthropic";
 import { PIAB_SYSTEM_PROMPT_ANTHROPIC } from "../app/lib/constants";
+import type { GenericActionCtx } from "convex/server";
 
 type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
 
-function formatMessageWithAttachments(message: Message): string {
+async function formatMessageWithAttachments(
+  ctx: GenericActionCtx<any>,
+  message: Message
+): Promise<string> {
   let content = message.content!.trim();
-  // Add attachment information if available
-  if (message.attachments && message.attachments.length > 0) {
-    content += "\n\n[Attachments in this message:";
-    message.attachments.forEach((att) => {
-      if (att.parsedContent) {
-        content += `\n  Content:\n${att.parsedContent}`;
-      }
-    });
-    content += "]";
+
+  if (!message.attachments || message.attachments.length === 0) {
+    return content;
   }
+
+  content += "\n\n[Attachments in this message:";
+
+  message.attachments.forEach(async (att) => {
+    if (!att.parsedContentStorageId) {
+      return;
+    }
+
+    const blob = await ctx.storage.get(att.parsedContentStorageId);
+    if (!blob) {
+      throw new Error("Parsed content not found in storage");
+    }
+    const text = await blob.text();
+
+    content += `\n  Content:\n${text}`;
+  });
+  content += "]";
+
   return content;
 }
 
@@ -63,23 +79,23 @@ export const streamMessage = httpAction(async (ctx, request) => {
           // Enhance system prompt with ONE deep question
           enhancedSystemPrompt = `${PIAB_SYSTEM_PROMPT_ANTHROPIC}
 
-IMPORTANT: Start your response with this specific deep, challenging question that cuts to the heart of their legal issue:
+          IMPORTANT: Start your response with this specific deep, challenging question that cuts to the heart of their legal issue:
 
-"${questions[0]}"
+          "${questions[0]}"
 
-After posing this question, wait for their response before providing any further guidance. Your goal is to make them think deeply about the complexities and nuances of their situation through this single, penetrating question.`;
+          After posing this question, wait for their response before providing any further guidance. Your goal is to make them think deeply about the complexities and nuances of their situation through this single, penetrating question.`;
         } catch (error) {
           console.log("Could not get demo questions:", error);
         }
       }
 
-      const formattedMessages: ModelMessage[] = [
-        ...validMessages.map((msg) => ({
+      const formattedMessages: ModelMessage[] = await Promise.all(
+        validMessages.map(async (msg) => ({
           role:
             msg.role === "user" ? ("user" as const) : ("assistant" as const),
-          content: formatMessageWithAttachments(msg),
-        })),
-      ];
+          content: await formatMessageWithAttachments(ctx, msg),
+        }))
+      );
 
       let fullContent = "";
       let chunkIndex = 0;

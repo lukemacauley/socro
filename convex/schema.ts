@@ -65,7 +65,7 @@ const applicationTables = {
       v.literal("completed"),
       v.literal("failed")
     ),
-    parsedContent: v.optional(v.string()), // For parsed content from Reducto
+    parsedContentStorageId: v.id("_storage"), // Storage ID for parsed content from Reducto
   })
     .index("by_message_id", ["messageId"])
     .index("by_thread_id", ["threadId"])

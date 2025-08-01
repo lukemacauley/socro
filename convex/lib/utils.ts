@@ -7,7 +7,7 @@ import {
 import { ConvexError } from "convex/values";
 import { query, action, mutation } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { Doc, Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 
 type AuthedCtx = Promise<{
   user: Doc<"users">;
