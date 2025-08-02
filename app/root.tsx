@@ -19,10 +19,7 @@ import {
   SidebarInset,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
 } from "./components/ui/sidebar";
-import { AppSidebar } from "./components/app-sidebar";
-import { Separator } from "@radix-ui/react-separator";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -35,6 +32,34 @@ export const links: Route.LinksFunction = () => [
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wdth,wght@12..36,75..150,300..900&display=swap",
   },
+  {
+    rel: "preload",
+    href: "/fonts/PPEditorialOld-Ultrabold.otf",
+    as: "font",
+    type: "font/otf",
+    crossOrigin: "anonymous",
+  },
+  // {
+  //   rel: "preload",
+  //   href: "/fonts/PPEditorialOld-Regular.otf",
+  //   as: "font",
+  //   type: "font/otf",
+  //   crossOrigin: "anonymous",
+  // },
+  // {
+  //   rel: "preload",
+  //   href: "/fonts/PPMori-Regular.otf",
+  //   as: "font",
+  //   type: "font/otf",
+  //   crossOrigin: "anonymous",
+  // },
+  // {
+  //   rel: "preload",
+  //   href: "/fonts/PPMori-SemiBold.otf",
+  //   as: "font",
+  //   type: "font/otf",
+  //   crossOrigin: "anonymous",
+  // },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

@@ -1,9 +1,5 @@
 import { Link } from "react-router";
-import { cn } from "~/lib/utils";
-import {
-  SidebarHeader as SidebarHeaderBase,
-  useSidebar,
-} from "~/components/ui/sidebar";
+import { SidebarHeader as SidebarHeaderBase } from "~/components/ui/sidebar";
 import { Search } from "lucide-react";
 import { Button } from "./ui/button";
 import { useQuery } from "convex-helpers/react/cache";
@@ -16,20 +12,14 @@ export function SidebarHeader({
   query: string;
   setQuery: (query: string) => void;
 }) {
-  const { state } = useSidebar();
-  const user = useQuery(api.users.current);
-
-  const isAdmin = user?.role === "admin";
+  // const user = useQuery(api.users.current);
+  // const isAdmin = user?.role === "admin";
 
   return (
     <SidebarHeaderBase>
       <Link to="/">
-        <h1
-          className={cn(
-            "font-medium text-xl  w-full tracking-tight text-center px-2 leading-relaxed text-primary"
-          )}
-        >
-          {state === "collapsed" ? "S" : "Socro"}
+        <h1 className="text-3xl w-full tracking-tight font-extrabold font-editorial-old font-editorial-old-ligatures text-center px-2 leading-relaxed text-primary">
+          Socro
         </h1>
       </Link>
       {/* {isAdmin && ( */}
