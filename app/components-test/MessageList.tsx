@@ -10,7 +10,7 @@ import { AIResponse } from "~/components/kibo-ui/ai/response";
 import { AttachmentList } from "./AttachmentList";
 import { Spinner } from "~/components/kibo-ui/spinner";
 import { Button } from "~/components/ui/button";
-import { RotateCw, CheckIcon, CopyIcon } from "lucide-react";
+import { RotateCw, CheckIcon, CopyIcon, Edit } from "lucide-react";
 import { useAction } from "convex/react";
 import { cn } from "~/lib/utils";
 import { marked } from "marked";
@@ -192,14 +192,25 @@ function MessageItem({
           isAi ? "mt-2 flex-row" : "flex-row-reverse"
         )}
       >
-        <Button
-          size="icon"
-          variant="ghost"
-          tooltip="Retry message"
-          onClick={handleRetry}
-        >
-          <RotateCw className="size-4" />
-        </Button>
+        {isAi ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            tooltip="Retry message"
+            onClick={handleRetry}
+          >
+            <RotateCw className="size-4" />
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            tooltip="Edit message"
+            onClick={handleRetry}
+          >
+            <Edit className="size-4" />
+          </Button>
+        )}
         <Button
           size="icon"
           variant="ghost"

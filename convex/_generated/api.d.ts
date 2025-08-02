@@ -20,7 +20,6 @@ import type * as seedUserStats from "../seedUserStats.js";
 import type * as streamingHttp from "../streamingHttp.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
-import type * as workflows from "../workflows.js";
 import type * as workos from "../workos.js";
 
 import type {
@@ -50,7 +49,6 @@ declare const fullApi: ApiFromModules<{
   streamingHttp: typeof streamingHttp;
   threads: typeof threads;
   users: typeof users;
-  workflows: typeof workflows;
   workos: typeof workos;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
