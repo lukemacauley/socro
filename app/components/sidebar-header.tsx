@@ -2,8 +2,6 @@ import { Link } from "react-router";
 import { SidebarHeader as SidebarHeaderBase } from "~/components/ui/sidebar";
 import { Search } from "lucide-react";
 import { Button } from "./ui/button";
-import { useQuery } from "convex-helpers/react/cache";
-import { api } from "convex/_generated/api";
 
 export function SidebarHeader({
   query,
@@ -12,9 +10,6 @@ export function SidebarHeader({
   query: string;
   setQuery: (query: string) => void;
 }) {
-  // const user = useQuery(api.users.current);
-  // const isAdmin = user?.role === "admin";
-
   return (
     <SidebarHeaderBase>
       <Link to="/">
@@ -22,13 +17,6 @@ export function SidebarHeader({
           Socro
         </h1>
       </Link>
-      {/* {isAdmin && ( */}
-      <Button variant="secondary" size="sm" asChild>
-        <Link to="/leaderboard" className="w-full">
-          Leaderboard
-        </Link>
-      </Button>
-      {/* )} */}
       <Button asChild className="w-full" size="sm">
         <Link to="/">New Chat</Link>
       </Button>

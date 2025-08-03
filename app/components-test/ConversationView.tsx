@@ -16,7 +16,7 @@ export function ConversationView({
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-72px)]">
+    <div className="flex flex-col h-[calc(100vh-16px)]">
       <MessageList
         messages={data?.messages}
         threadId={data?.threadId}

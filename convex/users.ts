@@ -1,5 +1,5 @@
 import { internalMutation, internalQuery } from "./_generated/server";
-import { v, type Validator } from "convex/values";
+import { ConvexError, v, type Validator } from "convex/values";
 import { internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
 import type {
@@ -32,7 +32,17 @@ export const getByWorkOSId = internalQuery({
 
 export const current = authedQuery({
   handler: async (ctx) => {
-    return ctx.user;
+    if (!ctx.orgId) {
+      throw new ConvexError("User is not part of an organisation");
+    }
+
+    const user = ctx.user;
+    const org = await ctx.db.get(ctx.orgId);
+
+    return {
+      ...user,
+      org,
+    };
   },
 });
 
