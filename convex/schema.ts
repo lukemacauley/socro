@@ -42,8 +42,10 @@ const applicationTables = {
     threadId: v.id("threads"),
     userId: v.id("users"),
     content: v.string(),
-    role: v.union(v.literal("user"), v.literal("ai")),
-    type: v.union(v.literal("ai"), v.literal("user"), v.literal("evaluation")),
+    role: v.union(v.literal("user"), v.literal("ai"), v.literal("evaluation")),
+    type: v.optional(
+      v.union(v.literal("user"), v.literal("ai"), v.literal("evaluation"))
+    ), // Deprecated, use role
     isStreaming: v.optional(v.boolean()),
     streamingComplete: v.optional(v.boolean()),
   })

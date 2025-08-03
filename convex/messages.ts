@@ -6,7 +6,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { type Id } from "./_generated/dataModel";
-import { authedAction } from "./lib/utils";
+import { authedAction, authedMutation } from "./lib/utils";
 import { generateText } from "ai";
 import { groq } from "@ai-sdk/groq";
 
@@ -33,11 +33,6 @@ export const sendMessage = authedAction({
       }
     );
 
-    await ctx.runAction(internal.messages.generateStreamingResponse, {
-      threadId: args.threadId,
-      responseMessageId,
-    });
-
     return {
       userMessageId,
       responseMessageId,
@@ -45,26 +40,30 @@ export const sendMessage = authedAction({
   },
 });
 
-export const retryMessage = authedAction({
+export const retryMessage = authedMutation({
   args: {
     messageId: v.id("messages"),
   },
   handler: async (ctx, args) => {
-    const message = await ctx.runMutation(
-      internal.messages.resetMessageForRetry,
-      {
-        messageId: args.messageId,
-        userId: ctx.userId,
-      }
-    );
-
-    // Generate new response
-    await ctx.runAction(internal.messages.generateStreamingResponse, {
-      threadId: message.threadId,
-      responseMessageId: args.messageId,
+    await ctx.runMutation(internal.messages.resetMessageForRetry, {
+      messageId: args.messageId,
     });
+  },
+});
 
-    return { messageId: args.messageId };
+export const editMessage = authedMutation({
+  args: {
+    messageId: v.id("messages"),
+    threadId: v.id("threads"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.messages.resetMessageForEdit, {
+      userId: ctx.userId,
+      messageId: args.messageId,
+      threadId: args.threadId,
+      content: args.content,
+    });
   },
 });
 
@@ -97,15 +96,9 @@ export const createThreadAndSendMessage = authedAction({
       }
     );
 
-    // Generate title for the new chat thread
     await ctx.scheduler.runAfter(0, internal.messages.generateThreadTitle, {
       threadId,
       content: args.content,
-    });
-
-    await ctx.runAction(internal.messages.generateStreamingResponse, {
-      threadId,
-      responseMessageId,
     });
 
     return {
@@ -130,7 +123,6 @@ export const insertWithResponsePlaceholder = internalMutation({
       role: "user",
       userId: args.userId,
       threadId: args.threadId,
-      type: "user",
     });
 
     if (args.uploadId) {
@@ -154,29 +146,12 @@ export const insertWithResponsePlaceholder = internalMutation({
       threadId: args.threadId,
       isStreaming: true,
       streamingComplete: false,
-      type: "ai",
     });
 
     return {
       userMessageId,
       responseMessageId,
     };
-  },
-});
-
-export const generateStreamingResponse = internalAction({
-  args: {
-    threadId: v.id("threads"),
-    responseMessageId: v.id("messages"),
-  },
-  handler: async (ctx, args) => {
-    // The actual streaming happens via the HTTP endpoint
-    // This action now just serves as a trigger
-    // The client will connect to the SSE endpoint to receive the stream
-    console.log(
-      "Streaming will happen via HTTP endpoint for message:",
-      args.responseMessageId
-    );
   },
 });
 
@@ -299,7 +274,6 @@ export const updateThreadTitleAndPreview = internalMutation({
 export const resetMessageForRetry = internalMutation({
   args: {
     messageId: v.id("messages"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     const message = await ctx.db.get(args.messageId);
@@ -307,12 +281,10 @@ export const resetMessageForRetry = internalMutation({
       throw new Error("Message not found");
     }
 
-    // Only allow retry on AI messages
     if (message.role !== "ai") {
       throw new Error("Can only retry AI messages");
     }
 
-    // Reset message state
     await ctx.db.patch(args.messageId, {
       content: "",
       isStreaming: true,
@@ -320,5 +292,41 @@ export const resetMessageForRetry = internalMutation({
     });
 
     return message;
+  },
+});
+
+export const resetMessageForEdit = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    threadId: v.id("threads"),
+    userId: v.id("users"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, {
+      content: args.content,
+    });
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
+      .order("asc")
+      .collect();
+
+    const messageIndex = messages.findIndex((m) => m._id === args.messageId);
+    const messagesToDelete = messages.slice(messageIndex + 1);
+
+    for (const msg of messagesToDelete) {
+      await ctx.db.delete(msg._id);
+    }
+
+    await ctx.db.insert("messages", {
+      content: "",
+      role: "ai",
+      userId: args.userId,
+      threadId: args.threadId,
+      isStreaming: true,
+      streamingComplete: false,
+    });
   },
 });

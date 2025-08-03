@@ -11,13 +11,14 @@ import { AttachmentList } from "./AttachmentList";
 import { Spinner } from "~/components/kibo-ui/spinner";
 import { Button } from "~/components/ui/button";
 import { RotateCw, CheckIcon, CopyIcon, Edit } from "lucide-react";
-import { useAction } from "convex/react";
+import { useMutation } from "convex/react";
 import { cn } from "~/lib/utils";
 import { marked } from "marked";
 import { toast } from "sonner";
 import { useMessageStream } from "~/hooks/useMessageStream";
 import type { Id } from "convex/_generated/dataModel";
 import { useQuery } from "convex-helpers/react/cache";
+import { Textarea } from "~/components/ui/textarea";
 
 export type Message = NonNullable<
   typeof api.threads.getThreadByClientId._returnType
@@ -117,7 +118,8 @@ function MessageItem({
 }) {
   const messageId = message._id;
 
-  const retryMessage = useAction(api.messages.retryMessage);
+  const retryMessage = useMutation(api.messages.retryMessage);
+  const editMessage = useMutation(api.messages.editMessage);
 
   const { streamedContent } = useMessageStream(
     messageId,
@@ -125,20 +127,33 @@ function MessageItem({
     message.isStreaming
   );
 
-  const isAi = message.type === "ai";
-
   const displayContent =
     message.isStreaming && streamedContent ? streamedContent : message.content;
-
+  const isAi = message.role === "ai";
   const isEmpty = !displayContent || displayContent.trim() === "";
 
   const [isCopied, setIsCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(displayContent);
 
   const handleRetry = async () => {
     try {
       await retryMessage({ messageId });
     } catch (error) {
       console.error("Failed to retry message:", error);
+    }
+  };
+
+  const handleEdit = async () => {
+    try {
+      await editMessage({
+        threadId: message.threadId,
+        messageId,
+        content: editedContent,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to edit message:", error);
     }
   };
 
@@ -174,6 +189,20 @@ function MessageItem({
       });
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.shiftKey && e.key === "Enter") {
+      e.preventDefault();
+      setEditedContent((prev) => prev + "\n");
+      return;
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      handleEdit();
+    } else if (e.key === "Escape") {
+      setIsEditing(false);
+      setEditedContent(displayContent);
+    }
+  };
+
   return (
     <AIMessage from={isAi ? "assistant" : "user"}>
       {isEmpty ? (
@@ -182,14 +211,28 @@ function MessageItem({
         <AIResponse>{displayContent}</AIResponse>
       ) : (
         <AIMessageContent>
-          {displayContent}
-          <AttachmentList attachments={message.attachments} />
+          {isEditing ? (
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className={cn(
+                "w-96 md:text-base",
+                "focus-visible:border-transparent focus-visible:ring-0 !bg-transparent"
+              )}
+            />
+          ) : (
+            <>
+              {displayContent}
+              <AttachmentList attachments={message.attachments} />
+            </>
+          )}
         </AIMessageContent>
       )}
       <div
         className={cn(
           "opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1",
-          isAi ? "mt-2 flex-row" : "flex-row-reverse"
+          isAi ? "mt-2" : ""
         )}
       >
         {isAi ? (
@@ -206,7 +249,7 @@ function MessageItem({
             size="icon"
             variant="ghost"
             tooltip="Edit message"
-            onClick={handleRetry}
+            onClick={() => setIsEditing(true)}
           >
             <Edit className="size-4" />
           </Button>
