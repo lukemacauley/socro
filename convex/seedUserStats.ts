@@ -115,6 +115,7 @@ export const seedUserStats = internalMutation({
       if (!existingStats) {
         await ctx.db.insert("userStats", {
           userId: user._id,
+          orgId: user.orgId,
           ...demoStats[i],
         });
         statsCreated++;

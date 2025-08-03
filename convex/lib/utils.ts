@@ -12,7 +12,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 type AuthedCtx = Promise<{
   user: Doc<"users">;
   userId: Id<"users">;
-  organisationId: Id<"organisations"> | undefined;
+  orgId: Id<"organisations"> | undefined;
 }>;
 
 export const authedQuery = customQuery(
@@ -23,20 +23,15 @@ export const authedQuery = customQuery(
       throw new ConvexError("Not authenticated");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
-      .first();
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: identity.subject,
+    });
 
     if (!user) {
       throw new ConvexError("User not found");
     }
 
-    return {
-      user,
-      userId: user._id,
-      organisationId: user.organisationId,
-    };
+    return { user, userId: user._id, orgId: user.orgId };
   })
 );
 
@@ -48,16 +43,15 @@ export const authedMutation = customMutation(
       throw new ConvexError("Not authenticated");
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_workos_id", (q) => q.eq("workOSId", identity.subject))
-      .first();
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: identity.subject,
+    });
 
     if (!user) {
       throw new ConvexError("User not found");
     }
 
-    return { user, userId: user._id, organisationId: user.organisationId };
+    return { user, userId: user._id, orgId: user.orgId };
   })
 );
 
@@ -77,10 +71,6 @@ export const authedAction = customAction(
       throw new ConvexError("User not found");
     }
 
-    return {
-      user,
-      userId: user._id,
-      organisationId: user.organisationId,
-    };
+    return { user, userId: user._id, orgId: user.orgId };
   })
 );

@@ -6,7 +6,7 @@ const applicationTables = {
   users: defineTable({
     name: v.string(),
     email: v.string(),
-    organisationId: v.optional(v.id("organisations")),
+    orgId: v.optional(v.id("organisations")),
     workOSId: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     lastActivityAt: v.optional(v.number()),
@@ -15,7 +15,7 @@ const applicationTables = {
     ),
   })
     .index("by_workos_id", ["workOSId"])
-    .index("by_organisation_id", ["organisationId"]),
+    .index("by_org_id", ["orgId"]),
   organisations: defineTable({
     name: v.string(),
     workOSId: v.string(), // WorkOS organization ID
@@ -74,6 +74,7 @@ const applicationTables = {
     .index("by_upload_id", ["uploadId"]),
   userStats: defineTable({
     userId: v.id("users"),
+    orgId: v.optional(v.id("organisations")),
     scenariosCompleted: v.optional(v.number()),
     scenariosStarted: v.optional(v.number()),
     totalPoints: v.optional(v.number()),
@@ -82,13 +83,14 @@ const applicationTables = {
     bestStreak: v.optional(v.number()),
   })
     // For sorts
-    .index("by_average_score", ["averageScore"])
-    .index("by_current_streak", ["currentStreak"])
-    .index("by_best_streak", ["bestStreak"])
-    .index("by_total_points", ["totalPoints"])
-    .index("by_scenarios_completed", ["scenariosCompleted"])
-    .index("by_scenarios_started", ["scenariosStarted"])
+    .index("by_average_score", ["orgId", "averageScore"])
+    .index("by_current_streak", ["orgId", "currentStreak"])
+    .index("by_best_streak", ["orgId", "bestStreak"])
+    .index("by_total_points", ["orgId", "totalPoints"])
+    .index("by_scenarios_completed", ["orgId", "scenariosCompleted"])
+    .index("by_scenarios_started", ["orgId", "scenariosStarted"])
     // For user lookups
+    .index("by_org_id", ["orgId"])
     .index("by_user_id", ["userId"]),
 };
 

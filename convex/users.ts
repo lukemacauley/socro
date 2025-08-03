@@ -90,14 +90,11 @@ export const updateOrganisationMembership = internalMutation({
       return;
     }
 
-    const organisation = await ctx.runQuery(
-      internal.organisations.getByWorkOSId,
-      {
-        workOSId: data.organizationId,
-      }
-    );
+    const org = await ctx.runQuery(internal.organisations.getByWorkOSId, {
+      workOSId: data.organizationId,
+    });
 
-    if (organisation === null) {
+    if (org === null) {
       console.warn(
         `Can't update organisation membership, organisation not found for WorkOS organisation ID: ${data.organizationId}`
       );
@@ -105,7 +102,7 @@ export const updateOrganisationMembership = internalMutation({
     }
 
     await ctx.db.patch(user._id, {
-      organisationId: organisation._id,
+      orgId: org._id,
     });
   },
 });
@@ -125,7 +122,7 @@ export const removeOrganisationMembership = internalMutation({
     }
 
     await ctx.db.patch(user._id, {
-      organisationId: undefined,
+      orgId: undefined,
     });
   },
 });
@@ -148,16 +145,24 @@ export const getLeaderboard = authedQuery({
     try {
       userStatsPage = await ctx.db
         .query("userStats")
-        .withIndex(indexName as any)
+        .withIndex(indexName as any, (q) => q.eq("orgId", ctx.orgId))
         .order(sortOrder)
         .paginate(args.paginationOpts);
     } catch {
       userStatsPage = await ctx.db
         .query("userStats")
+        .withIndex("by_total_points", (q) => q.eq("orgId", ctx.orgId))
         .order(sortOrder)
         .paginate(args.paginationOpts);
       sortError = true;
     }
+
+    // console.log({
+    //   userOrg: ctx.orgId,
+    //   indexName,
+    //   sortError,
+    //   stats: userStatsPage.page,
+    // });
 
     const leaderboard = await Promise.all(
       userStatsPage.page.map(async (stats) => {
