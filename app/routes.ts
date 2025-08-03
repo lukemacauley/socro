@@ -6,12 +6,11 @@ import {
 } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
   layout("routes/layout.tsx", [
-    route("new", "routes/new.tsx"),
+    index("routes/new.tsx"),
     route("threads", "routes/threads/all.tsx"),
     route("threads/:id", "routes/threads/detail.tsx"),
-    route("vault", "routes/vault.tsx"),
+    route("leaderboard", "routes/leaderboard.tsx"),
     route("history", "routes/history.tsx"),
   ]),
 ] satisfies RouteConfig;

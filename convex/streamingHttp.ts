@@ -4,21 +4,38 @@ import type { Id } from "./_generated/dataModel";
 import { type ModelMessage, streamText } from "ai";
 import { groq } from "@ai-sdk/groq";
 import { anthropic } from "@ai-sdk/anthropic";
+import { PIAB_SYSTEM_PROMPT_ANTHROPIC } from "../app/lib/constants";
+import type { GenericActionCtx } from "convex/server";
 
 type Message = (typeof internal.messages.getThreadHistory._returnType)[number];
 
-function formatMessageWithAttachments(message: Message): string {
+async function formatMessageWithAttachments(
+  ctx: GenericActionCtx<any>,
+  message: Message
+): Promise<string> {
   let content = message.content!.trim();
-  // Add attachment information if available
-  if (message.attachments && message.attachments.length > 0) {
-    content += "\n\n[Attachments in this message:";
-    message.attachments.forEach((att) => {
-      if (att.parsedContent) {
-        content += `\n  Content:\n${att.parsedContent}`;
-      }
-    });
-    content += "]";
+
+  if (!message.attachments || message.attachments.length === 0) {
+    return content;
   }
+
+  content += "\n\n[Attachments in this message:";
+
+  message.attachments.forEach(async (att) => {
+    if (!att.parsedContentStorageId) {
+      return;
+    }
+
+    const blob = await ctx.storage.get(att.parsedContentStorageId);
+    if (!blob) {
+      throw new Error("Parsed content not found in storage");
+    }
+    const text = await blob.text();
+
+    content += `\n  Content:\n${text}`;
+  });
+  content += "]";
+
   return content;
 }
 
@@ -41,27 +58,52 @@ export const streamMessage = httpAction(async (ctx, request) => {
         threadId,
       });
 
-      const systemPrompt = `You are an expert legal AI assistant specializing in drafting professional email responses for lawyers. Your goal is to analyze incoming emails and create legally sound, contextually appropriate responses.`;
+      const validMessages = messages.filter((msg) => msg.content?.trim());
 
-      const validMessages = messages.filter(
-        (msg) => msg.role !== "system" && msg.content?.trim()
-      );
+      // Get the latest user message
+      const latestUserMessage = validMessages
+        .filter((msg) => msg.role === "user")
+        .pop();
+      let enhancedSystemPrompt = PIAB_SYSTEM_PROMPT_ANTHROPIC;
 
-      const formattedMessages: ModelMessage[] = [
-        ...validMessages.map((msg) => ({
+      // Get demo questions for new conversations
+      if (latestUserMessage && validMessages.length <= 2) {
+        try {
+          const { topic, questions } = await ctx.runAction(
+            internal.demo.getRelevantQuestions,
+            {
+              userMessage: latestUserMessage.content || "",
+            }
+          );
+
+          // Enhance system prompt with ONE deep question
+          enhancedSystemPrompt = `${PIAB_SYSTEM_PROMPT_ANTHROPIC}
+
+          IMPORTANT: Start your response with this specific deep, challenging question that cuts to the heart of their legal issue:
+
+          "${questions[0]}"
+
+          After posing this question, wait for their response before providing any further guidance. Your goal is to make them think deeply about the complexities and nuances of their situation through this single, penetrating question.`;
+        } catch (error) {
+          console.log("Could not get demo questions:", error);
+        }
+      }
+
+      const formattedMessages: ModelMessage[] = await Promise.all(
+        validMessages.map(async (msg) => ({
           role:
             msg.role === "user" ? ("user" as const) : ("assistant" as const),
-          content: formatMessageWithAttachments(msg),
-        })),
-      ];
+          content: await formatMessageWithAttachments(ctx, msg),
+        }))
+      );
 
       let fullContent = "";
       let chunkIndex = 0;
 
       const result = streamText({
-        // model: anthropic("claude-sonnet-4-20250514"),
+        // model: anthropic("claude-opus-4-20250514"),
         model: groq("moonshotai/kimi-k2-instruct"),
-        system: systemPrompt,
+        system: enhancedSystemPrompt,
         messages: formattedMessages,
       });
 

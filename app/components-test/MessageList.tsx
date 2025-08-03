@@ -10,31 +10,91 @@ import { AIResponse } from "~/components/kibo-ui/ai/response";
 import { AttachmentList } from "./AttachmentList";
 import { Spinner } from "~/components/kibo-ui/spinner";
 import { Button } from "~/components/ui/button";
-import { RotateCw, CheckIcon, CopyIcon } from "lucide-react";
-import { useAction } from "convex/react";
+import { RotateCw, CheckIcon, CopyIcon, Edit } from "lucide-react";
+import { useMutation } from "convex/react";
 import { cn } from "~/lib/utils";
 import { marked } from "marked";
 import { toast } from "sonner";
 import { useMessageStream } from "~/hooks/useMessageStream";
 import type { Id } from "convex/_generated/dataModel";
+import { useQuery } from "convex-helpers/react/cache";
+import { Textarea } from "~/components/ui/textarea";
 
 export type Message = NonNullable<
   typeof api.threads.getThreadByClientId._returnType
 >["messages"][number];
 
+const initialSuggestions = [
+  {
+    title: "Help with Torts",
+    description: "Get help understanding tort law concepts and cases",
+    prompt: "Help me with torts",
+  },
+  {
+    title: "Criminal Law Basics",
+    description: "Learn about criminal law principles and defenses",
+    prompt: "Explain the basics of criminal law",
+  },
+  {
+    title: "Contract Review",
+    description: "Understand contract terms and obligations",
+    prompt: "Help me review a contract",
+  },
+  {
+    title: "Legal Research",
+    description: "Find relevant cases and statutes for your issue",
+    prompt: "I need help with legal research",
+  },
+];
+
 export const MessageList = memo(function MessageList({
   messages,
   threadId,
+  onSendFirstMessage,
 }: {
   messages: Message[] | undefined;
   threadId: Id<"threads"> | undefined;
+  onSendFirstMessage?: (content: string) => void;
 }) {
+  const user = useQuery(api.users.current);
+
   if (!messages || messages.length === 0) {
-    return <div className="flex-1 flex flex-col min-h-0 pt-12" />;
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <div
+          className={
+            onSendFirstMessage
+              ? "flex-1 flex items-center justify-center mb-16"
+              : "hidden"
+          }
+        >
+          <div className="max-w-2xl w-full px-6">
+            <h2 className="text-2xl font-semibold text-center mb-8">
+              What can I help you with, {user?.name}?
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {initialSuggestions.map((suggestion, index) => (
+                <Button
+                  variant="outline"
+                  key={index}
+                  onClick={() => onSendFirstMessage?.(suggestion.prompt)}
+                  className="block group h-auto p-4 whitespace-normal font-normal"
+                >
+                  <h3 className="font-medium mb-1">{suggestion.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {suggestion.description}
+                  </p>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 pt-12">
+    <div className="flex-1 flex flex-col min-h-0">
       <AIConversation className="bg-primary-foreground">
         <AIConversationContent>
           <div className="max-w-3xl mx-auto">
@@ -58,7 +118,8 @@ function MessageItem({
 }) {
   const messageId = message._id;
 
-  const retryMessage = useAction(api.messages.retryMessage);
+  const retryMessage = useMutation(api.messages.retryMessage);
+  const editMessage = useMutation(api.messages.editMessage);
 
   const { streamedContent } = useMessageStream(
     messageId,
@@ -66,14 +127,14 @@ function MessageItem({
     message.isStreaming
   );
 
-  const isAi = message.type === "ai_response";
-
   const displayContent =
     message.isStreaming && streamedContent ? streamedContent : message.content;
-
+  const isAi = message.role === "ai";
   const isEmpty = !displayContent || displayContent.trim() === "";
 
   const [isCopied, setIsCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(displayContent);
 
   const handleRetry = async () => {
     try {
@@ -83,12 +144,17 @@ function MessageItem({
     }
   };
 
-  const extractEmailCodeBlocks = (content: string): string => {
-    const emailCodeBlockRegex = /```email\n([\s\S]*?)\n```/g;
-    const matches = [...content.matchAll(emailCodeBlockRegex)];
-    if (!matches.length) return "";
-
-    return matches.map((match) => match[1]).join("\n\n");
+  const handleEdit = async () => {
+    try {
+      await editMessage({
+        threadId: message.threadId,
+        messageId,
+        content: editedContent,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to edit message:", error);
+    }
   };
 
   const copyToClipboard = () => {
@@ -96,12 +162,7 @@ function MessageItem({
       return;
     }
 
-    let textToCopy = displayContent;
-
-    if (isAi && displayContent) {
-      const emailBlocks = extractEmailCodeBlocks(displayContent);
-      textToCopy = emailBlocks || displayContent;
-    }
+    const textToCopy = displayContent;
 
     if (!textToCopy) {
       console.error("No content to copy");
@@ -122,12 +183,24 @@ function MessageItem({
         }),
       ])
       .then(() => {
-        toast.success(
-          isAi ? "Email copied to clipboard " : "Message copied to clipboard"
-        );
+        toast.success("Message copied to clipboard");
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
       });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.shiftKey && e.key === "Enter") {
+      e.preventDefault();
+      setEditedContent((prev) => prev + "\n");
+      return;
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      handleEdit();
+    } else if (e.key === "Escape") {
+      setIsEditing(false);
+      setEditedContent(displayContent);
+    }
   };
 
   return (
@@ -138,8 +211,22 @@ function MessageItem({
         <AIResponse>{displayContent}</AIResponse>
       ) : (
         <AIMessageContent>
-          {displayContent}
-          <AttachmentList attachments={message.attachments} />
+          {isEditing ? (
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className={cn(
+                "w-96 md:text-base",
+                "focus-visible:border-transparent focus-visible:ring-0 !bg-transparent"
+              )}
+            />
+          ) : (
+            <>
+              {displayContent}
+              <AttachmentList attachments={message.attachments} />
+            </>
+          )}
         </AIMessageContent>
       )}
       <div
@@ -148,18 +235,29 @@ function MessageItem({
           isAi ? "mt-2" : ""
         )}
       >
+        {isAi ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            tooltip="Retry message"
+            onClick={handleRetry}
+          >
+            <RotateCw className="size-4" />
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            variant="ghost"
+            tooltip="Edit message"
+            onClick={() => setIsEditing(true)}
+          >
+            <Edit className="size-4" />
+          </Button>
+        )}
         <Button
           size="icon"
           variant="ghost"
-          tooltip="Retry message"
-          onClick={handleRetry}
-        >
-          <RotateCw className="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          tooltip={isAi ? "Copy email" : "Copy message"}
+          tooltip="Copy message"
           onClick={copyToClipboard}
         >
           {isCopied ? (

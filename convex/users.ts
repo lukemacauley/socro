@@ -1,31 +1,54 @@
 import { internalMutation, internalQuery } from "./_generated/server";
-import { type UserJSON } from "@clerk/backend";
 import { v, type Validator } from "convex/values";
 import { internal } from "./_generated/api";
+import { paginationOptsValidator } from "convex/server";
+import type {
+  UserCreatedEvent,
+  UserUpdatedEvent,
+  OrganizationMembershipCreated,
+  OrganizationMembershipUpdated,
+} from "@workos-inc/node";
+import { authedQuery } from "./lib/utils";
 
-export const getByClerkId = internalQuery({
-  args: { clerkId: v.string() },
+function camelToSnakeCase(str: string) {
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+type UserWebhookEvent = (UserCreatedEvent | UserUpdatedEvent)["data"];
+type UserMembershipWebhookEvent = (
+  | OrganizationMembershipCreated
+  | OrganizationMembershipUpdated
+)["data"];
+
+export const getByWorkOSId = internalQuery({
+  args: { workOSId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_workos_id", (q) => q.eq("workOSId", args.workOSId))
       .first();
   },
 });
 
-export const upsertFromClerk = internalMutation({
-  args: { data: v.any() as Validator<UserJSON> }, // no runtime validation, trust Clerk
+export const current = authedQuery({
+  handler: async (ctx) => {
+    return ctx.user;
+  },
+});
+
+export const upsertFromWorkOS = internalMutation({
+  args: { data: v.any() as Validator<UserWebhookEvent> }, // no runtime validation, trust WorkOS
   async handler(ctx, { data }) {
     const userAttributes = {
-      name: `${data.first_name} ${data.last_name}`.trim(),
-      email: data.email_addresses[0].email_address,
-      imageUrl: data.image_url,
-      clerkId: data.id,
-      createdAt: Date.now(),
+      name: `${data.firstName} ${data.lastName}`.trim(),
+      email: data.email,
+      imageUrl: data.profilePictureUrl ? data.profilePictureUrl : undefined,
+      workOSId: data.id,
+      lastActivityAt: Date.now(),
     };
 
-    const user = await ctx.runQuery(internal.users.getByClerkId, {
-      clerkId: data.id,
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: data.id,
     });
 
     if (user === null) {
@@ -36,41 +59,135 @@ export const upsertFromClerk = internalMutation({
   },
 });
 
-export const deleteFromClerk = internalMutation({
-  args: { clerkUserId: v.string() },
-  handler: async (ctx, { clerkUserId }) => {
-    const user = await ctx.runQuery(internal.users.getByClerkId, {
-      clerkId: clerkUserId,
+export const deleteFromWorkOS = internalMutation({
+  args: { workOSId: v.string() },
+  async handler(ctx, args) {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: args.workOSId,
     });
 
     if (user !== null) {
       await ctx.db.delete(user._id);
     } else {
       console.warn(
-        `Can't delete user, there is none for Clerk user ID: ${clerkUserId}`
+        `Can't delete user, there is none for WorkOS user ID: ${args.workOSId}`
       );
     }
   },
 });
 
-export const getBySubscriptionId = internalQuery({
-  args: { subscriptionId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("by_microsoft_subscription_id", (q) =>
-        q.eq("microsoftSubscriptionId", args.subscriptionId)
-      )
-      .unique();
+export const updateOrganisationMembership = internalMutation({
+  args: { data: v.any() as Validator<UserMembershipWebhookEvent> }, // no runtime validation, trust WorkOS
+  async handler(ctx, { data }) {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: data.userId,
+    });
+
+    if (user === null) {
+      console.warn(
+        `Can't update organisation membership, user not found for WorkOS user ID: ${data.userId}`
+      );
+      return;
+    }
+
+    const organisation = await ctx.runQuery(
+      internal.organisations.getByWorkOSId,
+      {
+        workOSId: data.organizationId,
+      }
+    );
+
+    if (organisation === null) {
+      console.warn(
+        `Can't update organisation membership, organisation not found for WorkOS organisation ID: ${data.organizationId}`
+      );
+      return;
+    }
+
+    await ctx.db.patch(user._id, {
+      organisationId: organisation._id,
+    });
   },
 });
 
-export const getAllWithSubscriptions = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("users")
-      .filter((q) => q.neq(q.field("microsoftSubscriptionId"), undefined))
-      .collect();
+export const removeOrganisationMembership = internalMutation({
+  args: { workOSUserId: v.string() },
+  async handler(ctx, args) {
+    const user = await ctx.runQuery(internal.users.getByWorkOSId, {
+      workOSId: args.workOSUserId,
+    });
+
+    if (user === null) {
+      console.warn(
+        `Can't remove organisation membership, user not found for WorkOS user ID: ${args.workOSUserId}`
+      );
+      return;
+    }
+
+    await ctx.db.patch(user._id, {
+      organisationId: undefined,
+    });
+  },
+});
+
+export const getLeaderboard = authedQuery({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    sortBy: v.optional(v.string()),
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+  },
+  handler: async (ctx, args) => {
+    const sortBy = args.sortBy || "totalPoints";
+    const sortOrder = args.sortOrder || "desc";
+
+    // Convert camelCase to snake_case for index name
+    const indexName = `by_${camelToSnakeCase(sortBy)}`;
+
+    let userStatsPage;
+    let sortError = false;
+    try {
+      userStatsPage = await ctx.db
+        .query("userStats")
+        .withIndex(indexName as any)
+        .order(sortOrder)
+        .paginate(args.paginationOpts);
+    } catch {
+      userStatsPage = await ctx.db
+        .query("userStats")
+        .order(sortOrder)
+        .paginate(args.paginationOpts);
+      sortError = true;
+    }
+
+    const leaderboard = await Promise.all(
+      userStatsPage.page.map(async (stats) => {
+        const user = await ctx.db.get(stats.userId);
+        if (!user) {
+          console.error(`User not found for ID: ${stats.userId}`);
+          return;
+        }
+        return {
+          ...stats,
+          ...user,
+          _id: user._id,
+        };
+      })
+    );
+
+    let sortedLeaderboard = leaderboard;
+
+    if (sortError) {
+      sortedLeaderboard = leaderboard.sort((a, b) => {
+        const aValue = (a as any)[sortBy] || 0;
+        const bValue = (b as any)[sortBy] || 0;
+        return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
+      });
+    }
+
+    return {
+      page: sortedLeaderboard,
+      isDone: userStatsPage.isDone,
+      continueCursor: userStatsPage.continueCursor,
+    };
   },
 });

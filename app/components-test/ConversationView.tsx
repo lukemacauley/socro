@@ -4,22 +4,26 @@ import { useQuery } from "convex-helpers/react/cache";
 import { api } from "convex/_generated/api";
 
 export function ConversationView({
-  clientThreadId,
+  browserId,
   onSendFirstMessage,
 }: {
-  clientThreadId?: string;
+  browserId?: string;
   onSendFirstMessage?: (content: string, uploadId?: string) => void;
 }) {
   const data = useQuery(
     api.threads.getThreadByClientId,
-    clientThreadId ? { threadId: clientThreadId } : "skip"
+    browserId ? { browserId } : "skip"
   );
 
   return (
-    <div className="flex flex-col h-screen">
-      <MessageList messages={data?.messages} threadId={data?.threadId} />
+    <div className="flex flex-col h-[calc(100vh-72px)]">
+      <MessageList
+        messages={data?.messages}
+        threadId={data?.threadId}
+        onSendFirstMessage={onSendFirstMessage}
+      />
       <MessageInput
-        clientThreadId={clientThreadId}
+        browserId={browserId}
         threadId={data?.threadId}
         onSendFirstMessage={onSendFirstMessage}
       />

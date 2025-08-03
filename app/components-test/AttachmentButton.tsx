@@ -23,11 +23,7 @@ export default function AttachmentButton({
 }) {
   const storageUrl = useQuery(
     api.attachments.getAttachmentUrl,
-    storageId
-      ? {
-          storageId,
-        }
-      : "skip"
+    storageId ? { storageId } : "skip"
   );
 
   const handleOnClick = useCallback(() => {
