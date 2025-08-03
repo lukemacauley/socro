@@ -33,7 +33,7 @@ export default function Layout() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => signOut({ returnTo: "/", navigate: true })}
+                  onClick={() => signOut({ returnTo: "/" })}
                   tooltip="Sign out"
                 >
                   <LogOut />
