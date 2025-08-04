@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { type ModelMessage, streamText } from "ai";
 import { groq } from "@ai-sdk/groq";
-import { anthropic } from "@ai-sdk/anthropic";
+import { anthropic, type AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import { PIAB_SYSTEM_PROMPT_ANTHROPIC } from "../app/lib/constants";
 import type { GenericActionCtx } from "convex/server";
 
@@ -60,13 +60,11 @@ export const streamMessage = httpAction(async (ctx, request) => {
 
       const validMessages = messages.filter((msg) => msg.content?.trim());
 
-      // Get the latest user message
       const latestUserMessage = validMessages
         .filter((msg) => msg.role === "user")
         .pop();
       let enhancedSystemPrompt = PIAB_SYSTEM_PROMPT_ANTHROPIC;
 
-      // Get demo questions for new conversations
       if (latestUserMessage && validMessages.length <= 2) {
         try {
           const { topic, questions } = await ctx.runAction(
@@ -76,7 +74,6 @@ export const streamMessage = httpAction(async (ctx, request) => {
             }
           );
 
-          // Enhance system prompt with ONE deep question
           enhancedSystemPrompt = `${PIAB_SYSTEM_PROMPT_ANTHROPIC}
 
           IMPORTANT: Start your response with this specific deep, challenging question that cuts to the heart of their legal issue:
@@ -98,39 +95,57 @@ export const streamMessage = httpAction(async (ctx, request) => {
       );
 
       let fullContent = "";
+      let fullReasoning = "";
       let chunkIndex = 0;
 
-      const result = streamText({
-        // model: anthropic("claude-opus-4-20250514"),
-        model: groq("moonshotai/kimi-k2-instruct"),
+      const { textStream, fullStream } = streamText({
+        model: anthropic("claude-opus-4-20250514"),
+        // model: groq("moonshotai/kimi-k2-instruct"),
         system: enhancedSystemPrompt,
         messages: formattedMessages,
+        providerOptions: {
+          anthropic: {
+            thinking: { type: "enabled", budgetTokens: 20000 },
+          } satisfies AnthropicProviderOptions,
+        },
       });
 
-      for await (const chunk of result.textStream) {
-        if (chunk) {
-          fullContent += chunk;
+      for await (const event of fullStream) {
+        if (event) {
+          let content = "";
+          let reasoning = "";
 
-          try {
-            await writer.write(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "chunk",
-                  content: chunk,
-                  chunkIndex,
-                  messageId,
-                })}\n\n`
-              )
-            );
-          } catch (writeError) {
-            console.error(
-              `[STREAMING] Error writing chunk ${chunkIndex}:`,
-              writeError
-            );
-            throw writeError;
+          if (event.type === "text-delta") {
+            content = event.text || "";
+            fullContent += content;
+          } else if (event.type === "reasoning-delta") {
+            reasoning = event.text || "";
+            fullReasoning += reasoning;
+          } else {
           }
 
-          chunkIndex++;
+          if (content || reasoning) {
+            try {
+              await writer.write(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "chunk",
+                    content,
+                    reasoning,
+                    chunkIndex,
+                    messageId,
+                  })}\n\n`
+                )
+              );
+              chunkIndex++;
+            } catch (writeError) {
+              console.error(
+                `[STREAMING] Error writing chunk ${chunkIndex}:`,
+                writeError
+              );
+              throw writeError;
+            }
+          }
         }
       }
 
@@ -147,6 +162,7 @@ export const streamMessage = httpAction(async (ctx, request) => {
         messageId,
         finalContent:
           fullContent || "I apologise, but I couldn't generate a response.",
+        reasoning: fullReasoning,
       });
     } catch (error) {
       await writer.write(

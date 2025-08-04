@@ -48,6 +48,7 @@ const applicationTables = {
     ), // Deprecated, use role
     isStreaming: v.optional(v.boolean()),
     streamingComplete: v.optional(v.boolean()),
+    reasoning: v.optional(v.string()),
   })
     .index("by_thread_id", ["threadId"])
     .index("by_user_id", ["userId"]),

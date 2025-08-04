@@ -6,6 +6,7 @@ type StreamData = {
   type: "chunk" | "complete" | "error";
   messageId: string;
   content?: string;
+  reasoning?: string;
   chunkIndex?: number;
   error?: string;
 };
@@ -19,11 +20,13 @@ export function useMessageStream(
   const reconnectDelay = 1000;
 
   const [streamedContent, setStreamedContent] = useState("");
+  const [streamedReasoning, setStreamedReasoning] = useState("");
   const [connectionState, setConnectionState] = useState<
     "idle" | "connecting" | "connected" | "error" | "complete"
   >("idle");
 
   const chunksRef = useRef<Map<number, string>>(new Map());
+  const reasoningChunksRef = useRef<Map<number, string>>(new Map());
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectCountRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -32,6 +35,13 @@ export function useMessageStream(
     const sortedChunks = Array.from(chunksRef.current.entries())
       .sort(([a], [b]) => a - b)
       .map(([_, content]) => content);
+    return sortedChunks.join("");
+  }, []);
+
+  const reconstructReasoning = useCallback(() => {
+    const sortedChunks = Array.from(reasoningChunksRef.current.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([_, reasoning]) => reasoning);
     return sortedChunks.join("");
   }, []);
 
@@ -62,7 +72,9 @@ export function useMessageStream(
 
     // Reset state
     chunksRef.current.clear();
+    reasoningChunksRef.current.clear();
     setStreamedContent("");
+    setStreamedReasoning("");
     setConnectionState("connecting");
 
     const sseUrl = `${convexUrl}/stream?messageId=${messageId}&threadId=${threadId}`;
@@ -90,16 +102,28 @@ export function useMessageStream(
               if (data.chunkIndex === 0) {
                 console.log(`[CLIENT] First chunk received`);
               }
-              if (data.chunkIndex !== undefined && data.content) {
-                chunksRef.current.set(data.chunkIndex, data.content);
-                const content = reconstructContent();
-                setStreamedContent(content);
+              if (data.chunkIndex !== undefined) {
+                if (data.content) {
+                  chunksRef.current.set(data.chunkIndex, data.content);
+                  const content = reconstructContent();
+                  setStreamedContent(content);
+                }
+                if (data.reasoning) {
+                  reasoningChunksRef.current.set(
+                    data.chunkIndex,
+                    data.reasoning
+                  );
+                  const reasoning = reconstructReasoning();
+                  setStreamedReasoning(reasoning);
+                }
               }
               break;
 
             case "complete":
               const finalContent = reconstructContent();
+              const finalReasoning = reconstructReasoning();
               setStreamedContent(finalContent);
+              setStreamedReasoning(finalReasoning);
               setConnectionState("complete");
               cleanup();
               break;
@@ -149,6 +173,7 @@ export function useMessageStream(
     reconnectDelay,
     cleanup,
     reconstructContent,
+    reconstructReasoning,
   ]);
 
   useEffect(() => {
@@ -158,5 +183,6 @@ export function useMessageStream(
 
   return {
     streamedContent,
+    streamedReasoning,
   };
 }

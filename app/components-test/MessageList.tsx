@@ -7,6 +7,11 @@ import {
 } from "~/components/kibo-ui/ai/conversation";
 import { AIMessage, AIMessageContent } from "~/components/kibo-ui/ai/message";
 import { AIResponse } from "~/components/kibo-ui/ai/response";
+import {
+  AIReasoning,
+  AIReasoningTrigger,
+  AIReasoningContent,
+} from "~/components/kibo-ui/ai/reasoning";
 import { AttachmentList } from "./AttachmentList";
 import { Spinner } from "~/components/kibo-ui/spinner";
 import { Button } from "~/components/ui/button";
@@ -121,7 +126,7 @@ function MessageItem({
   const retryMessage = useMutation(api.messages.retryMessage);
   const editMessage = useMutation(api.messages.editMessage);
 
-  const { streamedContent } = useMessageStream(
+  const { streamedContent, streamedReasoning } = useMessageStream(
     messageId,
     threadId || message.threadId,
     message.isStreaming
@@ -129,8 +134,14 @@ function MessageItem({
 
   const displayContent =
     message.isStreaming && streamedContent ? streamedContent : message.content;
+  const displayReasoning =
+    message.isStreaming && streamedReasoning
+      ? streamedReasoning
+      : message.reasoning;
   const isAi = message.role === "ai";
-  const isEmpty = !displayContent || displayContent.trim() === "";
+  const isEmpty =
+    (!displayContent || displayContent.trim() === "") &&
+    (!displayReasoning || displayReasoning.trim() === "");
 
   const [isCopied, setIsCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -208,7 +219,15 @@ function MessageItem({
       {isEmpty ? (
         <Spinner variant="bars" />
       ) : isAi ? (
-        <AIResponse>{displayContent}</AIResponse>
+        <>
+          {displayReasoning && (
+            <AIReasoning className="w-full" isStreaming={message.isStreaming}>
+              <AIReasoningTrigger />
+              <AIReasoningContent>{displayReasoning}</AIReasoningContent>
+            </AIReasoning>
+          )}
+          {displayContent && <AIResponse>{displayContent}</AIResponse>}
+        </>
       ) : (
         <AIMessageContent>
           {isEditing ? (

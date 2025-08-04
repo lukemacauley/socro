@@ -187,12 +187,14 @@ export const completeStreaming = internalMutation({
   args: {
     messageId: v.id("messages"),
     finalContent: v.string(),
+    reasoning: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.messageId, {
       content: args.finalContent,
       isStreaming: false,
       streamingComplete: true,
+      ...(args.reasoning && { reasoning: args.reasoning }),
     });
   },
 });

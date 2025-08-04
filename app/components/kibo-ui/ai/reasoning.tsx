@@ -161,7 +161,9 @@ export const AIReasoningContent = memo(
       className={cn("mt-4 text-muted-foreground text-sm", className)}
       {...props}
     >
-      <AIResponse className="grid gap-2">{children}</AIResponse>
+      <AIResponse className="grid gap-2 text-sm text-muted-foreground">
+        {children}
+      </AIResponse>
     </CollapsibleContent>
   )
 );
