@@ -12,9 +12,9 @@ export function SidebarHeader({
 }) {
   return (
     <SidebarHeaderBase>
-      <div className="w-full my-4 flex items-center justify-center">
+      <div className="w-full my-3 flex items-center justify-center">
         <Link to="/">
-          <img src="/socro-logo.svg" alt="Socro Logo" className="h-8" />
+          <img src="/socro-logo.svg" alt="Socro Logo" className="h-7.5" />
         </Link>
       </div>
       <Button asChild className="w-full" size="sm">
