@@ -14,7 +14,7 @@ export default function Layout() {
     <TooltipProvider>
       <Unauthenticated>
         <div className="fixed top-0 inset-x-0 z-50 w-full">
-          <div className="flex items-center bg-primary-foreground justify-between py-2 max-w-screen-xl w-full mx-auto">
+          <div className="flex items-center bg-primary-foreground justify-between py-4 max-w-screen-xl w-full mx-auto">
             <div className="">
               <Link to="/">
                 <img src="/socro-logo.svg" alt="Socro Logo" className="h-7.5" />
