@@ -12,11 +12,11 @@ export function SidebarHeader({
 }) {
   return (
     <SidebarHeaderBase>
-      <Link to="/">
-        <h1 className="text-3xl w-full tracking-tight font-extrabold font-editorial-old font-editorial-old-ligatures text-center px-2 leading-relaxed text-primary">
-          Socro
-        </h1>
-      </Link>
+      <div className="w-full my-4 flex items-center justify-center">
+        <Link to="/">
+          <img src="/socro-logo.svg" alt="Socro Logo" className="h-8" />
+        </Link>
+      </div>
       <Button asChild className="w-full" size="sm">
         <Link to="/">New Chat</Link>
       </Button>

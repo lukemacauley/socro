@@ -21,6 +21,47 @@ import {
   SidebarRail,
 } from "./components/ui/sidebar";
 
+// Enabling lawyers to be better thinkers
+// "While AI drafts the documents, master the questions that win the case."
+// "Transform legal minds through questions AI can't ask."
+// "Build the judgment AI can't replace."
+// "Question deeper. Lead further."
+// The Partnership Track Focus: "The questions that separate associates from partners."
+// The Craft Angle: "Sharpen the thinking AI can't automate."
+// The Competitive Edge: "Think like the partner AI works for."
+// The Evolution Play: "From legal processor to strategic counselor."
+// The Direct Challenge: "Don't just know the law. Question it."
+// The Wisdom Builder: "Questions that build legal instinct, not just knowledge."
+// The Future-Proof Angle: "Master the art AI can't learn."
+// The Clarity Through Questions: "Cut through complexity with surgical questions."
+// The Leadership Development: "Think in questions. Lead in solutions."
+// The Socratic Power Play: "Weaponize curiosity. Dominate the boardroom."
+// The Transformation Promise: "Turn good lawyers into irreplaceable advisors."
+// The Brutal Truth: "AI writes briefs. Partners write futures."
+
+// "A Socratic questioning app that develops the strategic thinking and judgment that make senior partners irreplaceable. While AI handles legal research and drafting, master the critical analysis, client counseling, and complex problem-solving that define legal leadership. Transform from lawyer to trusted advisor through guided questioning that sharpens instincts AI will never have."
+
+// "Develop the strategic legal thinking AI can't replace. Socratic questioning app that builds the judgment and instincts that make senior partners invaluable."
+
+const title = "Socro — Sharpen the thinking AI can't automate";
+const description =
+  "Develop the strategic legal thinking AI can't replace. Socratic questioning app that builds the judgment and instincts that make senior partners invaluable.";
+
+export const meta: Route.MetaFunction = () => {
+  return [
+    { title },
+    { name: "description", content: description },
+    { name: "author", content: "Socro" },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { property: "og:type", content: "website" },
+    { property: "og:site_name", content: "Socro" },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: title },
+    { name: "twitter:description", content: description },
+  ];
+};
+
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -39,27 +80,18 @@ export const links: Route.LinksFunction = () => [
     type: "font/otf",
     crossOrigin: "anonymous",
   },
-  // {
-  //   rel: "preload",
-  //   href: "/fonts/PPEditorialOld-Regular.otf",
-  //   as: "font",
-  //   type: "font/otf",
-  //   crossOrigin: "anonymous",
-  // },
-  // {
-  //   rel: "preload",
-  //   href: "/fonts/PPMori-Regular.otf",
-  //   as: "font",
-  //   type: "font/otf",
-  //   crossOrigin: "anonymous",
-  // },
-  // {
-  //   rel: "preload",
-  //   href: "/fonts/PPMori-SemiBold.otf",
-  //   as: "font",
-  //   type: "font/otf",
-  //   crossOrigin: "anonymous",
-  // },
+  {
+    rel: "icon",
+    type: "image/png",
+    sizes: "32x32",
+    href: "/favicon.png",
+  },
+  {
+    rel: "icon",
+    type: "image/png",
+    sizes: "16x16",
+    href: "/favicon.png",
+  },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
