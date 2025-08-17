@@ -14,7 +14,7 @@ export default function Layout() {
     <TooltipProvider>
       <Unauthenticated>
         <div className="fixed top-0 inset-x-0 z-50 w-full">
-          <div className="flex items-center bg-primary-foreground justify-between py-4 max-w-screen-xl w-full mx-auto">
+          <div className="flex items-center bg-primary-foreground justify-between py-4 px-4 sm:px-0 max-w-screen-xl w-full mx-auto">
             <div className="">
               <Link to="/">
                 <img src="/socro-logo.svg" alt="Socro Logo" className="h-7.5" />
@@ -30,9 +30,9 @@ export default function Layout() {
             </div>
           </div>
         </div>
-        <div className="max-w-screen-xl mx-auto flex flex-col gap-20 mb-20">
+        <div className="max-w-screen-xl mx-auto flex flex-col px-4 sm:px-0 gap-20 mb-20">
           <div className="pt-88">
-            <h1 className="text-5xl leading-tight">
+            <h1 className="text-3xl md:text-5xl leading-tight">
               Develop the strategic thinking and judgment
               <br />
               that make senior partners irreplaceable.
