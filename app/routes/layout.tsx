@@ -31,11 +31,10 @@ export default function Layout() {
           </div>
         </div>
         <div className="max-w-screen-xl mx-auto flex flex-col px-4 sm:px-0 gap-20 mb-20">
-          <div className="pt-88">
-            <h1 className="text-3xl md:text-5xl leading-tight">
-              Develop the strategic thinking and judgment
-              <br />
-              that make senior partners irreplaceable.
+          <div className="pt-40 sm:pt-88">
+            <h1 className="text-3xl max-w-[930px] text-pretty md:text-5xl leading-tight">
+              Develop the strategic thinking and judgment that make senior
+              partners irreplaceable.
             </h1>
           </div>
           <div className="relative">
@@ -46,11 +45,15 @@ export default function Layout() {
               speed={0.1}
               style={{ width: "100%", height: "800px" }}
             />
-            <img
-              src="/hero.png"
-              alt="Socro Hero"
-              className="w-4/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            />
+            <picture>
+              <source media="(max-width: 768px)" srcSet="/hero-mobile.png" />
+              <source media="(min-width: 769px)" srcSet="/hero.png" />
+              <img
+                src="/hero.png"
+                alt="Socro Hero"
+                className="w-4/5 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
+            </picture>
           </div>
         </div>
       </Unauthenticated>
