@@ -85,10 +85,10 @@ export default function Layout() {
                   {/* Left Content */}
                   <div className="space-y-8">
                     <div className="space-y-6">
-                      <h1 className="text-3xl lg:text-5xl">
+                      <h1 className="text-3xl lg:text-4xl">
                         Built on legal excellence
                       </h1>
-                      <p className="text-lg max-w-md">
+                      <p className="text-lg max-w-md text-muted-foreground">
                         Your associates train on scenarios developed with
                         Halsbury's Law. This isn't generic check-a-box training,
                         it's rigorous UK legal thinking that directly translates
@@ -136,10 +136,10 @@ export default function Layout() {
                   {/* Left Content */}
                   <div className="space-y-8">
                     <div className="space-y-6">
-                      <h1 className="text-3xl lg:text-5xl">
+                      <h1 className="text-3xl lg:text-4xl">
                         Performance that's measurable
                       </h1>
-                      <p className="text-lg max-w-md">
+                      <p className="text-lg max-w-md text-muted-foreground">
                         See exactly how your associates think through problems
                         across five critical dimensions: depth of reasoning,
                         creative approach, perspective analysis, principle
