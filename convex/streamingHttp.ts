@@ -2,8 +2,8 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { type ModelMessage, streamText } from "ai";
-import { groq } from "@ai-sdk/groq";
 import { anthropic, type AnthropicProviderOptions } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { PIAB_SYSTEM_PROMPT_ANTHROPIC } from "../app/lib/constants";
 import type { GenericActionCtx } from "convex/server";
 
@@ -63,7 +63,28 @@ export const streamMessage = httpAction(async (ctx, request) => {
       const latestUserMessage = validMessages
         .filter((msg) => msg.role === "user")
         .pop();
-      let enhancedSystemPrompt = PIAB_SYSTEM_PROMPT_ANTHROPIC;
+
+      const formattedMessages: ModelMessage[] = await Promise.all(
+        validMessages.map(async (msg) => ({
+          role:
+            msg.role === "user" ? ("user" as const) : ("assistant" as const),
+          content: await formatMessageWithAttachments(ctx, msg),
+        }))
+      );
+
+      // Replace the {{LEGAL_ISSUE}} placeholder with the actual user message
+      const lastFormattedContent =
+        formattedMessages[formattedMessages.length - 1]?.content;
+      const userIssue =
+        latestUserMessage?.content ||
+        (typeof lastFormattedContent === "string"
+          ? lastFormattedContent
+          : "") ||
+        "";
+      let enhancedSystemPrompt = PIAB_SYSTEM_PROMPT_ANTHROPIC.replace(
+        "{{LEGAL_ISSUE}}",
+        userIssue
+      );
 
       if (latestUserMessage && validMessages.length <= 2) {
         try {
@@ -74,7 +95,7 @@ export const streamMessage = httpAction(async (ctx, request) => {
             }
           );
 
-          enhancedSystemPrompt = `${PIAB_SYSTEM_PROMPT_ANTHROPIC}
+          enhancedSystemPrompt = `${enhancedSystemPrompt}
 
           IMPORTANT: Start your response with this specific deep, challenging question that cuts to the heart of their legal issue:
 
@@ -86,32 +107,27 @@ export const streamMessage = httpAction(async (ctx, request) => {
         }
       }
 
-      const formattedMessages: ModelMessage[] = await Promise.all(
-        validMessages.map(async (msg) => ({
-          role:
-            msg.role === "user" ? ("user" as const) : ("assistant" as const),
-          content: await formatMessageWithAttachments(ctx, msg),
-        }))
-      );
-
       let fullContent = "";
       let fullReasoning = "";
       let chunkIndex = 0;
 
-      const { textStream, fullStream } = streamText({
-        model: anthropic("claude-opus-4-20250514"),
+      const { fullStream } = streamText({
+        // model: anthropic("claude-opus-4-20250514"),
+        // model: google("gemini-2.0-flash"),
         // model: groq("moonshotai/kimi-k2-instruct"),
+        model: openai("gpt-5-2025-08-07"),
         system: enhancedSystemPrompt,
         messages: formattedMessages,
-        providerOptions: {
-          anthropic: {
-            thinking: { type: "enabled", budgetTokens: 20000 },
-          } satisfies AnthropicProviderOptions,
-        },
+        // providerOptions: {
+        //   anthropic: {
+        //     thinking: { type: "enabled", budgetTokens: 20000 },
+        //   } satisfies AnthropicProviderOptions,
+        // },
       });
 
       for await (const event of fullStream) {
         if (event) {
+          console.log({ event });
           let content = "";
           let reasoning = "";
 

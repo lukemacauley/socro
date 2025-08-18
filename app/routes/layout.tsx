@@ -32,7 +32,7 @@ export default function Layout() {
                 Sign In
               </Button>
               <Button asChild>
-                <Link to="mailto:info@socro.ai">Book a Demo</Link>
+                <Link to="mailto:contact@socro.ai">Book a Demo</Link>
               </Button>
             </div>
           </div>
@@ -78,11 +78,10 @@ export default function Layout() {
             </p>
           </div>
 
-          <div className="bg-card rounded-xl border border-border">
+          {/* <div className="bg-card rounded-xl border border-border">
             <main className="px-6 lg:px-12">
               <div className="max-w-7xl mx-auto">
                 <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center py-12 lg:py-20">
-                  {/* Left Content */}
                   <div className="space-y-8">
                     <div className="space-y-6">
                       <h1 className="text-3xl lg:text-4xl">
@@ -98,7 +97,6 @@ export default function Layout() {
                   </div>
                 </div>
 
-                {/* Features Section */}
                 <div className="grid md:grid-cols-3 gap-12 py-12 lg:py-20 border-t border-border">
                   <div className="space-y-4">
                     <h3 className="font-medium">
@@ -128,12 +126,11 @@ export default function Layout() {
                 </div>
               </div>
             </main>
-          </div>
-          <div className="bg-card rounded-xl border border-border">
+          </div> 
+           <div className="bg-card rounded-xl border border-border">
             <main className="px-6 lg:px-12">
               <div className="max-w-7xl mx-auto">
                 <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center py-12 lg:py-20">
-                  {/* Left Content */}
                   <div className="space-y-8">
                     <div className="space-y-6">
                       <h1 className="text-3xl lg:text-4xl">
@@ -151,7 +148,6 @@ export default function Layout() {
                   </div>
                 </div>
 
-                {/* Features Section */}
                 <div className="grid md:grid-cols-3 gap-12 py-12 lg:py-20 border-t border-border">
                   <div className="space-y-4">
                     <h3 className="font-medium">
@@ -182,6 +178,7 @@ export default function Layout() {
               </div>
             </main>
           </div>
+          */}
           <div className="relative">
             <MeshGradient
               colors={["#535146", "#83827d", "#28261b"]}
