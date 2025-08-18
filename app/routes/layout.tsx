@@ -37,7 +37,7 @@ export default function Layout() {
             </div>
           </div>
         </div>
-        <div className="max-w-screen-xl mx-auto flex flex-col px-4 sm:px-0 gap-20 mb-20">
+        <div className="max-w-screen-xl mx-auto flex flex-col px-4 sm:px-0 gap-12 md:gap-20 mb-20">
           <div className="pt-40 sm:pt-88">
             <h1 className="text-3xl max-w-5xl text-pretty md:text-5xl leading-tight">
               Develop the strategic thinking and judgment that make senior
@@ -99,7 +99,7 @@ export default function Layout() {
                 </div>
 
                 {/* Features Section */}
-                <div className="grid md:grid-cols-3 gap-12 py-16 lg:py-24 border-t border-border">
+                <div className="grid md:grid-cols-3 gap-12 py-12 lg:py-20 border-t border-border">
                   <div className="space-y-4">
                     <h3 className="font-medium">
                       Scenarios from your practice areas
@@ -152,7 +152,7 @@ export default function Layout() {
                 </div>
 
                 {/* Features Section */}
-                <div className="grid md:grid-cols-3 gap-12 py-16 lg:py-24 border-t border-border">
+                <div className="grid md:grid-cols-3 gap-12 py-12 lg:py-20 border-t border-border">
                   <div className="space-y-4">
                     <h3 className="font-medium">
                       Identify your future partners early
@@ -190,21 +190,21 @@ export default function Layout() {
               speed={0.1}
               style={{ width: "100%", height: "500px" }}
             />
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center p-4">
               <div className="max-w-3xl w-full">
-                <h3 className="text-3xl text-center text-white">
+                <h3 className="text-xl md:text-3xl text-center text-pretty text-white">
                   Let’s connect you with a Socro expert.
                   <br />
                   See the full power of Socro in 30 minutes.
                 </h3>
-                <div className="flex items-center gap-2 mt-10">
+                <div className="flex flex-col md:flex-row items-center gap-2 mt-10">
                   <Input
-                    className="!bg-primary-foreground h-16 !text-2xl"
+                    className="!bg-primary-foreground h-12 sm:h-16 text-xl sm:!text-2xl"
                     placeholder="Enter your email"
                   />
                   <Button
                     size="lg"
-                    className="h-16 text-2xl"
+                    className="h-12 sm:h-16 w-full sm:w-auto text-xl sm:text-2xl"
                     variant="secondary"
                   >
                     Book a demo
