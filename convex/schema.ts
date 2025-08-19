@@ -93,6 +93,21 @@ const applicationTables = {
     // For user lookups
     .index("by_org_id", ["orgId"])
     .index("by_user_id", ["userId"]),
+  demoRequests: defineTable({
+    email: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    company: v.optional(v.string()),
+    jobTitle: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("contacted"),
+        v.literal("completed")
+      )
+    ),
+  }).index("by_email", ["email"]),
 };
 
 export default defineSchema({

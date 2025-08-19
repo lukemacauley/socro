@@ -11,6 +11,7 @@ export default [
     route("threads", "routes/threads/all.tsx"),
     route("threads/:id", "routes/threads/detail.tsx"),
     route("leaderboard", "routes/leaderboard.tsx"),
+    route("demo", "routes/demo.tsx"),
     route("history", "routes/history.tsx"),
   ]),
 ] satisfies RouteConfig;

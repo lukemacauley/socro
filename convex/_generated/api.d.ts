@@ -10,6 +10,7 @@
 
 import type * as attachments from "../attachments.js";
 import type * as demo from "../demo.js";
+import type * as demoRequests from "../demoRequests.js";
 import type * as http from "../http.js";
 import type * as lib_utils from "../lib/utils.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -39,6 +40,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   attachments: typeof attachments;
   demo: typeof demo;
+  demoRequests: typeof demoRequests;
   http: typeof http;
   "lib/utils": typeof lib_utils;
   "lib/validators": typeof lib_validators;
