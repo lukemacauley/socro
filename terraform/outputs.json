@@ -1,0 +1,27 @@
+{
+  "application_insights_connection_string": {
+    "sensitive": true,
+    "type": "string",
+    "value": "InstrumentationKey=b2a028d0-5993-4fa0-bea9-ac823ea2bccc;IngestionEndpoint=https://eastus2-3.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus2.livediagnostics.monitor.azure.com/;ApplicationId=e75a2906-4eea-4b56-8d57-4179bff0ee97"
+  },
+  "application_insights_key": {
+    "sensitive": true,
+    "type": "string",
+    "value": "b2a028d0-5993-4fa0-bea9-ac823ea2bccc"
+  },
+  "resource_group_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "rg-legalai-dev-react"
+  },
+  "static_web_app_deployment_token": {
+    "sensitive": true,
+    "type": "string",
+    "value": "a47cd3b7ef87f8622d06c75d933f1bbaec5b0a5e7d252f87661240a33e0a945201-8f689732-476b-4f3f-ac9b-20473a3d78a400f19250f470780f"
+  },
+  "static_web_app_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://gentle-water-0f470780f.1.azurestaticapps.net"
+  }
+}

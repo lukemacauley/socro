@@ -1,0 +1,161 @@
+{
+  "buildManifest": {
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "root.tsx",
+        "path": ""
+      },
+      "routes/layout": {
+        "id": "routes/layout",
+        "parentId": "root",
+        "file": "routes/layout.tsx"
+      },
+      "routes/new": {
+        "id": "routes/new",
+        "parentId": "routes/layout",
+        "file": "routes/new.tsx",
+        "index": true
+      },
+      "routes/threads/all": {
+        "id": "routes/threads/all",
+        "parentId": "routes/layout",
+        "file": "routes/threads/all.tsx",
+        "path": "threads"
+      },
+      "routes/threads/detail": {
+        "id": "routes/threads/detail",
+        "parentId": "routes/layout",
+        "file": "routes/threads/detail.tsx",
+        "path": "threads/:id"
+      },
+      "routes/leaderboard": {
+        "id": "routes/leaderboard",
+        "parentId": "routes/layout",
+        "file": "routes/leaderboard.tsx",
+        "path": "leaderboard"
+      },
+      "routes/demo": {
+        "id": "routes/demo",
+        "parentId": "routes/layout",
+        "file": "routes/demo.tsx",
+        "path": "demo"
+      },
+      "routes/history": {
+        "id": "routes/history",
+        "parentId": "routes/layout",
+        "file": "routes/history.tsx",
+        "path": "history"
+      }
+    }
+  },
+  "reactRouterConfig": {
+    "appDirectory": "/Users/lukemacauley/c/socro/app",
+    "basename": "/",
+    "buildDirectory": "/Users/lukemacauley/c/socro/build",
+    "future": {
+      "unstable_middleware": false,
+      "unstable_optimizeDeps": false,
+      "unstable_splitRouteModules": false,
+      "unstable_subResourceIntegrity": false,
+      "unstable_viteEnvironmentApi": false
+    },
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "root.tsx",
+        "path": ""
+      },
+      "routes/layout": {
+        "id": "routes/layout",
+        "parentId": "root",
+        "file": "routes/layout.tsx"
+      },
+      "routes/new": {
+        "id": "routes/new",
+        "parentId": "routes/layout",
+        "file": "routes/new.tsx",
+        "index": true
+      },
+      "routes/threads/all": {
+        "id": "routes/threads/all",
+        "parentId": "routes/layout",
+        "file": "routes/threads/all.tsx",
+        "path": "threads"
+      },
+      "routes/threads/detail": {
+        "id": "routes/threads/detail",
+        "parentId": "routes/layout",
+        "file": "routes/threads/detail.tsx",
+        "path": "threads/:id"
+      },
+      "routes/leaderboard": {
+        "id": "routes/leaderboard",
+        "parentId": "routes/layout",
+        "file": "routes/leaderboard.tsx",
+        "path": "leaderboard"
+      },
+      "routes/demo": {
+        "id": "routes/demo",
+        "parentId": "routes/layout",
+        "file": "routes/demo.tsx",
+        "path": "demo"
+      },
+      "routes/history": {
+        "id": "routes/history",
+        "parentId": "routes/layout",
+        "file": "routes/history.tsx",
+        "path": "history"
+      }
+    },
+    "routeDiscovery": {
+      "mode": "initial"
+    },
+    "serverBuildFile": "index.js",
+    "serverModuleFormat": "esm",
+    "ssr": false,
+    "unstable_routeConfig": [
+      {
+        "id": "root",
+        "path": "",
+        "file": "root.tsx",
+        "children": [
+          {
+            "file": "routes/layout.tsx",
+            "children": [
+              {
+                "file": "routes/new.tsx",
+                "index": true
+              },
+              {
+                "file": "routes/threads/all.tsx",
+                "path": "threads"
+              },
+              {
+                "file": "routes/threads/detail.tsx",
+                "path": "threads/:id"
+              },
+              {
+                "file": "routes/leaderboard.tsx",
+                "path": "leaderboard"
+              },
+              {
+                "file": "routes/demo.tsx",
+                "path": "demo"
+              },
+              {
+                "file": "routes/history.tsx",
+                "path": "history"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "viteConfig": {
+    "build": {
+      "assetsDir": "assets"
+    }
+  }
+}
