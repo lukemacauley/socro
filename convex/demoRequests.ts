@@ -6,32 +6,31 @@ export const submitDemoRequest = mutation({
     email: v.string(),
   },
   handler: async (ctx, args) => {
-    // Email validation regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(args.email)) {
-      throw new Error("Invalid email address");
+      return {
+        success: false,
+        message: "Invalid email address",
+        exists: false,
+      };
     }
 
-    // Check if email already exists
     const existingRequest = await ctx.db
       .query("demoRequests")
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
 
     if (existingRequest) {
-      return {
-        success: true,
-        message: "Demo request already submitted",
-        exists: true,
-      };
+      await ctx.db.patch(existingRequest._id, {
+        status: "pending",
+      });
+    } else {
+      await ctx.db.insert("demoRequests", {
+        email: args.email,
+        status: "pending",
+      });
     }
-
-    // Insert new demo request
-    await ctx.db.insert("demoRequests", {
-      email: args.email,
-      status: "pending",
-    });
 
     return {
       success: true,

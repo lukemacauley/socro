@@ -2,15 +2,13 @@ import { MeshGradient } from "@paper-design/shaders-react";
 import { api } from "convex/_generated/api";
 import { useMutation } from "convex/react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 
 export default function EmailSignup() {
-  const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
+  const [responseMessage, setResponseMessage] = useState("");
   const submitDemoRequest = useMutation(api.demoRequests.submitDemoRequest);
 
   const handleDemoSubmit = async () => {
@@ -21,10 +19,9 @@ export default function EmailSignup() {
 
     try {
       const result = await submitDemoRequest({ email });
+      setResponseMessage(result.message);
       if (result.success) {
-        // Redirect to demo request page with email as query param
-        // navigate(`/demo?email=${encodeURIComponent(email)}`);
-        toast.success("Thank you! We'll be in touch soon.");
+        setEmail("");
       }
     } catch (error) {
       toast.error(
@@ -32,6 +29,12 @@ export default function EmailSignup() {
       );
     }
   };
+
+  if (responseMessage) {
+    setTimeout(() => {
+      setResponseMessage("");
+    }, 5000);
+  }
 
   return (
     <div className="relative">
@@ -70,6 +73,11 @@ export default function EmailSignup() {
               Book a demo
             </Button>
           </div>
+          {responseMessage && (
+            <div className="mt-2 text-left text-primary-foreground">
+              {responseMessage}
+            </div>
+          )}
         </div>
       </div>
     </div>
