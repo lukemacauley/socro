@@ -63,23 +63,16 @@ export const meta: Route.MetaFunction = () => {
 };
 
 export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wdth,wght@12..36,75..150,300..900&display=swap",
-  },
-  {
-    rel: "preload",
-    href: "/fonts/PPEditorialOld-Ultrabold.otf",
-    as: "font",
-    type: "font/otf",
-    crossOrigin: "anonymous",
-  },
+  // { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  // {
+  //   rel: "preconnect",
+  //   href: "https://fonts.gstatic.com",
+  //   crossOrigin: "anonymous",
+  // },
+  // {
+  //   rel: "stylesheet",
+  //   href: "https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wdth,wght@12..36,75..150,300..900&display=swap",
+  // },
   {
     rel: "icon",
     type: "image/png",
