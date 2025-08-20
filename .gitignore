@@ -11,3 +11,10 @@
 microsoft-driver.ts
 
 security.md
+
+# Terraform - only ignore the large provider files, not the lock file
+/terraform/.terraform/
+/terraform/*.tfstate
+/terraform/*.tfstate.backup
+/terraform/*.tfplan
+/terraform/*.tfvars.json
