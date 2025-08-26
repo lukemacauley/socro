@@ -73,16 +73,16 @@ export default function Page() {
             </picture>
           </div>
           <div className="max-w-5xl mx-auto flex flex-col gap-10 py-20">
-            <p className="text-3xl text-pretty md:text-5xl leading-tight">
+            <p className="text-3xl text-pretty md:text-4xl leading-tight">
               Socro develops the analytical skills your associates need through
               real-world scenarios and guided questioning.
             </p>
-            <p className="text-3xl text-pretty md:text-5xl leading-tight">
-              While AI automates the predictable, your lawyers learn to navigate
-              the complex, ambiguous problems that make or break client
+            <p className="text-3xl text-pretty md:text-4xl leading-tight">
+              With AI automating predictable work, your lawyers learn to
+              navigate the complex, ambiguous problems that make or break client
               relationships.
             </p>
-            <p className="text-3xl text-pretty md:text-5xl leading-tight">
+            <p className="text-3xl text-pretty md:text-4xl leading-tight">
               Better thinkers become better partners. And better partners build
               better firms.
             </p>
